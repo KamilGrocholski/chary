@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Margostat</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --border: #243244;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #0b1220;
+      color: var(--text);
+    }
+    button {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      background: var(--accent);
+      color: #00111f;
+      font-weight: 700;
+    }
+    button:hover { filter: brightness(1.1); }
+
+    .toolbar {
+      margin-bottom: 20px;
+    }
+    .toolbar-row1 {
+      display: grid;
+      grid-template-columns: 200px 180px 1fr auto;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 12px;
+    }
+    .toolbar-row2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+    .prof-filter {
+      grid-column: span 2;
+    }
+    .prof-checkboxes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      padding: 6px 0;
+    }
+    .prof-checkboxes label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      color: var(--text);
+      margin: 0;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .prof-checkboxes input[type=checkbox] {
+      width: auto;
+      padding: 0;
+      accent-color: var(--accent);
+    }
+
+    .stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin: 0 0 20px;
+      color: var(--muted);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+    .chartBox { height: 420px; }
+    canvas { width: 100% !important; height: 100% !important; }
+    .error {
+      color: #fca5a5;
+      white-space: pre-wrap;
+      margin-bottom: 12px;
+    }
+    #fileInfo {
+      padding: 10px 0;
+      color: var(--muted);
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card toolbar">
+      <div class="toolbar-row1">
+        <div>
+          <label for="worldSelect">Świat</label>
+          <select id="worldSelect"></select>
+        </div>
+        <div>
+          <label for="snapshotSelect">Data</label>
+          <select id="snapshotSelect"></select>
+        </div>
+        <div>
+          <label>Plik</label>
+          <div style="display:flex;align-items:center;gap:6px;width:fit-content">
+            <div id="fileInfo">—</div>
+            <button id="copyBtn" title="Kopiuj link" style="width:auto;padding:4px 8px;font-size:13px;background:#1e293b;color:var(--accent);border:1px solid var(--border);flex-shrink:0">⎘</button>
+          </div>
+        </div>
+        <div style="min-width:100px">
+          <label>&nbsp;</label>
+          <button id="applyBtn">Filtruj</button>
+        </div>
+      </div>
+
+      <div class="toolbar-row2">
+        <div>
+          <label for="minLevel">Min level</label>
+          <input id="minLevel" type="number" placeholder="np. 1" min="1" />
+        </div>
+        <div>
+          <label for="maxLevel">Max level</label>
+          <input id="maxLevel" type="number" placeholder="np. 400" min="1" />
+        </div>
+        <div>
+          <label for="minHonor">Min honor</label>
+          <input id="minHonor" type="number" placeholder="np. 0" min="0" />
+        </div>
+        <div>
+          <label for="maxHonor">Max honor</label>
+          <input id="maxHonor" type="number" placeholder="np. 99999" min="0" />
+        </div>
+        <div style="grid-column: span 2">
+          <label>Ostatnio online</label>
+          <div style="display:flex;gap:6px">
+            <input id="onlineValue" type="number" value="1" min="0" step="1" style="flex:1;min-width:0" />
+            <span style="padding:10px 4px;color:var(--muted);font-size:13px">dni</span>
+            <select id="onlinePreset" style="width:auto">
+              <option value="">preset</option>
+              <option value="1" selected>&lt; 24h</option>
+              <option value="2">2 dni</option>
+              <option value="3">3 dni</option>
+              <option value="7">7 dni</option>
+              <option value="14">14 dni</option>
+              <option value="30">30 dni</option>
+              <option value="">Wszyscy</option>
+            </select>
+          </div>
+        </div>
+        <div style="grid-column: 1 / -1">
+          <label>Profesja</label>
+          <div class="prof-checkboxes" id="profCheckboxes"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats card" id="stats">Ładowanie…</div>
+    <div id="error" class="error"></div>
+
+    <div class="card chartBox">
+      <canvas id="professionChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const PROF = {
+      1: "Wojownik",
+      2: "Mag",
+      3: "Paladyn",
+      4: "Tropiciel",
+      5: "Tancerz ostrzy",
+      6: "Łowca",
+    };
+
+    const PROF_COLORS = {
+      1: "#60a5fa",
+      2: "#f472b6",
+      3: "#34d399",
+      4: "#f59e0b",
+      5: "#a78bfa",
+      6: "#f87171",
+    };
+
+    const el = (id) => {
+      const node = document.getElementById(id);
+      if (!node) throw new Error(`Brak elementu #${id}`);
+      return node;
+    };
+
+    let manifest = null;
+    let rawData = [];
+    let professionChart = null;
+
+    (function buildProfCheckboxes() {
+      const container = el("profCheckboxes");
+      Object.entries(PROF).forEach(([id, name]) => {
+        const color = PROF_COLORS[id];
+        const lbl = document.createElement("label");
+        lbl.style.color = color;
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.value = id;
+        cb.checked = true;
+        cb.style.accentColor = color;
+        lbl.appendChild(cb);
+        lbl.appendChild(document.createTextNode(name));
+        container.appendChild(lbl);
+      });
+    })();
+
+
+    function isRow(row) {
+      return Array.isArray(row) && row.length >= 7;
+    }
+
+    function getLevel(row) {
+      return isRow(row) ? Number(row[2]) || 0 : Number(row.level) || 0;
+    }
+
+    function getProfession(row) {
+      return isRow(row) ? Number(row[3]) || 0 : Number(row.profession) || 0;
+    }
+
+    function getHonor(row) {
+      return isRow(row) ? Number(row[4]) || 0 : Number(row.honor) || 0;
+    }
+
+    function getLastOnline(row) {
+      return isRow(row) ? row[6] : row.lastOnline;
+    }
+
+    function getWorlds() {
+      return manifest?.worlds || [];
+    }
+
+    function getCurrentWorld() {
+      return el("worldSelect").value;
+    }
+
+    function getCurrentSnapshotFile() {
+      return el("snapshotSelect").value;
+    }
+
+    function getSelectedProfessions() {
+      const checked = el("profCheckboxes").querySelectorAll("input[type=checkbox]:checked");
+      return new Set([...checked].map(cb => Number(cb.value)));
+    }
+
+    function getMaxOfflineMs() {
+      const val = el("onlineValue").value;
+      if (val === "") return Infinity;
+      const n = Number(val);
+      if (!Number.isFinite(n) || n < 0) return Infinity;
+      return n * 24 * 60 * 60 * 1000;
+    }
+
+    function filterRows(rows) {
+      const minLevel = el("minLevel").value === "" ? -Infinity : Number(el("minLevel").value);
+      const maxLevel = el("maxLevel").value === "" ? Infinity : Number(el("maxLevel").value);
+      const minHonor = el("minHonor").value === "" ? -Infinity : Number(el("minHonor").value);
+      const maxHonor = el("maxHonor").value === "" ? Infinity : Number(el("maxHonor").value);
+      const maxOfflineMs = getMaxOfflineMs();
+      const selectedProfs = new Set(
+        [...el("profCheckboxes").querySelectorAll("input:checked")].map(cb => Number(cb.value))
+      );
+      const now = Date.now();
+
+      return rows.filter((r) => {
+        const level = getLevel(r);
+        if (level < minLevel || level > maxLevel) return false;
+
+        const honor = getHonor(r);
+        if (honor < minHonor || honor > maxHonor) return false;
+
+        if (!selectedProfs.has(getProfession(r))) return false;
+
+        const lastOnline = getLastOnline(r);
+        if (!lastOnline) return false;
+
+        const ts = new Date(lastOnline).getTime();
+        if (Number.isNaN(ts)) return false;
+
+        return (now - ts) <= maxOfflineMs;
+      });
+    }
+
+    function buildProfessionDatasets(rows) {
+      const levelSet = new Set();
+      for (const row of rows) {
+        const lvl = getLevel(row);
+        if (lvl) levelSet.add(lvl);
+      }
+      const labels = [...levelSet].sort((a, b) => a - b);
+
+      const buckets = {};
+      for (const row of rows) {
+        const p = getProfession(row);
+        const lvl = getLevel(row);
+        if (!lvl) continue;
+        if (!buckets[p]) buckets[p] = {};
+        buckets[p][lvl] = (buckets[p][lvl] || 0) + 1;
+      }
+
+      const datasets = Object.entries(PROF).map(([id, name]) => ({
+        label: name,
+        data: labels.map(lvl => buckets[id]?.[lvl] || 0),
+        backgroundColor: PROF_COLORS[id],
+        barPercentage: 1.0,
+        categoryPercentage: 1.0,
+      }));
+
+      return { labels, datasets };
+    }
+
+    function renderCharts(rows) {
+      const filtered = filterRows(rows);
+      const profData = buildProfessionDatasets(filtered);
+
+      if (professionChart) professionChart.destroy();
+
+      professionChart = new Chart(el("professionChart"), {
+        type: "bar",
+        data: profData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: { display: true, text: "Level według profesji" },
+            legend: { display: false },
+            tooltip: {
+              enabled: false,
+              external({ chart, tooltip }) {
+                let el = document.getElementById("profTooltip");
+                if (!el) {
+                  el = document.createElement("div");
+                  el.id = "profTooltip";
+                  el.style.cssText = "position:fixed;pointer-events:none;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px 14px;font-size:13px;color:#e5e7eb;min-width:180px;z-index:999;transition:opacity .1s";
+                  document.body.appendChild(el);
+                }
+                if (tooltip.opacity === 0) { el.style.opacity = 0; return; }
+
+                const dataIndex = tooltip.dataPoints?.[0]?.dataIndex;
+                if (dataIndex == null) { el.style.opacity = 0; return; }
+                const total = chart.data.datasets.reduce((sum, ds) => sum + (ds.data[dataIndex] || 0), 0);
+                const level = chart.data.labels[dataIndex];
+
+                const entries = chart.data.datasets
+                  .map(ds => ({ label: ds.label, color: ds.backgroundColor, val: ds.data[dataIndex] || 0 }))
+                  .filter(e => e.val > 0)
+                  .sort((a, b) => b.val - a.val);
+
+                const rows = entries.map(e => {
+                  const pct = ((e.val / total) * 100).toFixed(1);
+                  return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
+                    <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${e.color};flex-shrink:0"></span>
+                    <span style="flex:1">${e.label}</span>
+                    <span style="color:#94a3b8;margin-left:8px">${e.val}</span>
+                    <span style="color:#38bdf8;min-width:48px;text-align:right">${pct}%</span>
+                  </div>`;
+                }).join("");
+
+                el.innerHTML = `
+                  <div style="font-weight:700;margin-bottom:6px;color:#38bdf8">Level ${level}</div>
+                  ${rows}
+                  <div style="border-top:1px solid #334155;margin-top:6px;padding-top:6px;color:#94a3b8">Razem: <b style="color:#e5e7eb">${total}</b></div>
+                `;
+
+                const pos = chart.canvas.getBoundingClientRect();
+                el.style.opacity = 1;
+
+                let x = pos.left + tooltip.caretX + 12;
+                let y = pos.top + tooltip.caretY - 10;
+
+                // measure after render
+                const tw = el.offsetWidth;
+                const th = el.offsetHeight;
+                if (x + tw > window.innerWidth - 8) x = pos.left + tooltip.caretX - tw - 12;
+                if (y + th > window.innerHeight - 8) y = window.innerHeight - th - 8;
+                if (y < 8) y = 8;
+
+                el.style.left = x + "px";
+                el.style.top = y + "px";
+              },
+            },
+          },
+          scales: {
+            y: { beginAtZero: true, stacked: true, ticks: { precision: 0 } },
+            x: { stacked: true, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 50 } },
+          },
+        },
+      });
+
+      const counts = Object.fromEntries(Object.entries(PROF).map(([id, n]) => [id, { name: n, color: PROF_COLORS[id], count: 0 }]));
+      for (const row of filtered) {
+        const id = getProfession(row);
+        if (counts[id]) counts[id].count++;
+      }
+
+      const sorted = Object.values(counts).sort((a, b) => b.count - a.count);
+      const profBadges = sorted.map(({ name, color, count }) =>
+        `<span style="color:${color};white-space:nowrap">${name}: <b>${count}</b></span>`
+      ).join(" · ");
+
+      el("stats").innerHTML = `
+        <div style="margin-bottom:6px">Razem: <b>${filtered.length}</b></div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px 16px">${profBadges}</div>
+      `;
+    }
+
+    function capitalize(s) {
+      return s ? s[0].toUpperCase() + s.slice(1) : s;
+    }
+
+    function formatTimestamp(ts) {
+      // "2026-04-17T15-24-07" → "17.04.2026 15:24:07"
+      const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})/);
+      if (!m) return ts;
+      return `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}:${m[6]}`;
+    }
+
+    function fillWorldSelect() {
+      const worlds = getWorlds();
+      el("worldSelect").innerHTML = worlds.map(w =>
+        `<option value="${w.name}">${capitalize(w.name)}</option>`
+      ).join("");
+    }
+
+    function fillSnapshotSelect() {
+      const worldName = getCurrentWorld();
+      const world = getWorlds().find(w => w.name === worldName);
+      const files = world?.files || [];
+
+      el("snapshotSelect").innerHTML = files.map(f => {
+        const raw = f.timestamp || (f.file.split("/").pop() || f.file).replace(/\.json$/, "");
+        return `<option value="${f.file}">${formatTimestamp(raw)}</option>`;
+      }).join("");
+
+      el("fileInfo").textContent = files[0]?.file || "—";
+    }
+
+    async function loadSnapshot(file) {
+      if (!file) return;
+      el("fileInfo").textContent = file;
+      el("error").textContent = "";
+
+      const res = await fetch(`/${file}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status} dla ${file}`);
+
+      const json = await res.json();
+      rawData = json.rows ?? json.data ?? json;
+      renderCharts(rawData);
+    }
+
+    async function init() {
+      try {
+        const res = await fetch("/manifest.json");
+        if (!res.ok) throw new Error(`HTTP ${res.status} dla manifest.json`);
+
+        manifest = await res.json();
+        fillWorldSelect();
+        fillSnapshotSelect();
+        await loadSnapshot(getCurrentSnapshotFile());
+      } catch (e) {
+        el("error").textContent = String(e?.message || e);
+      }
+    }
+
+    el("worldSelect").addEventListener("change", async () => {
+      fillSnapshotSelect();
+      try {
+        await loadSnapshot(getCurrentSnapshotFile());
+      } catch (e) {
+        el("error").textContent = String(e?.message || e);
+      }
+    });
+
+    el("snapshotSelect").addEventListener("change", async () => {
+      try {
+        await loadSnapshot(getCurrentSnapshotFile());
+      } catch (e) {
+        el("error").textContent = String(e?.message || e);
+      }
+    });
+
+    el("onlinePreset").addEventListener("change", () => {
+      const val = el("onlinePreset").value;
+      el("onlineValue").value = val;
+      rerender();
+    });
+
+    function rerender() { if (rawData.length) renderCharts(rawData); }
+
+    ["minLevel", "maxLevel", "minHonor", "maxHonor", "onlineValue"]
+      .forEach(id => el(id).addEventListener("input", rerender));
+    el("profCheckboxes").addEventListener("change", rerender);
+
+
+    el("copyBtn").addEventListener("click", async () => {
+      const file = getCurrentSnapshotFile();
+      if (!file) return;
+      const url = `${location.origin}/${file}`;
+      await navigator.clipboard.writeText(url);
+      const btn = el("copyBtn");
+      btn.textContent = "✓";
+      setTimeout(() => { btn.textContent = "⎘"; }, 1500);
+    });
+
+    el("applyBtn").addEventListener("click", () => {
+      try {
+        renderCharts(rawData);
+      } catch (e) {
+        el("error").textContent = String(e?.message || e);
+      }
+    });
+
+    window.addEventListener("DOMContentLoaded", () => {
+      init();
+    });
+  </script>
+</body>
+</html>

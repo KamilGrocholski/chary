@@ -1,0 +1,48 @@
+{
+  "worlds": [
+    {
+      "name": "aether",
+      "files": [
+        {
+          "timestamp": "2026-04-16T13-52-28",
+          "file": "worlds/aether/2026-04-16T13-52-28.json"
+        },
+        {
+          "timestamp": "2026-04-17T15-24-07",
+          "file": "worlds/aether/2026-04-17T15-24-07.json"
+        }
+      ]
+    },
+    {
+      "name": "classic",
+      "files": [
+        {
+          "timestamp": "2026-04-17T15-36-35",
+          "file": "worlds/classic/2026-04-17T15-36-35.json"
+        }
+      ]
+    },
+    {
+      "name": "tarhuna",
+      "files": [
+        {
+          "timestamp": "2026-04-17T15-43-21",
+          "file": "worlds/tarhuna/2026-04-17T15-43-21.json"
+        }
+      ]
+    },
+    {
+      "name": "tempest",
+      "files": [
+        {
+          "timestamp": "2026-04-16T13-44-17",
+          "file": "worlds/tempest/2026-04-16T13-44-17.json"
+        },
+        {
+          "timestamp": "2026-04-17T15-32-40",
+          "file": "worlds/tempest/2026-04-17T15-32-40.json"
+        }
+      ]
+    }
+  ]
+}

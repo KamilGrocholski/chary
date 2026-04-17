@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.margonem.pl)",
+      "WebFetch(domain:api.margonem.pl)",
+      "Bash(curl -s \"https://www.margonem.pl\")"
+    ]
+  }
+}
