@@ -4,12 +4,35 @@
       "name": "aether",
       "files": [
         {
-          "timestamp": "2026-04-16T13-52-28",
-          "file": "worlds/aether/2026-04-16T13-52-28.json"
-        },
+          "timestamp": "2026-04-17T16-41-43",
+          "file": "worlds/aether/2026-04-17T16-41-43.json"
+        }
+      ]
+    },
+    {
+      "name": "aldous",
+      "files": [
         {
-          "timestamp": "2026-04-17T15-24-07",
-          "file": "worlds/aether/2026-04-17T15-24-07.json"
+          "timestamp": "2026-04-17T16-50-16",
+          "file": "worlds/aldous/2026-04-17T16-50-16.json"
+        }
+      ]
+    },
+    {
+      "name": "berufs",
+      "files": [
+        {
+          "timestamp": "2026-04-17T16-54-45",
+          "file": "worlds/berufs/2026-04-17T16-54-45.json"
+        }
+      ]
+    },
+    {
+      "name": "brutal",
+      "files": [
+        {
+          "timestamp": "2026-04-17T16-57-44",
+          "file": "worlds/brutal/2026-04-17T16-57-44.json"
         }
       ]
     },
@@ -17,8 +40,98 @@
       "name": "classic",
       "files": [
         {
-          "timestamp": "2026-04-17T15-36-35",
-          "file": "worlds/classic/2026-04-17T15-36-35.json"
+          "timestamp": "2026-04-17T16-59-16",
+          "file": "worlds/classic/2026-04-17T16-59-16.json"
+        }
+      ]
+    },
+    {
+      "name": "fobos",
+      "files": [
+        {
+          "timestamp": "2026-04-17T17-06-04",
+          "file": "worlds/fobos/2026-04-17T17-06-04.json"
+        }
+      ]
+    },
+    {
+      "name": "gefion",
+      "files": [
+        {
+          "timestamp": "2026-04-17T17-11-15",
+          "file": "worlds/gefion/2026-04-17T17-11-15.json"
+        }
+      ]
+    },
+    {
+      "name": "gordion",
+      "files": [
+        {
+          "timestamp": "2026-04-17T17-16-24",
+          "file": "worlds/gordion/2026-04-17T17-16-24.json"
+        }
+      ]
+    },
+    {
+      "name": "hutena",
+      "files": [
+        {
+          "timestamp": "2026-04-17T17-35-24",
+          "file": "worlds/hutena/2026-04-17T17-35-24.json"
+        }
+      ]
+    },
+    {
+      "name": "jaruna",
+      "files": [
+        {
+          "timestamp": "2026-04-17T17-41-10",
+          "file": "worlds/jaruna/2026-04-17T17-41-10.json"
+        }
+      ]
+    },
+    {
+      "name": "katahha",
+      "files": [
+        {
+          "timestamp": "2026-04-17T17-47-36",
+          "file": "worlds/katahha/2026-04-17T17-47-36.json"
+        }
+      ]
+    },
+    {
+      "name": "lelwani",
+      "files": [
+        {
+          "timestamp": "2026-04-17T17-54-07",
+          "file": "worlds/lelwani/2026-04-17T17-54-07.json"
+        }
+      ]
+    },
+    {
+      "name": "majuna",
+      "files": [
+        {
+          "timestamp": "2026-04-17T17-59-35",
+          "file": "worlds/majuna/2026-04-17T17-59-35.json"
+        }
+      ]
+    },
+    {
+      "name": "nomada",
+      "files": [
+        {
+          "timestamp": "2026-04-17T18-06-20",
+          "file": "worlds/nomada/2026-04-17T18-06-20.json"
+        }
+      ]
+    },
+    {
+      "name": "perkun",
+      "files": [
+        {
+          "timestamp": "2026-04-17T18-10-13",
+          "file": "worlds/perkun/2026-04-17T18-10-13.json"
         }
       ]
     },
@@ -26,8 +139,17 @@
       "name": "tarhuna",
       "files": [
         {
-          "timestamp": "2026-04-17T15-43-21",
-          "file": "worlds/tarhuna/2026-04-17T15-43-21.json"
+          "timestamp": "2026-04-17T18-13-00",
+          "file": "worlds/tarhuna/2026-04-17T18-13-00.json"
+        }
+      ]
+    },
+    {
+      "name": "telawel",
+      "files": [
+        {
+          "timestamp": "2026-04-17T18-18-51",
+          "file": "worlds/telawel/2026-04-17T18-18-51.json"
         }
       ]
     },
@@ -35,12 +157,26 @@
       "name": "tempest",
       "files": [
         {
-          "timestamp": "2026-04-16T13-44-17",
-          "file": "worlds/tempest/2026-04-16T13-44-17.json"
-        },
+          "timestamp": "2026-04-17T18-24-39",
+          "file": "worlds/tempest/2026-04-17T18-24-39.json"
+        }
+      ]
+    },
+    {
+      "name": "zemyna",
+      "files": [
         {
-          "timestamp": "2026-04-17T15-32-40",
-          "file": "worlds/tempest/2026-04-17T15-32-40.json"
+          "timestamp": "2026-04-17T18-28-34",
+          "file": "worlds/zemyna/2026-04-17T18-28-34.json"
+        }
+      ]
+    },
+    {
+      "name": "zorza",
+      "files": [
+        {
+          "timestamp": "2026-04-17T18-33-33",
+          "file": "worlds/zorza/2026-04-17T18-33-33.json"
         }
       ]
     }
