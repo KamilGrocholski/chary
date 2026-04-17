@@ -479,7 +479,7 @@
       el("fileInfo").textContent = file;
       el("error").textContent = "";
 
-      const res = await fetch(`/${file}`);
+      const res = await fetch(file);
       if (!res.ok) throw new Error(`HTTP ${res.status} dla ${file}`);
 
       const json = await res.json();
@@ -489,7 +489,7 @@
 
     async function init() {
       try {
-        const res = await fetch("/manifest.json");
+        const res = await fetch("manifest.json");
         if (!res.ok) throw new Error(`HTTP ${res.status} dla manifest.json`);
 
         manifest = await res.json();
@@ -534,7 +534,7 @@
     el("copyBtn").addEventListener("click", async () => {
       const file = getCurrentSnapshotFile();
       if (!file) return;
-      const url = `${location.origin}/${file}`;
+      const url = new URL(file, location.href).href;
       await navigator.clipboard.writeText(url);
       const btn = el("copyBtn");
       btn.textContent = "✓";
