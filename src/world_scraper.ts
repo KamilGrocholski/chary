@@ -267,6 +267,7 @@ async function scrapeWorld(world: string, interval: number) {
   let maxPages = 1;
 
   await log("INFO", `Starting scrape`, { world, interval });
+  process.stdout.write(`\n⟳ ${world} — łączenie...\n`);
 
   while (page <= maxPages) {
     const url = buildUrl(world, page);
@@ -308,6 +309,7 @@ async function scrapeWorld(world: string, interval: number) {
 
     allRows.push(...rows);
     await log("DEBUG", `page ${page}/${maxPages}: ${rows.length} rows`, { world });
+    process.stdout.write(`\r  ${world}: strona ${page}/${maxPages} (${allRows.length} graczy)`);
     page++;
 
     if (page <= maxPages) await sleep(interval);
@@ -334,6 +336,7 @@ async function scrapeWorld(world: string, interval: number) {
     throw err;
   }
 
+  process.stdout.write(`\r✓ ${world}: ${allRows.length} graczy, ${maxPages} stron — zapisano\n`);
   await log("INFO", `Done`, { world, rows: allRows.length, pages: maxPages, file });
 }
 
