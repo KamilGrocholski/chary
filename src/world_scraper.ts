@@ -149,7 +149,7 @@ function parseLastOnline(text: string, now = new Date()): Date | null {
     return new Date(now.getTime() - 60 * 1000);
   }
 
-  const d = t.match(/(\d+)\s+dni?\s+temu/);
+  const d = t.match(/(\d+)\s+(?:dni?|dzień)\s+temu/);
   if (d) {
     const date = new Date(now);
     date.setDate(date.getDate() - Number(d[1]));

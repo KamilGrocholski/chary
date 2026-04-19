@@ -169,17 +169,18 @@
         <div style="grid-column: span 2">
           <label>Ostatnio online</label>
           <div style="display:flex;gap:6px">
-            <input id="onlineValue" type="number" value="1" min="0" step="1" style="flex:1;min-width:0" />
+            <input id="onlineValue" type="number" value="" min="0" step="1" style="flex:1;min-width:0" />
             <span style="padding:10px 4px;color:var(--muted);font-size:13px">dni</span>
             <select id="onlinePreset" style="width:auto">
               <option value="">preset</option>
-              <option value="1" selected>&lt; 24h</option>
-              <option value="2">2 dni</option>
-              <option value="3">3 dni</option>
-              <option value="7">7 dni</option>
-              <option value="14">14 dni</option>
-              <option value="30">30 dni</option>
-              <option value="">Wszyscy</option>
+              <option value="0">&lt; 24h</option>
+              <option value="1">1 dzień temu</option>
+              <option value="2">2 dni temu</option>
+              <option value="3">3 dni temu</option>
+              <option value="7">7 dni temu</option>
+              <option value="14">14 dni temu</option>
+              <option value="30">30 dni temu</option>
+              <option value="" selected>Wszyscy</option>
             </select>
           </div>
         </div>
@@ -261,8 +262,16 @@
       return isRow(row) ? Number(row[4]) || 0 : Number(row.honor) || 0;
     }
 
-    function getLastOnline(row) {
-      return isRow(row) ? row[6] : row.lastOnline;
+    function getLastOnlineText(row) {
+      return isRow(row) ? row[5] : row.lastOnlineText;
+    }
+
+    function parseLastOnlineDays(text) {
+      const t = (text ?? "").trim().toLowerCase();
+      if (t.includes("mniej") && t.includes("24h")) return 0;
+      const m = t.match(/(\d+)\s+(?:dni?|dzień)\s+temu/);
+      if (m) return Number(m[1]);
+      return null;
     }
 
     function getWorlds() {
@@ -282,12 +291,12 @@
       return new Set([...checked].map(cb => Number(cb.value)));
     }
 
-    function getMaxOfflineMs() {
+    function getMaxOfflineDays() {
       const val = el("onlineValue").value;
       if (val === "") return Infinity;
       const n = Number(val);
       if (!Number.isFinite(n) || n < 0) return Infinity;
-      return n * 24 * 60 * 60 * 1000;
+      return n;
     }
 
     function filterRows(rows) {
@@ -295,11 +304,10 @@
       const maxLevel = el("maxLevel").value === "" ? Infinity : Number(el("maxLevel").value);
       const minHonor = el("minHonor").value === "" ? -Infinity : Number(el("minHonor").value);
       const maxHonor = el("maxHonor").value === "" ? Infinity : Number(el("maxHonor").value);
-      const maxOfflineMs = getMaxOfflineMs();
+      const maxOfflineDays = getMaxOfflineDays();
       const selectedProfs = new Set(
         [...el("profCheckboxes").querySelectorAll("input:checked")].map(cb => Number(cb.value))
       );
-      const now = Date.now();
 
       return rows.filter((r) => {
         const level = getLevel(r);
@@ -310,13 +318,10 @@
 
         if (!selectedProfs.has(getProfession(r))) return false;
 
-        const lastOnline = getLastOnline(r);
-        if (!lastOnline) return false;
+        const days = parseLastOnlineDays(getLastOnlineText(r));
+        if (days === null) return false;
 
-        const ts = new Date(lastOnline).getTime();
-        if (Number.isNaN(ts)) return false;
-
-        return (now - ts) <= maxOfflineMs;
+        return days <= maxOfflineDays;
       });
     }
 
