@@ -471,7 +471,7 @@
       const world = getWorlds().find(w => w.name === worldName);
       const files = world?.files || [];
 
-      el("snapshotSelect").innerHTML = files.map(f => {
+      el("snapshotSelect").innerHTML = [...files].reverse().map(f => {
         const raw = f.timestamp || (f.file.split("/").pop() || f.file).replace(/\.json$/, "");
         return `<option value="${f.file}">${formatTimestamp(raw)}</option>`;
       }).join("");
