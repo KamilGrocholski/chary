@@ -53,6 +53,11 @@
       font-weight: 700;
     }
     button:hover { filter: brightness(1.1); }
+    .reset-btn {
+        border: 1px solid var(--accent);
+        background: none;
+        color: var(--accent);
+    }
 
     .toolbar {
       margin-bottom: 20px;
@@ -143,10 +148,6 @@
             <button id="copyBtn" title="Kopiuj link" style="width:auto;padding:4px 8px;font-size:13px;background:#1e293b;color:var(--accent);border:1px solid var(--border);flex-shrink:0">⎘</button>
           </div>
         </div>
-        <div style="min-width:100px">
-          <label>&nbsp;</label>
-          <button id="applyBtn">Filtruj</button>
-        </div>
       </div>
 
       <div class="toolbar-row2">
@@ -187,6 +188,10 @@
         <div style="grid-column: 1 / -1">
           <label>Profesja</label>
           <div class="prof-checkboxes" id="profCheckboxes"></div>
+        </div>
+        <div style="min-width:100px;display:flex;flex-direction:row;gap:8px">
+          <button id="applyBtn">Filtruj</button>
+          <button id="resetBtn" class="reset-btn">Resetuj</button>
         </div>
       </div>
     </div>
@@ -323,6 +328,19 @@
 
         return days <= maxOfflineDays;
       });
+    }
+
+    function resetFilter() {
+      el("minLevel").value = "";
+      el("maxLevel").value = "";
+      el("minHonor").value = "";
+      el("maxHonor").value = "";
+      el("onlineValue").value = "";
+      el("onlinePreset").value = "";
+      const profCheckboxes = el("profCheckboxes").querySelectorAll("input");
+      for (const profCheckbox of profCheckboxes) {
+          profCheckbox.checked = "true";
+      }
     }
 
     function buildProfessionDatasets(rows) {
@@ -553,6 +571,16 @@
         el("error").textContent = String(e?.message || e);
       }
     });
+
+    el("resetBtn").addEventListener("click", () => {
+      try {
+        resetFilter();
+        renderCharts(rawData);
+      } catch (e) {
+        el("error").textContent = String(e?.message || e);
+      }
+    });
+
 
     window.addEventListener("DOMContentLoaded", () => {
       init();
