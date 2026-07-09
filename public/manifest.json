@@ -30,6 +30,10 @@
         {
           "timestamp": "2026-06-26T11-06-57",
           "file": "worlds/aether/2026-06-26T11-06-57.json"
+        },
+        {
+          "timestamp": "2026-07-09T08-52-06",
+          "file": "worlds/aether/2026-07-09T08-52-06.json"
         }
       ]
     },
@@ -63,6 +67,10 @@
         {
           "timestamp": "2026-06-26T11-15-22",
           "file": "worlds/aldous/2026-06-26T11-15-22.json"
+        },
+        {
+          "timestamp": "2026-07-09T09-00-22",
+          "file": "worlds/aldous/2026-07-09T09-00-22.json"
         }
       ]
     },
@@ -96,6 +104,10 @@
         {
           "timestamp": "2026-06-26T11-19-45",
           "file": "worlds/berufs/2026-06-26T11-19-45.json"
+        },
+        {
+          "timestamp": "2026-07-09T09-04-37",
+          "file": "worlds/berufs/2026-07-09T09-04-37.json"
         }
       ]
     },
@@ -129,6 +141,10 @@
         {
           "timestamp": "2026-06-26T11-22-44",
           "file": "worlds/brutal/2026-06-26T11-22-44.json"
+        },
+        {
+          "timestamp": "2026-07-09T09-07-32",
+          "file": "worlds/brutal/2026-07-09T09-07-32.json"
         }
       ]
     },
@@ -162,6 +178,10 @@
         {
           "timestamp": "2026-06-26T11-24-16",
           "file": "worlds/classic/2026-06-26T11-24-16.json"
+        },
+        {
+          "timestamp": "2026-07-09T09-09-02",
+          "file": "worlds/classic/2026-07-09T09-09-02.json"
         }
       ]
     },
@@ -195,6 +215,10 @@
         {
           "timestamp": "2026-06-26T11-31-10",
           "file": "worlds/fobos/2026-06-26T11-31-10.json"
+        },
+        {
+          "timestamp": "2026-07-09T09-15-47",
+          "file": "worlds/fobos/2026-07-09T09-15-47.json"
         }
       ]
     },
@@ -228,6 +252,10 @@
         {
           "timestamp": "2026-06-26T11-36-14",
           "file": "worlds/gefion/2026-06-26T11-36-14.json"
+        },
+        {
+          "timestamp": "2026-07-09T09-20-42",
+          "file": "worlds/gefion/2026-07-09T09-20-42.json"
         }
       ]
     },
@@ -261,6 +289,10 @@
         {
           "timestamp": "2026-06-26T11-41-18",
           "file": "worlds/gordion/2026-06-26T11-41-18.json"
+        },
+        {
+          "timestamp": "2026-07-09T09-25-39",
+          "file": "worlds/gordion/2026-07-09T09-25-39.json"
         }
       ]
     },
@@ -294,6 +326,10 @@
         {
           "timestamp": "2026-06-26T12-00-59",
           "file": "worlds/hutena/2026-06-26T12-00-59.json"
+        },
+        {
+          "timestamp": "2026-07-09T09-44-47",
+          "file": "worlds/hutena/2026-07-09T09-44-47.json"
         }
       ]
     },
@@ -327,6 +363,10 @@
         {
           "timestamp": "2026-06-26T12-06-42",
           "file": "worlds/jaruna/2026-06-26T12-06-42.json"
+        },
+        {
+          "timestamp": "2026-07-09T09-50-21",
+          "file": "worlds/jaruna/2026-07-09T09-50-21.json"
         }
       ]
     },
@@ -360,6 +400,10 @@
         {
           "timestamp": "2026-06-26T12-13-04",
           "file": "worlds/katahha/2026-06-26T12-13-04.json"
+        },
+        {
+          "timestamp": "2026-07-09T09-56-35",
+          "file": "worlds/katahha/2026-07-09T09-56-35.json"
         }
       ]
     },
@@ -393,6 +437,10 @@
         {
           "timestamp": "2026-06-26T12-19-39",
           "file": "worlds/lelwani/2026-06-26T12-19-39.json"
+        },
+        {
+          "timestamp": "2026-07-09T10-03-02",
+          "file": "worlds/lelwani/2026-07-09T10-03-02.json"
         }
       ]
     },
@@ -426,6 +474,10 @@
         {
           "timestamp": "2026-06-26T12-25-02",
           "file": "worlds/majuna/2026-06-26T12-25-02.json"
+        },
+        {
+          "timestamp": "2026-07-09T10-08-16",
+          "file": "worlds/majuna/2026-07-09T10-08-16.json"
         }
       ]
     },
@@ -459,6 +511,10 @@
         {
           "timestamp": "2026-06-26T12-31-49",
           "file": "worlds/nomada/2026-06-26T12-31-49.json"
+        },
+        {
+          "timestamp": "2026-07-09T10-14-54",
+          "file": "worlds/nomada/2026-07-09T10-14-54.json"
         }
       ]
     },
@@ -492,6 +548,10 @@
         {
           "timestamp": "2026-06-26T12-35-39",
           "file": "worlds/perkun/2026-06-26T12-35-39.json"
+        },
+        {
+          "timestamp": "2026-07-09T10-18-37",
+          "file": "worlds/perkun/2026-07-09T10-18-37.json"
         }
       ]
     },
@@ -525,6 +585,10 @@
         {
           "timestamp": "2026-06-26T12-38-26",
           "file": "worlds/tarhuna/2026-06-26T12-38-26.json"
+        },
+        {
+          "timestamp": "2026-07-09T10-21-20",
+          "file": "worlds/tarhuna/2026-07-09T10-21-20.json"
         }
       ]
     },
@@ -558,6 +622,10 @@
         {
           "timestamp": "2026-06-26T12-44-18",
           "file": "worlds/telawel/2026-06-26T12-44-18.json"
+        },
+        {
+          "timestamp": "2026-07-09T10-27-08",
+          "file": "worlds/telawel/2026-07-09T10-27-08.json"
         }
       ]
     },
@@ -591,6 +659,10 @@
         {
           "timestamp": "2026-06-26T12-50-10",
           "file": "worlds/tempest/2026-06-26T12-50-10.json"
+        },
+        {
+          "timestamp": "2026-07-09T10-32-55",
+          "file": "worlds/tempest/2026-07-09T10-32-55.json"
         }
       ]
     },
@@ -624,6 +696,10 @@
         {
           "timestamp": "2026-06-26T12-54-05",
           "file": "worlds/zemyna/2026-06-26T12-54-05.json"
+        },
+        {
+          "timestamp": "2026-07-09T10-36-47",
+          "file": "worlds/zemyna/2026-07-09T10-36-47.json"
         }
       ]
     },
@@ -657,6 +733,10 @@
         {
           "timestamp": "2026-06-26T12-59-00",
           "file": "worlds/zorza/2026-06-26T12-59-00.json"
+        },
+        {
+          "timestamp": "2026-07-09T10-41-38",
+          "file": "worlds/zorza/2026-07-09T10-41-38.json"
         }
       ]
     }
