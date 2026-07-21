@@ -103,6 +103,7 @@ function logError(err: ScraperError, context?: object) {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const BASE = "https://www.margonem.pl";
+const FETCH_TIMEOUT_MS = 30_000;
 const PUBLIC_DIR = "public";
 const WORLDS_DIR = path.join(PUBLIC_DIR, "worlds");
 const MANIFEST_FILE = path.join(PUBLIC_DIR, "manifest.json");
@@ -113,9 +114,19 @@ function buildUrl(world: string, page: number) {
   return `${BASE}/ladder/players,${world}?page=${page}`;
 }
 
-function parseNumber(text: string) {
+// Lenient: used for pagination discovery where a missing value falls back to 1.
+function parseNumber(text: string): number {
   const n = Number(text.replace(/[^\d-]/g, ""));
   return Number.isFinite(n) ? n : 0;
+}
+
+// Strict: returns null when `text` does not hold a valid integer, so callers
+// can throw with context instead of silently coercing garbage to 0.
+function parseIntStrict(text: string): number | null {
+  const cleaned = text.replace(/[^\d-]/g, "");
+  if (cleaned === "" || cleaned === "-") return null;
+  const n = Number(cleaned);
+  return Number.isInteger(n) ? n : null;
 }
 
 function formatStamp(d: Date) {
@@ -159,7 +170,8 @@ function parseLastOnline(text: string, now = new Date()): Date | null {
   return null;
 }
 
-function professionToInt(name: string): number {
+// Returns null for an unknown profession so the caller can throw with context.
+function professionToInt(name: string): number | null {
   const m: Record<string, number> = {
     Wojownik: 1,
     Mag: 2,
@@ -169,7 +181,7 @@ function professionToInt(name: string): number {
     Łowca: 6,
     owca: 6,
   };
-  return m[name.trim()] ?? 0;
+  return m[name.trim()] ?? null;
 }
 
 function parseTable($: cheerio.CheerioAPI, world: string, page: number): PlayerRow[] {
@@ -184,17 +196,49 @@ function parseTable($: cheerio.CheerioAPI, world: string, page: number): PlayerR
 
   table.find("tbody tr").each((_, tr) => {
     const tds = $(tr).children("td");
-    if (tds.length < 6) return;
+    if (tds.length < 6) {
+      throw new ParseError(`Row has ${tds.length} columns, expected at least 6`, world, page);
+    }
 
-    const rank = parseNumber($(tds[0]).text());
+    const rawRank = $(tds[0]).text();
+    const rawLevel = $(tds[2]).text();
+    const rawProfession = $(tds[3]).text();
+    const rawHonor = $(tds[4]).text();
+
+    const rank = parseIntStrict(rawRank);
+    if (rank === null || rank < 1) {
+      throw new ParseError(`Invalid rank: ${JSON.stringify(rawRank.trim())}`, world, page);
+    }
+
     const name = $(tds[1]).text().trim();
-    const level = parseNumber($(tds[2]).text());
-    const profession = professionToInt($(tds[3]).text().trim());
-    const honor = parseNumber($(tds[4]).text());
-    const lastOnlineText = $(tds[5]).text().trim();
-    const lastOnlineDate = parseLastOnline(lastOnlineText);
+    if (!name) {
+      throw new ParseError(`Empty player name (rank ${rank})`, world, page);
+    }
 
-    if (!lastOnlineDate) return; // skip rows with unrecognized last-online format
+    const level = parseIntStrict(rawLevel);
+    if (level === null || level < 1) {
+      throw new ParseError(`Invalid level for "${name}": ${JSON.stringify(rawLevel.trim())}`, world, page);
+    }
+
+    const profession = professionToInt(rawProfession);
+    if (profession === null) {
+      throw new ParseError(`Unknown profession for "${name}": ${JSON.stringify(rawProfession.trim())}`, world, page);
+    }
+
+    const honor = parseIntStrict(rawHonor);
+    if (honor === null) {
+      throw new ParseError(`Invalid honor for "${name}": ${JSON.stringify(rawHonor.trim())}`, world, page);
+    }
+
+    const lastOnlineText = $(tds[5]).text().trim();
+    if (!lastOnlineText) {
+      throw new ParseError(`Empty last-online for "${name}"`, world, page);
+    }
+
+    const lastOnlineDate = parseLastOnline(lastOnlineText);
+    if (!lastOnlineDate) {
+      throw new ParseError(`Unrecognized last-online for "${name}": ${JSON.stringify(lastOnlineText)}`, world, page);
+    }
 
     rows.push([
       rank,
@@ -276,6 +320,7 @@ async function scrapeWorld(world: string, interval: number) {
     try {
       const res = await fetch(url, {
         headers: { "user-agent": "Mozilla/5.0", accept: "text/html,application/xhtml+xml" },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
 
       if (!res.ok) {
@@ -328,8 +373,7 @@ async function scrapeWorld(world: string, interval: number) {
 
   try {
     await mkdir(dir, { recursive: true });
-    await Bun.write(file, JSON.stringify(payload, null, 2));
-    await rebuildManifest();
+    await Bun.write(file, JSON.stringify(payload));
   } catch (e) {
     const err = new IoError(`Failed to save snapshot for ${world}: ${e instanceof Error ? e.message : String(e)}`, e);
     await logError(err, { world, file });
@@ -388,4 +432,5 @@ async function scrapeWithRetry(world: string, interval: number) {
   for (const world of worlds) {
     await scrapeWithRetry(world, interval);
   }
+  await rebuildManifest();
 })();
