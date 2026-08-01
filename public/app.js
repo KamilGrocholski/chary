@@ -55,9 +55,6 @@ export function visibleActivityBuckets(maxDays = Infinity) {
   return ACTIVITY_BOUNDS.map(([from], bucket) => (from <= maxDays ? bucket : null)).filter((b) => b !== null);
 }
 
-/** Ranking pokazuje ~20655 dni dla kont, które nigdy nie były online. */
-const NEVER_ONLINE_DAYS = 10_000;
-
 // ── Dane snapshotu ──────────────────────────────────────────────────────────
 //
 // `<ts>.f.json` trzyma kolumnowo to, czego potrzebuje filtrowanie:

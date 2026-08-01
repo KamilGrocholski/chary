@@ -19,9 +19,13 @@
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
 
-    // Some stricter flags (disabled by default)
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    // Martwy kod ma się nie zbierać — NEVER_ONLINE_DAYS przeżył w public/app.js
+    // przebudowę formatu tylko dlatego, że nikt go nie pilnował.
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+
+    // public/app.js nie jest sprawdzany (brak "checkJs") — pod strict sypie 25
+    // błędów typowania DOM-u, nie realnych bugów. Do rozważenia z adnotacjami JSDoc.
     "noPropertyAccessFromIndexSignature": false
   }
 }
