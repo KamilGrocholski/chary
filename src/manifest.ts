@@ -12,8 +12,6 @@ export type SnapshotEntry = {
   filters: string;
   /** Nicki i charId — dopiero przy wyszukiwarce gracza. */
   names?: string;
-  /** Opcjonalny agregat, generowany na żądanie (`bun run rebuild --agg`). */
-  agg?: string;
   /** Snapshot w starym, jednoplikowym formacie — tylko dopóki nie zmigrowany. */
   file?: string;
 };
@@ -50,7 +48,6 @@ export async function rebuildManifest(): Promise<Manifest> {
         timestamp,
         filters: rel(present.has(filters) ? filters : legacy),
         ...(present.has(`${timestamp}.n.json`) ? { names: rel(`${timestamp}.n.json`) } : {}),
-        ...(present.has(`${timestamp}.agg.json`) ? { agg: rel(`${timestamp}.agg.json`) } : {}),
         ...(present.has(legacy) ? { file: rel(legacy) } : {}),
       });
     }

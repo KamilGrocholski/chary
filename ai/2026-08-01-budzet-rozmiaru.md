@@ -21,9 +21,10 @@ Skład przyrostu na rundę (21 światów, 548 tys. graczy + `luvia`):
 - 7,0 MB — pliki `.n.json` (nicki + `charId`), 13,4 B na gracza,
 - 0,9 MB — `luvia`, dopisana do `src/worlds.ts`.
 
-Agregaty nie są już generowane domyślnie — dashboard filtruje dokładnie na `.f.json`,
-więc byłyby martwym plikiem. Wracają jednym poleceniem (`bun run rebuild --agg`,
-+0,2 MB na rundę), gdy powstanie widok obejmujący wiele migawek naraz.
+Agregatów nie ma — dashboard filtruje dokładnie na `.f.json`, więc byłyby martwym plikiem,
+a kod, który je liczył, został usunięty jako pisany na zapas. Gdy powstanie widok
+obejmujący wiele migawek naraz, agregat policzy się z `.f.json` w kilkunastu liniach
+dopasowanych do tego, czego ten widok naprawdę potrzebuje (~8 KB na migawkę).
 
 ## Jak to się zmieniało
 

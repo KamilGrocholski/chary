@@ -150,9 +150,9 @@ export function namesPathFor(dir: string, timestamp: string) {
 
 /** Czy nazwa pliku to snapshot w starym, jednoplikowym formacie. */
 export function isLegacySnapshot(fileName: string) {
-  return fileName.endsWith(".json") && !/\.(f|n|agg)\.json$/.test(fileName);
+  return fileName.endsWith(".json") && !/\.(f|n)\.json$/.test(fileName);
 }
 
 export function timestampFromFileName(fileName: string) {
-  return fileName.replace(/\.(f|n|agg)?\.?json$/, "");
+  return fileName.replace(/\.(f|n)?\.?json$/, "");
 }

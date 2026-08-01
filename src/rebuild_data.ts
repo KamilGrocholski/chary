@@ -1,6 +1,5 @@
 import { readdir, stat, unlink } from "node:fs/promises";
 import path from "node:path";
-import { aggPathFor, buildAggregate } from "./aggregate.ts";
 import { WORLDS_DIR, rebuildManifest } from "./manifest.ts";
 import {
   filterPathFor,
@@ -9,17 +8,14 @@ import {
   normalizeLegacyRows,
   splitNormalized,
   timestampFromFileName,
-  type FilterFile,
 } from "./snapshot.ts";
 
 // Utrzymanie danych w public/:
 //   - migracja snapshotów z jednego pliku do pary `.f.json` / `.n.json`,
-//   - opcjonalnie agregaty (`--agg`),
 //   - przebudowa manifestu.
 // Bezpieczne do wielokrotnego uruchamiania.
 
 const args = process.argv.slice(2);
-const withAgg = args.includes("--agg");
 const keepLegacy = args.includes("--keep-legacy");
 
 function mb(bytes: number) {
@@ -29,7 +25,6 @@ function mb(bytes: number) {
 let before = 0;
 let after = 0;
 let migrated = 0;
-let aggregates = 0;
 
 const worldDirs = (await readdir(WORLDS_DIR, { withFileTypes: true }))
   .filter((d) => d.isDirectory())
@@ -67,14 +62,6 @@ for (const world of worldDirs) {
     migrated++;
   }
 
-  if (withAgg) {
-    for (const name of (await readdir(dir)).filter((f) => f.endsWith(".f.json"))) {
-      const filters = JSON.parse(await Bun.file(path.join(dir, name)).text()) as FilterFile;
-      await Bun.write(aggPathFor(dir, filters.timestamp), JSON.stringify(buildAggregate(filters)));
-      aggregates++;
-    }
-  }
-
   process.stdout.write(`✓ ${world.padEnd(9)} ${String(legacy.length).padStart(2)} zmigrowanych\n`);
 }
 
@@ -85,5 +72,4 @@ if (migrated > 0) {
 } else {
   process.stdout.write(`\nNic do migracji — wszystkie snapshoty są już rozdzielone.\n`);
 }
-if (withAgg) process.stdout.write(`Agregaty: ${aggregates} plików\n`);
 process.stdout.write(`Manifest: ${manifest.worlds.length} światów\n`);

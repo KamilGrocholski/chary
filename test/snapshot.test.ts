@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { buildAggregate } from "../src/aggregate.ts";
 import {
   isLegacySnapshot,
   normalizeLegacyRows,
@@ -90,7 +89,6 @@ describe("rozpoznawanie plików", () => {
     ["2026-07-21T22-04-12.json", true],
     ["2026-07-21T22-04-12.f.json", false],
     ["2026-07-21T22-04-12.n.json", false],
-    ["2026-07-21T22-04-12.agg.json", false],
   ] as const)("isLegacySnapshot(%p) → %p", (name, expected) => {
     expect(isLegacySnapshot(name)).toBe(expected);
   });
@@ -99,24 +97,7 @@ describe("rozpoznawanie plików", () => {
     ["2026-07-21T22-04-12.json", "2026-07-21T22-04-12"],
     ["2026-07-21T22-04-12.f.json", "2026-07-21T22-04-12"],
     ["2026-07-21T22-04-12.n.json", "2026-07-21T22-04-12"],
-    ["2026-07-21T22-04-12.agg.json", "2026-07-21T22-04-12"],
   ] as const)("timestampFromFileName(%p) → %p", (name, expected) => {
     expect(timestampFromFileName(name)).toBe(expected);
-  });
-});
-
-describe("agregat (generowany na żądanie)", () => {
-  test("liczy rozkłady z pliku filtrów", () => {
-    const { filters } = splitSnapshot(rows, META);
-    const agg = buildAggregate(filters);
-
-    expect(agg.total).toBe(3);
-    expect(agg.byProfession).toEqual([1, 0, 1, 1, 0, 0]);
-    expect(agg.levels.map(([level]) => level)).toEqual([100, 359, 378]);
-    expect(agg.activity).toEqual([
-      [0, [0, 0, 0, 1, 0, 0]], // <24h — tropiciel
-      [2, [0, 0, 1, 0, 0, 0]], // ≤30 dni — paladyn
-      [4, [1, 0, 0, 0, 0, 0]], // nigdy — wojownik
-    ]);
   });
 });

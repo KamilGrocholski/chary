@@ -106,13 +106,10 @@ Starsze snapshoty (jeden plik na migawkę, z tekstem „Mniej niż 24h temu” i
 
 ```bash
 bun run rebuild                # migruje stare, jednoplikowe snapshoty do pary .f/.n i przebudowuje manifest
-bun run rebuild --agg          # dodatkowo generuje agregaty .agg.json
 bun run rebuild --keep-legacy  # zostawia oryginalne pliki po migracji
 ```
 
 Bezpieczne do wielokrotnego uruchamiania.
-
-**Agregaty** (`src/aggregate.ts`) zwijają snapshot do ~8 KB (rozkład poziomów, aktywności i honoru per profesja). Dashboard ich nie potrzebuje — filtruje dokładnie na `.f.json` — ale dla widoku obejmującego wiele migawek naraz (trend populacji przez 9 snapshotów) 9×8 KB bije 9×500 KB. Dlatego kod został, a pliki generuje się na żądanie.
 
 ## Testy
 
@@ -149,7 +146,6 @@ src/
   world_scraper.ts   # scraper rankingów (fetch, retry, zapis)
   parser.ts          # parsowanie HTML-a rankingu (czyste funkcje)
   snapshot.ts        # format snapshotu: podział na .f/.n i migracja starych
-  aggregate.ts       # agregaty (na żądanie)
   manifest.ts        # przebudowa public/manifest.json
   rebuild_data.ts    # utrzymanie: migracja + agregaty + manifest
   worlds.ts          # lista śledzonych światów
