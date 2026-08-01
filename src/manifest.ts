@@ -7,7 +7,15 @@ export const WORLDS_DIR = path.join(PUBLIC_DIR, "worlds");
 export const MANIFEST_FILE = path.join(PUBLIC_DIR, "manifest.json");
 
 export type SnapshotEntry = {
-  timestamp: string;
+  /**
+   * Nieprzezroczysty identyfikator migawki — zarazem trzon nazw plików.
+   * NIE jest datą: pliki sprzed sierpnia 2026 mają w nazwie czas lokalny,
+   * nowsze UTC, więc porównywanie tych stringów myli o strefę czasową.
+   * Do wyświetlania i liczenia odstępów służy `startedAt`.
+   */
+  id: string;
+  /** Moment rozpoczęcia scrapu, ISO 8601 w UTC — jedyne wiarygodne źródło czasu. */
+  startedAt?: string;
   /** Poziom/profesja/honor/dni — dashboard ładuje zawsze. */
   filters: string;
   /** Nicki i charId — dopiero przy wyszukiwarce gracza. */
@@ -36,23 +44,33 @@ export async function rebuildManifest(): Promise<Manifest> {
     const present = new Set(names);
     const rel = (file: string) => path.posix.join("worlds", worldName, file);
 
-    const timestamps = new Set(names.map(timestampFromFileName));
+    const ids = new Set(names.map(timestampFromFileName));
     const snapshots: SnapshotEntry[] = [];
 
-    for (const timestamp of timestamps) {
-      const filters = `${timestamp}.f.json`;
-      const legacy = `${timestamp}.json`;
+    for (const id of ids) {
+      const filters = `${id}.f.json`;
+      const legacy = `${id}.json`;
       if (!present.has(filters) && !present.has(legacy)) continue;
 
+      const source = present.has(filters) ? filters : legacy;
+      // `startedAt` mieszka w samym snapshocie; manifest go wyciąga, żeby dashboard
+      // nie musiał pobierać kilkuset kilobajtów tylko po to, by pokazać datę.
+      const { startedAt } = JSON.parse(
+        await Bun.file(path.join(WORLDS_DIR, worldName, source)).text(),
+      ) as { startedAt?: string };
+
       snapshots.push({
-        timestamp,
-        filters: rel(present.has(filters) ? filters : legacy),
-        ...(present.has(`${timestamp}.n.json`) ? { names: rel(`${timestamp}.n.json`) } : {}),
+        id,
+        ...(startedAt ? { startedAt } : {}),
+        filters: rel(source),
+        ...(present.has(`${id}.n.json`) ? { names: rel(`${id}.n.json`) } : {}),
         ...(present.has(legacy) ? { file: rel(legacy) } : {}),
       });
     }
 
-    snapshots.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    // Po realnym czasie scrapu, nie po nazwie pliku — inaczej migawki ze szwu
+    // stref czasowych ustawiłyby się względem siebie o 2 h obok prawdy.
+    snapshots.sort((a, b) => (a.startedAt ?? a.id).localeCompare(b.startedAt ?? b.id));
     manifest.worlds.push({ name: worldName, files: snapshots });
   }
 

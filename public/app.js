@@ -136,16 +136,89 @@ export function totalsFromCounts(counts) {
   return { total, perProfession };
 }
 
+// ── Stan widoku w URL-u ─────────────────────────────────────────────────────
+//
+// Bez tego przycisk „kopiuj link do tego widoku” wysyłał widok domyślny —
+// ktoś, kto ustawił poziom 250-320 i honor > 100k, dzielił się czymś innym,
+// niż miał na ekranie.
+
+export function filtersToParams(f) {
+  const params = new URLSearchParams();
+  const put = (key, value) => {
+    if (Number.isFinite(value)) params.set(key, String(value));
+  };
+
+  put("minLevel", f.minLevel);
+  put("maxLevel", f.maxLevel);
+  put("minHonor", f.minHonor);
+  put("maxHonor", f.maxHonor);
+  put("maxDays", f.maxDays);
+
+  const profs = [...f.professions].sort((a, b) => a - b);
+  if (profs.length !== 6) params.set("prof", profs.join(","));
+
+  return params;
+}
+
+export function filtersFromParams(params) {
+  const num = (key, fallback) => {
+    const raw = params.get(key);
+    if (raw === null || raw === "") return fallback;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : fallback;
+  };
+
+  const rawProf = params.get("prof");
+  const parsed = (rawProf ?? "")
+    .split(",")
+    .map(Number)
+    .filter((p) => Number.isInteger(p) && p >= 1 && p <= 6);
+
+  const maxDays = num("maxDays", Infinity);
+  return {
+    minLevel: num("minLevel", -Infinity),
+    maxLevel: num("maxLevel", Infinity),
+    minHonor: num("minHonor", -Infinity),
+    maxHonor: num("maxHonor", Infinity),
+    // Ujemny próg dni nie znaczy nic — traktujemy jak brak filtra zamiast
+    // po cichu pokazywać pustą stronę.
+    maxDays: maxDays < 0 ? Infinity : maxDays,
+    professions: new Set(parsed.length > 0 ? parsed : [1, 2, 3, 4, 5, 6]),
+  };
+}
+
 // ── Formatowanie ────────────────────────────────────────────────────────────
 
 export function capitalize(s) {
   return s ? s[0].toUpperCase() + s.slice(1) : s;
 }
 
-/** „2026-04-17T15-24-07” → „17.04.2026 15:24” */
-export function formatTimestamp(ts) {
-  const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})/);
-  return m ? `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}` : ts;
+/**
+ * Data migawki w czasie lokalnym przeglądarki, liczona z `startedAt`.
+ *
+ * Identyfikator migawki (trzon nazwy pliku) NIE nadaje się na datę: do lipca 2026
+ * powstawał z czasu lokalnego scrapera, później z UTC, więc dwie migawki obok siebie
+ * pokazywałyby dwa różne zegary. Gdy `startedAt` brakuje, wracamy do identyfikatora
+ * i mówimy wprost, że to przybliżenie.
+ */
+export function formatSnapshotDate(entry) {
+  if (entry?.startedAt) {
+    const d = new Date(entry.startedAt);
+    if (!Number.isNaN(d.getTime())) {
+      const p = (n) => String(n).padStart(2, "0");
+      return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+  }
+
+  const m = String(entry?.id ?? "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})/);
+  return m ? `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]} (?)` : String(entry?.id ?? "—");
+}
+
+/** Odstęp między migawkami w dniach — liczony wyłącznie z `startedAt`. */
+export function daysBetween(a, b) {
+  if (!a?.startedAt || !b?.startedAt) return null;
+  const diff = new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
+  return Number.isNaN(diff) ? null : diff / 86_400_000;
 }
 
 // ── Warstwa DOM ─────────────────────────────────────────────────────────────
@@ -194,16 +267,33 @@ function setupDashboard() {
   }
 
   function readFilters() {
+    const maxDays = numberOr("onlineValue", Infinity);
     return {
       minLevel: numberOr("minLevel", -Infinity),
       maxLevel: numberOr("maxLevel", Infinity),
       minHonor: numberOr("minHonor", -Infinity),
       maxHonor: numberOr("maxHonor", Infinity),
-      maxDays: numberOr("onlineValue", Infinity),
+      maxDays: maxDays < 0 ? Infinity : maxDays,
       professions: new Set(
         [...el("profCheckboxes").querySelectorAll("input:checked")].map((cb) => Number(cb.value)),
       ),
     };
+  }
+
+  /** Odwrotność readFilters — wsadza stan z URL-a z powrotem w pola formularza. */
+  function applyFilters(f) {
+    const put = (id, value) => {
+      el(id).value = Number.isFinite(value) ? String(value) : "";
+    };
+    put("minLevel", f.minLevel);
+    put("maxLevel", f.maxLevel);
+    put("minHonor", f.minHonor);
+    put("maxHonor", f.maxHonor);
+    put("onlineValue", f.maxDays);
+    el("onlinePreset").value = Number.isFinite(f.maxDays) ? String(f.maxDays) : "all";
+    for (const cb of el("profCheckboxes").querySelectorAll("input")) {
+      cb.checked = f.professions.has(Number(cb.value));
+    }
   }
 
   function resetFilters() {
@@ -336,6 +426,7 @@ function setupDashboard() {
 
   function render() {
     if (!data) return;
+    writeUrlState();
     const filters = readFilters();
     const counts = countByLevel(data, filters);
     renderChart(counts);
@@ -372,7 +463,7 @@ function setupDashboard() {
 
   const getWorlds = () => manifest?.worlds || [];
   const currentWorldEntries = () => getWorlds().find((w) => w.name === el("worldSelect").value)?.files || [];
-  const selectedEntry = () => currentWorldEntries().find((f) => f.timestamp === el("snapshotSelect").value);
+  const selectedEntry = () => currentWorldEntries().find((f) => f.id === el("snapshotSelect").value);
 
   function fillWorldSelect(selected) {
     el("worldSelect").innerHTML = getWorlds()
@@ -384,13 +475,16 @@ function setupDashboard() {
   function fillSnapshotSelect(selected) {
     const files = [...currentWorldEntries()].reverse(); // najnowsze na górze
     el("snapshotSelect").innerHTML = files
-      .map((f) => `<option value="${f.timestamp}">${formatTimestamp(f.timestamp)}</option>`)
+      .map((f) => `<option value="${f.id}">${formatSnapshotDate(f)}</option>`)
       .join("");
-    if (selected && files.some((f) => f.timestamp === selected)) el("snapshotSelect").value = selected;
+    if (selected && files.some((f) => f.id === selected)) el("snapshotSelect").value = selected;
   }
 
   function writeUrlState() {
-    const params = new URLSearchParams({ world: el("worldSelect").value, date: el("snapshotSelect").value });
+    const params = filtersToParams(readFilters());
+    params.set("world", el("worldSelect").value);
+    params.set("date", el("snapshotSelect").value);
+    params.sort();
     history.replaceState(null, "", `${location.pathname}?${params}`);
   }
 
@@ -408,6 +502,7 @@ function setupDashboard() {
       const params = new URLSearchParams(location.search);
       fillWorldSelect(params.get("world"));
       fillSnapshotSelect(params.get("date"));
+      applyFilters(filtersFromParams(params));
       await selectAndLoad();
     } catch (e) {
       el("error").textContent = String(e?.message || e);

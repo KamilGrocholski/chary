@@ -4,47 +4,56 @@
       "name": "aether",
       "files": [
         {
-          "timestamp": "2026-04-17T16-41-43",
+          "id": "2026-04-17T16-41-43",
+          "startedAt": "2026-04-17T14:41:43.303Z",
           "filters": "worlds/aether/2026-04-17T16-41-43.f.json",
           "names": "worlds/aether/2026-04-17T16-41-43.n.json"
         },
         {
-          "timestamp": "2026-04-30T06-30-11",
+          "id": "2026-04-30T06-30-11",
+          "startedAt": "2026-04-30T04:30:11.844Z",
           "filters": "worlds/aether/2026-04-30T06-30-11.f.json",
           "names": "worlds/aether/2026-04-30T06-30-11.n.json"
         },
         {
-          "timestamp": "2026-05-09T17-08-25",
+          "id": "2026-05-09T17-08-25",
+          "startedAt": "2026-05-09T15:08:25.869Z",
           "filters": "worlds/aether/2026-05-09T17-08-25.f.json",
           "names": "worlds/aether/2026-05-09T17-08-25.n.json"
         },
         {
-          "timestamp": "2026-05-15T12-34-10",
+          "id": "2026-05-15T12-34-10",
+          "startedAt": "2026-05-15T10:34:10.894Z",
           "filters": "worlds/aether/2026-05-15T12-34-10.f.json",
           "names": "worlds/aether/2026-05-15T12-34-10.n.json"
         },
         {
-          "timestamp": "2026-05-27T23-31-57",
+          "id": "2026-05-27T23-31-57",
+          "startedAt": "2026-05-27T21:31:57.975Z",
           "filters": "worlds/aether/2026-05-27T23-31-57.f.json",
           "names": "worlds/aether/2026-05-27T23-31-57.n.json"
         },
         {
-          "timestamp": "2026-06-13T12-51-10",
+          "id": "2026-06-13T12-51-10",
+          "startedAt": "2026-06-13T10:51:10.672Z",
           "filters": "worlds/aether/2026-06-13T12-51-10.f.json",
           "names": "worlds/aether/2026-06-13T12-51-10.n.json"
         },
         {
-          "timestamp": "2026-06-26T11-06-57",
+          "id": "2026-06-26T11-06-57",
+          "startedAt": "2026-06-26T09:06:57.817Z",
           "filters": "worlds/aether/2026-06-26T11-06-57.f.json",
           "names": "worlds/aether/2026-06-26T11-06-57.n.json"
         },
         {
-          "timestamp": "2026-07-09T08-52-06",
+          "id": "2026-07-09T08-52-06",
+          "startedAt": "2026-07-09T06:52:06.712Z",
           "filters": "worlds/aether/2026-07-09T08-52-06.f.json",
           "names": "worlds/aether/2026-07-09T08-52-06.n.json"
         },
         {
-          "timestamp": "2026-07-21T22-04-12",
+          "id": "2026-07-21T22-04-12",
+          "startedAt": "2026-07-21T20:04:12.489Z",
           "filters": "worlds/aether/2026-07-21T22-04-12.f.json",
           "names": "worlds/aether/2026-07-21T22-04-12.n.json"
         }
@@ -54,47 +63,56 @@
       "name": "aldous",
       "files": [
         {
-          "timestamp": "2026-04-17T16-50-16",
+          "id": "2026-04-17T16-50-16",
+          "startedAt": "2026-04-17T14:50:16.453Z",
           "filters": "worlds/aldous/2026-04-17T16-50-16.f.json",
           "names": "worlds/aldous/2026-04-17T16-50-16.n.json"
         },
         {
-          "timestamp": "2026-04-30T06-46-18",
+          "id": "2026-04-30T06-46-18",
+          "startedAt": "2026-04-30T04:46:18.272Z",
           "filters": "worlds/aldous/2026-04-30T06-46-18.f.json",
           "names": "worlds/aldous/2026-04-30T06-46-18.n.json"
         },
         {
-          "timestamp": "2026-05-09T17-16-55",
+          "id": "2026-05-09T17-16-55",
+          "startedAt": "2026-05-09T15:16:55.008Z",
           "filters": "worlds/aldous/2026-05-09T17-16-55.f.json",
           "names": "worlds/aldous/2026-05-09T17-16-55.n.json"
         },
         {
-          "timestamp": "2026-05-15T12-42-37",
+          "id": "2026-05-15T12-42-37",
+          "startedAt": "2026-05-15T10:42:37.771Z",
           "filters": "worlds/aldous/2026-05-15T12-42-37.f.json",
           "names": "worlds/aldous/2026-05-15T12-42-37.n.json"
         },
         {
-          "timestamp": "2026-05-27T23-40-22",
+          "id": "2026-05-27T23-40-22",
+          "startedAt": "2026-05-27T21:40:22.285Z",
           "filters": "worlds/aldous/2026-05-27T23-40-22.f.json",
           "names": "worlds/aldous/2026-05-27T23-40-22.n.json"
         },
         {
-          "timestamp": "2026-06-13T12-59-46",
+          "id": "2026-06-13T12-59-46",
+          "startedAt": "2026-06-13T10:59:46.665Z",
           "filters": "worlds/aldous/2026-06-13T12-59-46.f.json",
           "names": "worlds/aldous/2026-06-13T12-59-46.n.json"
         },
         {
-          "timestamp": "2026-06-26T11-15-22",
+          "id": "2026-06-26T11-15-22",
+          "startedAt": "2026-06-26T09:15:22.239Z",
           "filters": "worlds/aldous/2026-06-26T11-15-22.f.json",
           "names": "worlds/aldous/2026-06-26T11-15-22.n.json"
         },
         {
-          "timestamp": "2026-07-09T09-00-22",
+          "id": "2026-07-09T09-00-22",
+          "startedAt": "2026-07-09T07:00:22.546Z",
           "filters": "worlds/aldous/2026-07-09T09-00-22.f.json",
           "names": "worlds/aldous/2026-07-09T09-00-22.n.json"
         },
         {
-          "timestamp": "2026-07-21T22-12-32",
+          "id": "2026-07-21T22-12-32",
+          "startedAt": "2026-07-21T20:12:32.553Z",
           "filters": "worlds/aldous/2026-07-21T22-12-32.f.json",
           "names": "worlds/aldous/2026-07-21T22-12-32.n.json"
         }
@@ -104,47 +122,56 @@
       "name": "berufs",
       "files": [
         {
-          "timestamp": "2026-04-17T16-54-45",
+          "id": "2026-04-17T16-54-45",
+          "startedAt": "2026-04-17T14:54:45.381Z",
           "filters": "worlds/berufs/2026-04-17T16-54-45.f.json",
           "names": "worlds/berufs/2026-04-17T16-54-45.n.json"
         },
         {
-          "timestamp": "2026-04-30T06-54-29",
+          "id": "2026-04-30T06-54-29",
+          "startedAt": "2026-04-30T04:54:29.336Z",
           "filters": "worlds/berufs/2026-04-30T06-54-29.f.json",
           "names": "worlds/berufs/2026-04-30T06-54-29.n.json"
         },
         {
-          "timestamp": "2026-05-09T17-21-22",
+          "id": "2026-05-09T17-21-22",
+          "startedAt": "2026-05-09T15:21:22.166Z",
           "filters": "worlds/berufs/2026-05-09T17-21-22.f.json",
           "names": "worlds/berufs/2026-05-09T17-21-22.n.json"
         },
         {
-          "timestamp": "2026-05-15T12-47-05",
+          "id": "2026-05-15T12-47-05",
+          "startedAt": "2026-05-15T10:47:05.432Z",
           "filters": "worlds/berufs/2026-05-15T12-47-05.f.json",
           "names": "worlds/berufs/2026-05-15T12-47-05.n.json"
         },
         {
-          "timestamp": "2026-05-27T23-44-49",
+          "id": "2026-05-27T23-44-49",
+          "startedAt": "2026-05-27T21:44:49.391Z",
           "filters": "worlds/berufs/2026-05-27T23-44-49.f.json",
           "names": "worlds/berufs/2026-05-27T23-44-49.n.json"
         },
         {
-          "timestamp": "2026-06-13T13-04-15",
+          "id": "2026-06-13T13-04-15",
+          "startedAt": "2026-06-13T11:04:15.835Z",
           "filters": "worlds/berufs/2026-06-13T13-04-15.f.json",
           "names": "worlds/berufs/2026-06-13T13-04-15.n.json"
         },
         {
-          "timestamp": "2026-06-26T11-19-45",
+          "id": "2026-06-26T11-19-45",
+          "startedAt": "2026-06-26T09:19:45.947Z",
           "filters": "worlds/berufs/2026-06-26T11-19-45.f.json",
           "names": "worlds/berufs/2026-06-26T11-19-45.n.json"
         },
         {
-          "timestamp": "2026-07-09T09-04-37",
+          "id": "2026-07-09T09-04-37",
+          "startedAt": "2026-07-09T07:04:37.821Z",
           "filters": "worlds/berufs/2026-07-09T09-04-37.f.json",
           "names": "worlds/berufs/2026-07-09T09-04-37.n.json"
         },
         {
-          "timestamp": "2026-07-21T22-16-49",
+          "id": "2026-07-21T22-16-49",
+          "startedAt": "2026-07-21T20:16:49.785Z",
           "filters": "worlds/berufs/2026-07-21T22-16-49.f.json",
           "names": "worlds/berufs/2026-07-21T22-16-49.n.json"
         }
@@ -154,52 +181,62 @@
       "name": "brutal",
       "files": [
         {
-          "timestamp": "2026-04-17T16-57-44",
+          "id": "2026-04-17T16-57-44",
+          "startedAt": "2026-04-17T14:57:44.219Z",
           "filters": "worlds/brutal/2026-04-17T16-57-44.f.json",
           "names": "worlds/brutal/2026-04-17T16-57-44.n.json"
         },
         {
-          "timestamp": "2026-04-30T06-59-29",
+          "id": "2026-04-30T06-59-29",
+          "startedAt": "2026-04-30T04:59:29.530Z",
           "filters": "worlds/brutal/2026-04-30T06-59-29.f.json",
           "names": "worlds/brutal/2026-04-30T06-59-29.n.json"
         },
         {
-          "timestamp": "2026-05-09T17-24-18",
+          "id": "2026-05-09T17-24-18",
+          "startedAt": "2026-05-09T15:24:18.199Z",
           "filters": "worlds/brutal/2026-05-09T17-24-18.f.json",
           "names": "worlds/brutal/2026-05-09T17-24-18.n.json"
         },
         {
-          "timestamp": "2026-05-15T12-50-01",
+          "id": "2026-05-15T12-50-01",
+          "startedAt": "2026-05-15T10:50:01.029Z",
           "filters": "worlds/brutal/2026-05-15T12-50-01.f.json",
           "names": "worlds/brutal/2026-05-15T12-50-01.n.json"
         },
         {
-          "timestamp": "2026-05-27T23-47-43",
+          "id": "2026-05-27T23-47-43",
+          "startedAt": "2026-05-27T21:47:43.820Z",
           "filters": "worlds/brutal/2026-05-27T23-47-43.f.json",
           "names": "worlds/brutal/2026-05-27T23-47-43.n.json"
         },
         {
-          "timestamp": "2026-06-13T13-07-16",
+          "id": "2026-06-13T13-07-16",
+          "startedAt": "2026-06-13T11:07:16.190Z",
           "filters": "worlds/brutal/2026-06-13T13-07-16.f.json",
           "names": "worlds/brutal/2026-06-13T13-07-16.n.json"
         },
         {
-          "timestamp": "2026-06-26T11-22-44",
+          "id": "2026-06-26T11-22-44",
+          "startedAt": "2026-06-26T09:22:44.028Z",
           "filters": "worlds/brutal/2026-06-26T11-22-44.f.json",
           "names": "worlds/brutal/2026-06-26T11-22-44.n.json"
         },
         {
-          "timestamp": "2026-07-09T09-07-32",
+          "id": "2026-07-09T09-07-32",
+          "startedAt": "2026-07-09T07:07:32.271Z",
           "filters": "worlds/brutal/2026-07-09T09-07-32.f.json",
           "names": "worlds/brutal/2026-07-09T09-07-32.n.json"
         },
         {
-          "timestamp": "2026-07-21T22-19-42",
+          "id": "2026-07-21T22-19-42",
+          "startedAt": "2026-07-21T20:19:42.806Z",
           "filters": "worlds/brutal/2026-07-21T22-19-42.f.json",
           "names": "worlds/brutal/2026-07-21T22-19-42.n.json"
         },
         {
-          "timestamp": "2026-08-01T07-48-26",
+          "id": "2026-08-01T07-48-26",
+          "startedAt": "2026-08-01T07:48:26.850Z",
           "filters": "worlds/brutal/2026-08-01T07-48-26.f.json",
           "names": "worlds/brutal/2026-08-01T07-48-26.n.json"
         }
@@ -209,47 +246,56 @@
       "name": "classic",
       "files": [
         {
-          "timestamp": "2026-04-17T16-59-16",
+          "id": "2026-04-17T16-59-16",
+          "startedAt": "2026-04-17T14:59:16.985Z",
           "filters": "worlds/classic/2026-04-17T16-59-16.f.json",
           "names": "worlds/classic/2026-04-17T16-59-16.n.json"
         },
         {
-          "timestamp": "2026-04-30T07-01-51",
+          "id": "2026-04-30T07-01-51",
+          "startedAt": "2026-04-30T05:01:51.069Z",
           "filters": "worlds/classic/2026-04-30T07-01-51.f.json",
           "names": "worlds/classic/2026-04-30T07-01-51.n.json"
         },
         {
-          "timestamp": "2026-05-09T17-25-50",
+          "id": "2026-05-09T17-25-50",
+          "startedAt": "2026-05-09T15:25:50.032Z",
           "filters": "worlds/classic/2026-05-09T17-25-50.f.json",
           "names": "worlds/classic/2026-05-09T17-25-50.n.json"
         },
         {
-          "timestamp": "2026-05-15T12-51-32",
+          "id": "2026-05-15T12-51-32",
+          "startedAt": "2026-05-15T10:51:32.708Z",
           "filters": "worlds/classic/2026-05-15T12-51-32.f.json",
           "names": "worlds/classic/2026-05-15T12-51-32.n.json"
         },
         {
-          "timestamp": "2026-05-27T23-49-15",
+          "id": "2026-05-27T23-49-15",
+          "startedAt": "2026-05-27T21:49:15.086Z",
           "filters": "worlds/classic/2026-05-27T23-49-15.f.json",
           "names": "worlds/classic/2026-05-27T23-49-15.n.json"
         },
         {
-          "timestamp": "2026-06-13T13-08-50",
+          "id": "2026-06-13T13-08-50",
+          "startedAt": "2026-06-13T11:08:50.003Z",
           "filters": "worlds/classic/2026-06-13T13-08-50.f.json",
           "names": "worlds/classic/2026-06-13T13-08-50.n.json"
         },
         {
-          "timestamp": "2026-06-26T11-24-16",
+          "id": "2026-06-26T11-24-16",
+          "startedAt": "2026-06-26T09:24:16.625Z",
           "filters": "worlds/classic/2026-06-26T11-24-16.f.json",
           "names": "worlds/classic/2026-06-26T11-24-16.n.json"
         },
         {
-          "timestamp": "2026-07-09T09-09-02",
+          "id": "2026-07-09T09-09-02",
+          "startedAt": "2026-07-09T07:09:02.360Z",
           "filters": "worlds/classic/2026-07-09T09-09-02.f.json",
           "names": "worlds/classic/2026-07-09T09-09-02.n.json"
         },
         {
-          "timestamp": "2026-07-21T22-21-14",
+          "id": "2026-07-21T22-21-14",
+          "startedAt": "2026-07-21T20:21:14.027Z",
           "filters": "worlds/classic/2026-07-21T22-21-14.f.json",
           "names": "worlds/classic/2026-07-21T22-21-14.n.json"
         }
@@ -259,47 +305,56 @@
       "name": "fobos",
       "files": [
         {
-          "timestamp": "2026-04-17T17-06-04",
+          "id": "2026-04-17T17-06-04",
+          "startedAt": "2026-04-17T15:06:04.568Z",
           "filters": "worlds/fobos/2026-04-17T17-06-04.f.json",
           "names": "worlds/fobos/2026-04-17T17-06-04.n.json"
         },
         {
-          "timestamp": "2026-04-30T07-10-41",
+          "id": "2026-04-30T07-10-41",
+          "startedAt": "2026-04-30T05:10:41.992Z",
           "filters": "worlds/fobos/2026-04-30T07-10-41.f.json",
           "names": "worlds/fobos/2026-04-30T07-10-41.n.json"
         },
         {
-          "timestamp": "2026-05-09T17-32-34",
+          "id": "2026-05-09T17-32-34",
+          "startedAt": "2026-05-09T15:32:34.054Z",
           "filters": "worlds/fobos/2026-05-09T17-32-34.f.json",
           "names": "worlds/fobos/2026-05-09T17-32-34.n.json"
         },
         {
-          "timestamp": "2026-05-15T12-58-19",
+          "id": "2026-05-15T12-58-19",
+          "startedAt": "2026-05-15T10:58:19.912Z",
           "filters": "worlds/fobos/2026-05-15T12-58-19.f.json",
           "names": "worlds/fobos/2026-05-15T12-58-19.n.json"
         },
         {
-          "timestamp": "2026-05-27T23-56-02",
+          "id": "2026-05-27T23-56-02",
+          "startedAt": "2026-05-27T21:56:02.088Z",
           "filters": "worlds/fobos/2026-05-27T23-56-02.f.json",
           "names": "worlds/fobos/2026-05-27T23-56-02.n.json"
         },
         {
-          "timestamp": "2026-06-13T13-15-48",
+          "id": "2026-06-13T13-15-48",
+          "startedAt": "2026-06-13T11:15:48.785Z",
           "filters": "worlds/fobos/2026-06-13T13-15-48.f.json",
           "names": "worlds/fobos/2026-06-13T13-15-48.n.json"
         },
         {
-          "timestamp": "2026-06-26T11-31-10",
+          "id": "2026-06-26T11-31-10",
+          "startedAt": "2026-06-26T09:31:10.565Z",
           "filters": "worlds/fobos/2026-06-26T11-31-10.f.json",
           "names": "worlds/fobos/2026-06-26T11-31-10.n.json"
         },
         {
-          "timestamp": "2026-07-09T09-15-47",
+          "id": "2026-07-09T09-15-47",
+          "startedAt": "2026-07-09T07:15:47.817Z",
           "filters": "worlds/fobos/2026-07-09T09-15-47.f.json",
           "names": "worlds/fobos/2026-07-09T09-15-47.n.json"
         },
         {
-          "timestamp": "2026-07-21T22-28-26",
+          "id": "2026-07-21T22-28-26",
+          "startedAt": "2026-07-21T20:28:26.206Z",
           "filters": "worlds/fobos/2026-07-21T22-28-26.f.json",
           "names": "worlds/fobos/2026-07-21T22-28-26.n.json"
         }
@@ -309,47 +364,56 @@
       "name": "gefion",
       "files": [
         {
-          "timestamp": "2026-04-17T17-11-15",
+          "id": "2026-04-17T17-11-15",
+          "startedAt": "2026-04-17T15:11:15.167Z",
           "filters": "worlds/gefion/2026-04-17T17-11-15.f.json",
           "names": "worlds/gefion/2026-04-17T17-11-15.n.json"
         },
         {
-          "timestamp": "2026-04-30T07-15-51",
+          "id": "2026-04-30T07-15-51",
+          "startedAt": "2026-04-30T05:15:51.927Z",
           "filters": "worlds/gefion/2026-04-30T07-15-51.f.json",
           "names": "worlds/gefion/2026-04-30T07-15-51.n.json"
         },
         {
-          "timestamp": "2026-05-09T17-37-40",
+          "id": "2026-05-09T17-37-40",
+          "startedAt": "2026-05-09T15:37:40.993Z",
           "filters": "worlds/gefion/2026-05-09T17-37-40.f.json",
           "names": "worlds/gefion/2026-05-09T17-37-40.n.json"
         },
         {
-          "timestamp": "2026-05-15T13-03-27",
+          "id": "2026-05-15T13-03-27",
+          "startedAt": "2026-05-15T11:03:27.579Z",
           "filters": "worlds/gefion/2026-05-15T13-03-27.f.json",
           "names": "worlds/gefion/2026-05-15T13-03-27.n.json"
         },
         {
-          "timestamp": "2026-05-28T00-01-05",
+          "id": "2026-05-28T00-01-05",
+          "startedAt": "2026-05-27T22:01:05.732Z",
           "filters": "worlds/gefion/2026-05-28T00-01-05.f.json",
           "names": "worlds/gefion/2026-05-28T00-01-05.n.json"
         },
         {
-          "timestamp": "2026-06-13T13-20-59",
+          "id": "2026-06-13T13-20-59",
+          "startedAt": "2026-06-13T11:20:59.249Z",
           "filters": "worlds/gefion/2026-06-13T13-20-59.f.json",
           "names": "worlds/gefion/2026-06-13T13-20-59.n.json"
         },
         {
-          "timestamp": "2026-06-26T11-36-14",
+          "id": "2026-06-26T11-36-14",
+          "startedAt": "2026-06-26T09:36:14.009Z",
           "filters": "worlds/gefion/2026-06-26T11-36-14.f.json",
           "names": "worlds/gefion/2026-06-26T11-36-14.n.json"
         },
         {
-          "timestamp": "2026-07-09T09-20-42",
+          "id": "2026-07-09T09-20-42",
+          "startedAt": "2026-07-09T07:20:42.403Z",
           "filters": "worlds/gefion/2026-07-09T09-20-42.f.json",
           "names": "worlds/gefion/2026-07-09T09-20-42.n.json"
         },
         {
-          "timestamp": "2026-07-21T22-33-38",
+          "id": "2026-07-21T22-33-38",
+          "startedAt": "2026-07-21T20:33:38.402Z",
           "filters": "worlds/gefion/2026-07-21T22-33-38.f.json",
           "names": "worlds/gefion/2026-07-21T22-33-38.n.json"
         }
@@ -359,47 +423,56 @@
       "name": "gordion",
       "files": [
         {
-          "timestamp": "2026-04-17T17-16-24",
+          "id": "2026-04-17T17-16-24",
+          "startedAt": "2026-04-17T15:16:24.361Z",
           "filters": "worlds/gordion/2026-04-17T17-16-24.f.json",
           "names": "worlds/gordion/2026-04-17T17-16-24.n.json"
         },
         {
-          "timestamp": "2026-04-30T07-21-04",
+          "id": "2026-04-30T07-21-04",
+          "startedAt": "2026-04-30T05:21:04.022Z",
           "filters": "worlds/gordion/2026-04-30T07-21-04.f.json",
           "names": "worlds/gordion/2026-04-30T07-21-04.n.json"
         },
         {
-          "timestamp": "2026-05-09T17-42-44",
+          "id": "2026-05-09T17-42-44",
+          "startedAt": "2026-05-09T15:42:44.818Z",
           "filters": "worlds/gordion/2026-05-09T17-42-44.f.json",
           "names": "worlds/gordion/2026-05-09T17-42-44.n.json"
         },
         {
-          "timestamp": "2026-05-15T13-08-31",
+          "id": "2026-05-15T13-08-31",
+          "startedAt": "2026-05-15T11:08:31.669Z",
           "filters": "worlds/gordion/2026-05-15T13-08-31.f.json",
           "names": "worlds/gordion/2026-05-15T13-08-31.n.json"
         },
         {
-          "timestamp": "2026-05-28T00-06-06",
+          "id": "2026-05-28T00-06-06",
+          "startedAt": "2026-05-27T22:06:06.339Z",
           "filters": "worlds/gordion/2026-05-28T00-06-06.f.json",
           "names": "worlds/gordion/2026-05-28T00-06-06.n.json"
         },
         {
-          "timestamp": "2026-06-13T13-26-08",
+          "id": "2026-06-13T13-26-08",
+          "startedAt": "2026-06-13T11:26:08.924Z",
           "filters": "worlds/gordion/2026-06-13T13-26-08.f.json",
           "names": "worlds/gordion/2026-06-13T13-26-08.n.json"
         },
         {
-          "timestamp": "2026-06-26T11-41-18",
+          "id": "2026-06-26T11-41-18",
+          "startedAt": "2026-06-26T09:41:18.278Z",
           "filters": "worlds/gordion/2026-06-26T11-41-18.f.json",
           "names": "worlds/gordion/2026-06-26T11-41-18.n.json"
         },
         {
-          "timestamp": "2026-07-09T09-25-39",
+          "id": "2026-07-09T09-25-39",
+          "startedAt": "2026-07-09T07:25:39.008Z",
           "filters": "worlds/gordion/2026-07-09T09-25-39.f.json",
           "names": "worlds/gordion/2026-07-09T09-25-39.n.json"
         },
         {
-          "timestamp": "2026-07-21T22-38-55",
+          "id": "2026-07-21T22-38-55",
+          "startedAt": "2026-07-21T20:38:55.972Z",
           "filters": "worlds/gordion/2026-07-21T22-38-55.f.json",
           "names": "worlds/gordion/2026-07-21T22-38-55.n.json"
         }
@@ -409,47 +482,56 @@
       "name": "hutena",
       "files": [
         {
-          "timestamp": "2026-04-17T17-35-24",
+          "id": "2026-04-17T17-35-24",
+          "startedAt": "2026-04-17T15:35:24.308Z",
           "filters": "worlds/hutena/2026-04-17T17-35-24.f.json",
           "names": "worlds/hutena/2026-04-17T17-35-24.n.json"
         },
         {
-          "timestamp": "2026-04-30T07-40-18",
+          "id": "2026-04-30T07-40-18",
+          "startedAt": "2026-04-30T05:40:18.556Z",
           "filters": "worlds/hutena/2026-04-30T07-40-18.f.json",
           "names": "worlds/hutena/2026-04-30T07-40-18.n.json"
         },
         {
-          "timestamp": "2026-05-09T18-01-40",
+          "id": "2026-05-09T18-01-40",
+          "startedAt": "2026-05-09T16:01:40.639Z",
           "filters": "worlds/hutena/2026-05-09T18-01-40.f.json",
           "names": "worlds/hutena/2026-05-09T18-01-40.n.json"
         },
         {
-          "timestamp": "2026-05-15T13-27-31",
+          "id": "2026-05-15T13-27-31",
+          "startedAt": "2026-05-15T11:27:31.782Z",
           "filters": "worlds/hutena/2026-05-15T13-27-31.f.json",
           "names": "worlds/hutena/2026-05-15T13-27-31.n.json"
         },
         {
-          "timestamp": "2026-05-28T00-25-03",
+          "id": "2026-05-28T00-25-03",
+          "startedAt": "2026-05-27T22:25:03.394Z",
           "filters": "worlds/hutena/2026-05-28T00-25-03.f.json",
           "names": "worlds/hutena/2026-05-28T00-25-03.n.json"
         },
         {
-          "timestamp": "2026-06-13T13-45-41",
+          "id": "2026-06-13T13-45-41",
+          "startedAt": "2026-06-13T11:45:41.894Z",
           "filters": "worlds/hutena/2026-06-13T13-45-41.f.json",
           "names": "worlds/hutena/2026-06-13T13-45-41.n.json"
         },
         {
-          "timestamp": "2026-06-26T12-00-59",
+          "id": "2026-06-26T12-00-59",
+          "startedAt": "2026-06-26T10:00:59.993Z",
           "filters": "worlds/hutena/2026-06-26T12-00-59.f.json",
           "names": "worlds/hutena/2026-06-26T12-00-59.n.json"
         },
         {
-          "timestamp": "2026-07-09T09-44-47",
+          "id": "2026-07-09T09-44-47",
+          "startedAt": "2026-07-09T07:44:47.755Z",
           "filters": "worlds/hutena/2026-07-09T09-44-47.f.json",
           "names": "worlds/hutena/2026-07-09T09-44-47.n.json"
         },
         {
-          "timestamp": "2026-07-21T22-57-55",
+          "id": "2026-07-21T22-57-55",
+          "startedAt": "2026-07-21T20:57:55.550Z",
           "filters": "worlds/hutena/2026-07-21T22-57-55.f.json",
           "names": "worlds/hutena/2026-07-21T22-57-55.n.json"
         }
@@ -459,47 +541,56 @@
       "name": "jaruna",
       "files": [
         {
-          "timestamp": "2026-04-17T17-41-10",
+          "id": "2026-04-17T17-41-10",
+          "startedAt": "2026-04-17T15:41:10.590Z",
           "filters": "worlds/jaruna/2026-04-17T17-41-10.f.json",
           "names": "worlds/jaruna/2026-04-17T17-41-10.n.json"
         },
         {
-          "timestamp": "2026-04-30T07-46-04",
+          "id": "2026-04-30T07-46-04",
+          "startedAt": "2026-04-30T05:46:04.211Z",
           "filters": "worlds/jaruna/2026-04-30T07-46-04.f.json",
           "names": "worlds/jaruna/2026-04-30T07-46-04.n.json"
         },
         {
-          "timestamp": "2026-05-09T18-07-22",
+          "id": "2026-05-09T18-07-22",
+          "startedAt": "2026-05-09T16:07:22.514Z",
           "filters": "worlds/jaruna/2026-05-09T18-07-22.f.json",
           "names": "worlds/jaruna/2026-05-09T18-07-22.n.json"
         },
         {
-          "timestamp": "2026-05-15T13-33-15",
+          "id": "2026-05-15T13-33-15",
+          "startedAt": "2026-05-15T11:33:15.602Z",
           "filters": "worlds/jaruna/2026-05-15T13-33-15.f.json",
           "names": "worlds/jaruna/2026-05-15T13-33-15.n.json"
         },
         {
-          "timestamp": "2026-05-28T00-30-44",
+          "id": "2026-05-28T00-30-44",
+          "startedAt": "2026-05-27T22:30:44.901Z",
           "filters": "worlds/jaruna/2026-05-28T00-30-44.f.json",
           "names": "worlds/jaruna/2026-05-28T00-30-44.n.json"
         },
         {
-          "timestamp": "2026-06-13T13-51-29",
+          "id": "2026-06-13T13-51-29",
+          "startedAt": "2026-06-13T11:51:29.944Z",
           "filters": "worlds/jaruna/2026-06-13T13-51-29.f.json",
           "names": "worlds/jaruna/2026-06-13T13-51-29.n.json"
         },
         {
-          "timestamp": "2026-06-26T12-06-42",
+          "id": "2026-06-26T12-06-42",
+          "startedAt": "2026-06-26T10:06:42.886Z",
           "filters": "worlds/jaruna/2026-06-26T12-06-42.f.json",
           "names": "worlds/jaruna/2026-06-26T12-06-42.n.json"
         },
         {
-          "timestamp": "2026-07-09T09-50-21",
+          "id": "2026-07-09T09-50-21",
+          "startedAt": "2026-07-09T07:50:21.891Z",
           "filters": "worlds/jaruna/2026-07-09T09-50-21.f.json",
           "names": "worlds/jaruna/2026-07-09T09-50-21.n.json"
         },
         {
-          "timestamp": "2026-07-21T23-03-27",
+          "id": "2026-07-21T23-03-27",
+          "startedAt": "2026-07-21T21:03:27.235Z",
           "filters": "worlds/jaruna/2026-07-21T23-03-27.f.json",
           "names": "worlds/jaruna/2026-07-21T23-03-27.n.json"
         }
@@ -509,47 +600,56 @@
       "name": "katahha",
       "files": [
         {
-          "timestamp": "2026-04-17T17-47-36",
+          "id": "2026-04-17T17-47-36",
+          "startedAt": "2026-04-17T15:47:36.485Z",
           "filters": "worlds/katahha/2026-04-17T17-47-36.f.json",
           "names": "worlds/katahha/2026-04-17T17-47-36.n.json"
         },
         {
-          "timestamp": "2026-04-30T07-52-26",
+          "id": "2026-04-30T07-52-26",
+          "startedAt": "2026-04-30T05:52:26.225Z",
           "filters": "worlds/katahha/2026-04-30T07-52-26.f.json",
           "names": "worlds/katahha/2026-04-30T07-52-26.n.json"
         },
         {
-          "timestamp": "2026-05-09T18-13-44",
+          "id": "2026-05-09T18-13-44",
+          "startedAt": "2026-05-09T16:13:44.342Z",
           "filters": "worlds/katahha/2026-05-09T18-13-44.f.json",
           "names": "worlds/katahha/2026-05-09T18-13-44.n.json"
         },
         {
-          "timestamp": "2026-05-15T13-39-37",
+          "id": "2026-05-15T13-39-37",
+          "startedAt": "2026-05-15T11:39:37.239Z",
           "filters": "worlds/katahha/2026-05-15T13-39-37.f.json",
           "names": "worlds/katahha/2026-05-15T13-39-37.n.json"
         },
         {
-          "timestamp": "2026-05-28T00-37-03",
+          "id": "2026-05-28T00-37-03",
+          "startedAt": "2026-05-27T22:37:03.157Z",
           "filters": "worlds/katahha/2026-05-28T00-37-03.f.json",
           "names": "worlds/katahha/2026-05-28T00-37-03.n.json"
         },
         {
-          "timestamp": "2026-06-13T13-57-58",
+          "id": "2026-06-13T13-57-58",
+          "startedAt": "2026-06-13T11:57:58.394Z",
           "filters": "worlds/katahha/2026-06-13T13-57-58.f.json",
           "names": "worlds/katahha/2026-06-13T13-57-58.n.json"
         },
         {
-          "timestamp": "2026-06-26T12-13-04",
+          "id": "2026-06-26T12-13-04",
+          "startedAt": "2026-06-26T10:13:04.345Z",
           "filters": "worlds/katahha/2026-06-26T12-13-04.f.json",
           "names": "worlds/katahha/2026-06-26T12-13-04.n.json"
         },
         {
-          "timestamp": "2026-07-09T09-56-35",
+          "id": "2026-07-09T09-56-35",
+          "startedAt": "2026-07-09T07:56:35.629Z",
           "filters": "worlds/katahha/2026-07-09T09-56-35.f.json",
           "names": "worlds/katahha/2026-07-09T09-56-35.n.json"
         },
         {
-          "timestamp": "2026-07-21T23-09-39",
+          "id": "2026-07-21T23-09-39",
+          "startedAt": "2026-07-21T21:09:39.255Z",
           "filters": "worlds/katahha/2026-07-21T23-09-39.f.json",
           "names": "worlds/katahha/2026-07-21T23-09-39.n.json"
         }
@@ -559,47 +659,56 @@
       "name": "lelwani",
       "files": [
         {
-          "timestamp": "2026-04-17T17-54-07",
+          "id": "2026-04-17T17-54-07",
+          "startedAt": "2026-04-17T15:54:07.748Z",
           "filters": "worlds/lelwani/2026-04-17T17-54-07.f.json",
           "names": "worlds/lelwani/2026-04-17T17-54-07.n.json"
         },
         {
-          "timestamp": "2026-04-30T07-58-53",
+          "id": "2026-04-30T07-58-53",
+          "startedAt": "2026-04-30T05:58:53.383Z",
           "filters": "worlds/lelwani/2026-04-30T07-58-53.f.json",
           "names": "worlds/lelwani/2026-04-30T07-58-53.n.json"
         },
         {
-          "timestamp": "2026-05-09T18-20-12",
+          "id": "2026-05-09T18-20-12",
+          "startedAt": "2026-05-09T16:20:12.562Z",
           "filters": "worlds/lelwani/2026-05-09T18-20-12.f.json",
           "names": "worlds/lelwani/2026-05-09T18-20-12.n.json"
         },
         {
-          "timestamp": "2026-05-15T13-46-07",
+          "id": "2026-05-15T13-46-07",
+          "startedAt": "2026-05-15T11:46:07.143Z",
           "filters": "worlds/lelwani/2026-05-15T13-46-07.f.json",
           "names": "worlds/lelwani/2026-05-15T13-46-07.n.json"
         },
         {
-          "timestamp": "2026-05-28T00-43-32",
+          "id": "2026-05-28T00-43-32",
+          "startedAt": "2026-05-27T22:43:32.238Z",
           "filters": "worlds/lelwani/2026-05-28T00-43-32.f.json",
           "names": "worlds/lelwani/2026-05-28T00-43-32.n.json"
         },
         {
-          "timestamp": "2026-06-13T14-04-39",
+          "id": "2026-06-13T14-04-39",
+          "startedAt": "2026-06-13T12:04:39.159Z",
           "filters": "worlds/lelwani/2026-06-13T14-04-39.f.json",
           "names": "worlds/lelwani/2026-06-13T14-04-39.n.json"
         },
         {
-          "timestamp": "2026-06-26T12-19-39",
+          "id": "2026-06-26T12-19-39",
+          "startedAt": "2026-06-26T10:19:39.180Z",
           "filters": "worlds/lelwani/2026-06-26T12-19-39.f.json",
           "names": "worlds/lelwani/2026-06-26T12-19-39.n.json"
         },
         {
-          "timestamp": "2026-07-09T10-03-02",
+          "id": "2026-07-09T10-03-02",
+          "startedAt": "2026-07-09T08:03:02.380Z",
           "filters": "worlds/lelwani/2026-07-09T10-03-02.f.json",
           "names": "worlds/lelwani/2026-07-09T10-03-02.n.json"
         },
         {
-          "timestamp": "2026-07-21T23-16-09",
+          "id": "2026-07-21T23-16-09",
+          "startedAt": "2026-07-21T21:16:09.011Z",
           "filters": "worlds/lelwani/2026-07-21T23-16-09.f.json",
           "names": "worlds/lelwani/2026-07-21T23-16-09.n.json"
         }
@@ -609,47 +718,56 @@
       "name": "majuna",
       "files": [
         {
-          "timestamp": "2026-04-17T17-59-35",
+          "id": "2026-04-17T17-59-35",
+          "startedAt": "2026-04-17T15:59:35.530Z",
           "filters": "worlds/majuna/2026-04-17T17-59-35.f.json",
           "names": "worlds/majuna/2026-04-17T17-59-35.n.json"
         },
         {
-          "timestamp": "2026-04-30T08-04-16",
+          "id": "2026-04-30T08-04-16",
+          "startedAt": "2026-04-30T06:04:16.064Z",
           "filters": "worlds/majuna/2026-04-30T08-04-16.f.json",
           "names": "worlds/majuna/2026-04-30T08-04-16.n.json"
         },
         {
-          "timestamp": "2026-05-09T18-25-35",
+          "id": "2026-05-09T18-25-35",
+          "startedAt": "2026-05-09T16:25:35.030Z",
           "filters": "worlds/majuna/2026-05-09T18-25-35.f.json",
           "names": "worlds/majuna/2026-05-09T18-25-35.n.json"
         },
         {
-          "timestamp": "2026-05-15T13-51-30",
+          "id": "2026-05-15T13-51-30",
+          "startedAt": "2026-05-15T11:51:30.356Z",
           "filters": "worlds/majuna/2026-05-15T13-51-30.f.json",
           "names": "worlds/majuna/2026-05-15T13-51-30.n.json"
         },
         {
-          "timestamp": "2026-05-28T00-48-52",
+          "id": "2026-05-28T00-48-52",
+          "startedAt": "2026-05-27T22:48:52.311Z",
           "filters": "worlds/majuna/2026-05-28T00-48-52.f.json",
           "names": "worlds/majuna/2026-05-28T00-48-52.n.json"
         },
         {
-          "timestamp": "2026-06-13T14-10-07",
+          "id": "2026-06-13T14-10-07",
+          "startedAt": "2026-06-13T12:10:07.522Z",
           "filters": "worlds/majuna/2026-06-13T14-10-07.f.json",
           "names": "worlds/majuna/2026-06-13T14-10-07.n.json"
         },
         {
-          "timestamp": "2026-06-26T12-25-02",
+          "id": "2026-06-26T12-25-02",
+          "startedAt": "2026-06-26T10:25:02.730Z",
           "filters": "worlds/majuna/2026-06-26T12-25-02.f.json",
           "names": "worlds/majuna/2026-06-26T12-25-02.n.json"
         },
         {
-          "timestamp": "2026-07-09T10-08-16",
+          "id": "2026-07-09T10-08-16",
+          "startedAt": "2026-07-09T08:08:16.578Z",
           "filters": "worlds/majuna/2026-07-09T10-08-16.f.json",
           "names": "worlds/majuna/2026-07-09T10-08-16.n.json"
         },
         {
-          "timestamp": "2026-07-21T23-21-20",
+          "id": "2026-07-21T23-21-20",
+          "startedAt": "2026-07-21T21:21:20.948Z",
           "filters": "worlds/majuna/2026-07-21T23-21-20.f.json",
           "names": "worlds/majuna/2026-07-21T23-21-20.n.json"
         }
@@ -659,47 +777,56 @@
       "name": "nomada",
       "files": [
         {
-          "timestamp": "2026-04-17T18-06-20",
+          "id": "2026-04-17T18-06-20",
+          "startedAt": "2026-04-17T16:06:20.429Z",
           "filters": "worlds/nomada/2026-04-17T18-06-20.f.json",
           "names": "worlds/nomada/2026-04-17T18-06-20.n.json"
         },
         {
-          "timestamp": "2026-04-30T08-10-57",
+          "id": "2026-04-30T08-10-57",
+          "startedAt": "2026-04-30T06:10:57.652Z",
           "filters": "worlds/nomada/2026-04-30T08-10-57.f.json",
           "names": "worlds/nomada/2026-04-30T08-10-57.n.json"
         },
         {
-          "timestamp": "2026-05-09T18-32-18",
+          "id": "2026-05-09T18-32-18",
+          "startedAt": "2026-05-09T16:32:18.598Z",
           "filters": "worlds/nomada/2026-05-09T18-32-18.f.json",
           "names": "worlds/nomada/2026-05-09T18-32-18.n.json"
         },
         {
-          "timestamp": "2026-05-15T13-58-14",
+          "id": "2026-05-15T13-58-14",
+          "startedAt": "2026-05-15T11:58:14.467Z",
           "filters": "worlds/nomada/2026-05-15T13-58-14.f.json",
           "names": "worlds/nomada/2026-05-15T13-58-14.n.json"
         },
         {
-          "timestamp": "2026-05-28T00-55-35",
+          "id": "2026-05-28T00-55-35",
+          "startedAt": "2026-05-27T22:55:35.067Z",
           "filters": "worlds/nomada/2026-05-28T00-55-35.f.json",
           "names": "worlds/nomada/2026-05-28T00-55-35.n.json"
         },
         {
-          "timestamp": "2026-06-13T14-17-00",
+          "id": "2026-06-13T14-17-00",
+          "startedAt": "2026-06-13T12:17:00.137Z",
           "filters": "worlds/nomada/2026-06-13T14-17-00.f.json",
           "names": "worlds/nomada/2026-06-13T14-17-00.n.json"
         },
         {
-          "timestamp": "2026-06-26T12-31-49",
+          "id": "2026-06-26T12-31-49",
+          "startedAt": "2026-06-26T10:31:49.297Z",
           "filters": "worlds/nomada/2026-06-26T12-31-49.f.json",
           "names": "worlds/nomada/2026-06-26T12-31-49.n.json"
         },
         {
-          "timestamp": "2026-07-09T10-14-54",
+          "id": "2026-07-09T10-14-54",
+          "startedAt": "2026-07-09T08:14:54.358Z",
           "filters": "worlds/nomada/2026-07-09T10-14-54.f.json",
           "names": "worlds/nomada/2026-07-09T10-14-54.n.json"
         },
         {
-          "timestamp": "2026-07-21T23-28-03",
+          "id": "2026-07-21T23-28-03",
+          "startedAt": "2026-07-21T21:28:03.081Z",
           "filters": "worlds/nomada/2026-07-21T23-28-03.f.json",
           "names": "worlds/nomada/2026-07-21T23-28-03.n.json"
         }
@@ -709,47 +836,56 @@
       "name": "perkun",
       "files": [
         {
-          "timestamp": "2026-04-17T18-10-13",
+          "id": "2026-04-17T18-10-13",
+          "startedAt": "2026-04-17T16:10:13.679Z",
           "filters": "worlds/perkun/2026-04-17T18-10-13.f.json",
           "names": "worlds/perkun/2026-04-17T18-10-13.n.json"
         },
         {
-          "timestamp": "2026-04-30T08-14-48",
+          "id": "2026-04-30T08-14-48",
+          "startedAt": "2026-04-30T06:14:48.714Z",
           "filters": "worlds/perkun/2026-04-30T08-14-48.f.json",
           "names": "worlds/perkun/2026-04-30T08-14-48.n.json"
         },
         {
-          "timestamp": "2026-05-09T18-37-13",
+          "id": "2026-05-09T18-37-13",
+          "startedAt": "2026-05-09T16:37:13.479Z",
           "filters": "worlds/perkun/2026-05-09T18-37-13.f.json",
           "names": "worlds/perkun/2026-05-09T18-37-13.n.json"
         },
         {
-          "timestamp": "2026-05-15T14-02-06",
+          "id": "2026-05-15T14-02-06",
+          "startedAt": "2026-05-15T12:02:06.803Z",
           "filters": "worlds/perkun/2026-05-15T14-02-06.f.json",
           "names": "worlds/perkun/2026-05-15T14-02-06.n.json"
         },
         {
-          "timestamp": "2026-05-28T00-59-25",
+          "id": "2026-05-28T00-59-25",
+          "startedAt": "2026-05-27T22:59:25.252Z",
           "filters": "worlds/perkun/2026-05-28T00-59-25.f.json",
           "names": "worlds/perkun/2026-05-28T00-59-25.n.json"
         },
         {
-          "timestamp": "2026-06-13T14-20-54",
+          "id": "2026-06-13T14-20-54",
+          "startedAt": "2026-06-13T12:20:54.894Z",
           "filters": "worlds/perkun/2026-06-13T14-20-54.f.json",
           "names": "worlds/perkun/2026-06-13T14-20-54.n.json"
         },
         {
-          "timestamp": "2026-06-26T12-35-39",
+          "id": "2026-06-26T12-35-39",
+          "startedAt": "2026-06-26T10:35:39.149Z",
           "filters": "worlds/perkun/2026-06-26T12-35-39.f.json",
           "names": "worlds/perkun/2026-06-26T12-35-39.n.json"
         },
         {
-          "timestamp": "2026-07-09T10-18-37",
+          "id": "2026-07-09T10-18-37",
+          "startedAt": "2026-07-09T08:18:37.251Z",
           "filters": "worlds/perkun/2026-07-09T10-18-37.f.json",
           "names": "worlds/perkun/2026-07-09T10-18-37.n.json"
         },
         {
-          "timestamp": "2026-07-21T23-31-48",
+          "id": "2026-07-21T23-31-48",
+          "startedAt": "2026-07-21T21:31:48.665Z",
           "filters": "worlds/perkun/2026-07-21T23-31-48.f.json",
           "names": "worlds/perkun/2026-07-21T23-31-48.n.json"
         }
@@ -759,47 +895,56 @@
       "name": "tarhuna",
       "files": [
         {
-          "timestamp": "2026-04-17T18-13-00",
+          "id": "2026-04-17T18-13-00",
+          "startedAt": "2026-04-17T16:13:00.771Z",
           "filters": "worlds/tarhuna/2026-04-17T18-13-00.f.json",
           "names": "worlds/tarhuna/2026-04-17T18-13-00.n.json"
         },
         {
-          "timestamp": "2026-04-30T08-17-34",
+          "id": "2026-04-30T08-17-34",
+          "startedAt": "2026-04-30T06:17:34.629Z",
           "filters": "worlds/tarhuna/2026-04-30T08-17-34.f.json",
           "names": "worlds/tarhuna/2026-04-30T08-17-34.n.json"
         },
         {
-          "timestamp": "2026-05-09T18-39-59",
+          "id": "2026-05-09T18-39-59",
+          "startedAt": "2026-05-09T16:39:59.943Z",
           "filters": "worlds/tarhuna/2026-05-09T18-39-59.f.json",
           "names": "worlds/tarhuna/2026-05-09T18-39-59.n.json"
         },
         {
-          "timestamp": "2026-05-15T14-04-53",
+          "id": "2026-05-15T14-04-53",
+          "startedAt": "2026-05-15T12:04:53.326Z",
           "filters": "worlds/tarhuna/2026-05-15T14-04-53.f.json",
           "names": "worlds/tarhuna/2026-05-15T14-04-53.n.json"
         },
         {
-          "timestamp": "2026-05-28T01-02-10",
+          "id": "2026-05-28T01-02-10",
+          "startedAt": "2026-05-27T23:02:10.453Z",
           "filters": "worlds/tarhuna/2026-05-28T01-02-10.f.json",
           "names": "worlds/tarhuna/2026-05-28T01-02-10.n.json"
         },
         {
-          "timestamp": "2026-06-13T14-23-45",
+          "id": "2026-06-13T14-23-45",
+          "startedAt": "2026-06-13T12:23:45.579Z",
           "filters": "worlds/tarhuna/2026-06-13T14-23-45.f.json",
           "names": "worlds/tarhuna/2026-06-13T14-23-45.n.json"
         },
         {
-          "timestamp": "2026-06-26T12-38-26",
+          "id": "2026-06-26T12-38-26",
+          "startedAt": "2026-06-26T10:38:26.509Z",
           "filters": "worlds/tarhuna/2026-06-26T12-38-26.f.json",
           "names": "worlds/tarhuna/2026-06-26T12-38-26.n.json"
         },
         {
-          "timestamp": "2026-07-09T10-21-20",
+          "id": "2026-07-09T10-21-20",
+          "startedAt": "2026-07-09T08:21:20.253Z",
           "filters": "worlds/tarhuna/2026-07-09T10-21-20.f.json",
           "names": "worlds/tarhuna/2026-07-09T10-21-20.n.json"
         },
         {
-          "timestamp": "2026-07-21T23-34-31",
+          "id": "2026-07-21T23-34-31",
+          "startedAt": "2026-07-21T21:34:31.906Z",
           "filters": "worlds/tarhuna/2026-07-21T23-34-31.f.json",
           "names": "worlds/tarhuna/2026-07-21T23-34-31.n.json"
         }
@@ -809,47 +954,56 @@
       "name": "telawel",
       "files": [
         {
-          "timestamp": "2026-04-17T18-18-51",
+          "id": "2026-04-17T18-18-51",
+          "startedAt": "2026-04-17T16:18:51.290Z",
           "filters": "worlds/telawel/2026-04-17T18-18-51.f.json",
           "names": "worlds/telawel/2026-04-17T18-18-51.n.json"
         },
         {
-          "timestamp": "2026-04-30T08-23-22",
+          "id": "2026-04-30T08-23-22",
+          "startedAt": "2026-04-30T06:23:22.781Z",
           "filters": "worlds/telawel/2026-04-30T08-23-22.f.json",
           "names": "worlds/telawel/2026-04-30T08-23-22.n.json"
         },
         {
-          "timestamp": "2026-05-09T18-45-50",
+          "id": "2026-05-09T18-45-50",
+          "startedAt": "2026-05-09T16:45:50.393Z",
           "filters": "worlds/telawel/2026-05-09T18-45-50.f.json",
           "names": "worlds/telawel/2026-05-09T18-45-50.n.json"
         },
         {
-          "timestamp": "2026-05-15T14-10-42",
+          "id": "2026-05-15T14-10-42",
+          "startedAt": "2026-05-15T12:10:42.037Z",
           "filters": "worlds/telawel/2026-05-15T14-10-42.f.json",
           "names": "worlds/telawel/2026-05-15T14-10-42.n.json"
         },
         {
-          "timestamp": "2026-05-28T01-07-58",
+          "id": "2026-05-28T01-07-58",
+          "startedAt": "2026-05-27T23:07:58.369Z",
           "filters": "worlds/telawel/2026-05-28T01-07-58.f.json",
           "names": "worlds/telawel/2026-05-28T01-07-58.n.json"
         },
         {
-          "timestamp": "2026-06-13T14-29-42",
+          "id": "2026-06-13T14-29-42",
+          "startedAt": "2026-06-13T12:29:42.961Z",
           "filters": "worlds/telawel/2026-06-13T14-29-42.f.json",
           "names": "worlds/telawel/2026-06-13T14-29-42.n.json"
         },
         {
-          "timestamp": "2026-06-26T12-44-18",
+          "id": "2026-06-26T12-44-18",
+          "startedAt": "2026-06-26T10:44:18.809Z",
           "filters": "worlds/telawel/2026-06-26T12-44-18.f.json",
           "names": "worlds/telawel/2026-06-26T12-44-18.n.json"
         },
         {
-          "timestamp": "2026-07-09T10-27-08",
+          "id": "2026-07-09T10-27-08",
+          "startedAt": "2026-07-09T08:27:08.875Z",
           "filters": "worlds/telawel/2026-07-09T10-27-08.f.json",
           "names": "worlds/telawel/2026-07-09T10-27-08.n.json"
         },
         {
-          "timestamp": "2026-07-21T23-40-17",
+          "id": "2026-07-21T23-40-17",
+          "startedAt": "2026-07-21T21:40:17.026Z",
           "filters": "worlds/telawel/2026-07-21T23-40-17.f.json",
           "names": "worlds/telawel/2026-07-21T23-40-17.n.json"
         }
@@ -859,47 +1013,56 @@
       "name": "tempest",
       "files": [
         {
-          "timestamp": "2026-04-17T18-24-39",
+          "id": "2026-04-17T18-24-39",
+          "startedAt": "2026-04-17T16:24:39.379Z",
           "filters": "worlds/tempest/2026-04-17T18-24-39.f.json",
           "names": "worlds/tempest/2026-04-17T18-24-39.n.json"
         },
         {
-          "timestamp": "2026-04-30T08-29-07",
+          "id": "2026-04-30T08-29-07",
+          "startedAt": "2026-04-30T06:29:07.299Z",
           "filters": "worlds/tempest/2026-04-30T08-29-07.f.json",
           "names": "worlds/tempest/2026-04-30T08-29-07.n.json"
         },
         {
-          "timestamp": "2026-05-09T18-51-37",
+          "id": "2026-05-09T18-51-37",
+          "startedAt": "2026-05-09T16:51:37.695Z",
           "filters": "worlds/tempest/2026-05-09T18-51-37.f.json",
           "names": "worlds/tempest/2026-05-09T18-51-37.n.json"
         },
         {
-          "timestamp": "2026-05-15T14-16-27",
+          "id": "2026-05-15T14-16-27",
+          "startedAt": "2026-05-15T12:16:27.717Z",
           "filters": "worlds/tempest/2026-05-15T14-16-27.f.json",
           "names": "worlds/tempest/2026-05-15T14-16-27.n.json"
         },
         {
-          "timestamp": "2026-05-28T01-13-44",
+          "id": "2026-05-28T01-13-44",
+          "startedAt": "2026-05-27T23:13:44.651Z",
           "filters": "worlds/tempest/2026-05-28T01-13-44.f.json",
           "names": "worlds/tempest/2026-05-28T01-13-44.n.json"
         },
         {
-          "timestamp": "2026-06-13T14-35-37",
+          "id": "2026-06-13T14-35-37",
+          "startedAt": "2026-06-13T12:35:37.312Z",
           "filters": "worlds/tempest/2026-06-13T14-35-37.f.json",
           "names": "worlds/tempest/2026-06-13T14-35-37.n.json"
         },
         {
-          "timestamp": "2026-06-26T12-50-10",
+          "id": "2026-06-26T12-50-10",
+          "startedAt": "2026-06-26T10:50:10.045Z",
           "filters": "worlds/tempest/2026-06-26T12-50-10.f.json",
           "names": "worlds/tempest/2026-06-26T12-50-10.n.json"
         },
         {
-          "timestamp": "2026-07-09T10-32-55",
+          "id": "2026-07-09T10-32-55",
+          "startedAt": "2026-07-09T08:32:55.692Z",
           "filters": "worlds/tempest/2026-07-09T10-32-55.f.json",
           "names": "worlds/tempest/2026-07-09T10-32-55.n.json"
         },
         {
-          "timestamp": "2026-07-21T23-46-00",
+          "id": "2026-07-21T23-46-00",
+          "startedAt": "2026-07-21T21:46:00.012Z",
           "filters": "worlds/tempest/2026-07-21T23-46-00.f.json",
           "names": "worlds/tempest/2026-07-21T23-46-00.n.json"
         }
@@ -909,47 +1072,56 @@
       "name": "zemyna",
       "files": [
         {
-          "timestamp": "2026-04-17T18-28-34",
+          "id": "2026-04-17T18-28-34",
+          "startedAt": "2026-04-17T16:28:34.430Z",
           "filters": "worlds/zemyna/2026-04-17T18-28-34.f.json",
           "names": "worlds/zemyna/2026-04-17T18-28-34.n.json"
         },
         {
-          "timestamp": "2026-04-30T08-33-00",
+          "id": "2026-04-30T08-33-00",
+          "startedAt": "2026-04-30T06:33:00.537Z",
           "filters": "worlds/zemyna/2026-04-30T08-33-00.f.json",
           "names": "worlds/zemyna/2026-04-30T08-33-00.n.json"
         },
         {
-          "timestamp": "2026-05-09T18-55-32",
+          "id": "2026-05-09T18-55-32",
+          "startedAt": "2026-05-09T16:55:32.060Z",
           "filters": "worlds/zemyna/2026-05-09T18-55-32.f.json",
           "names": "worlds/zemyna/2026-05-09T18-55-32.n.json"
         },
         {
-          "timestamp": "2026-05-15T14-20-22",
+          "id": "2026-05-15T14-20-22",
+          "startedAt": "2026-05-15T12:20:22.908Z",
           "filters": "worlds/zemyna/2026-05-15T14-20-22.f.json",
           "names": "worlds/zemyna/2026-05-15T14-20-22.n.json"
         },
         {
-          "timestamp": "2026-05-28T01-17-38",
+          "id": "2026-05-28T01-17-38",
+          "startedAt": "2026-05-27T23:17:38.077Z",
           "filters": "worlds/zemyna/2026-05-28T01-17-38.f.json",
           "names": "worlds/zemyna/2026-05-28T01-17-38.n.json"
         },
         {
-          "timestamp": "2026-06-13T14-39-34",
+          "id": "2026-06-13T14-39-34",
+          "startedAt": "2026-06-13T12:39:34.227Z",
           "filters": "worlds/zemyna/2026-06-13T14-39-34.f.json",
           "names": "worlds/zemyna/2026-06-13T14-39-34.n.json"
         },
         {
-          "timestamp": "2026-06-26T12-54-05",
+          "id": "2026-06-26T12-54-05",
+          "startedAt": "2026-06-26T10:54:05.634Z",
           "filters": "worlds/zemyna/2026-06-26T12-54-05.f.json",
           "names": "worlds/zemyna/2026-06-26T12-54-05.n.json"
         },
         {
-          "timestamp": "2026-07-09T10-36-47",
+          "id": "2026-07-09T10-36-47",
+          "startedAt": "2026-07-09T08:36:47.584Z",
           "filters": "worlds/zemyna/2026-07-09T10-36-47.f.json",
           "names": "worlds/zemyna/2026-07-09T10-36-47.n.json"
         },
         {
-          "timestamp": "2026-07-21T23-49-50",
+          "id": "2026-07-21T23-49-50",
+          "startedAt": "2026-07-21T21:49:50.129Z",
           "filters": "worlds/zemyna/2026-07-21T23-49-50.f.json",
           "names": "worlds/zemyna/2026-07-21T23-49-50.n.json"
         }
@@ -959,47 +1131,56 @@
       "name": "zorza",
       "files": [
         {
-          "timestamp": "2026-04-17T18-33-33",
+          "id": "2026-04-17T18-33-33",
+          "startedAt": "2026-04-17T16:33:33.898Z",
           "filters": "worlds/zorza/2026-04-17T18-33-33.f.json",
           "names": "worlds/zorza/2026-04-17T18-33-33.n.json"
         },
         {
-          "timestamp": "2026-04-30T08-37-55",
+          "id": "2026-04-30T08-37-55",
+          "startedAt": "2026-04-30T06:37:55.991Z",
           "filters": "worlds/zorza/2026-04-30T08-37-55.f.json",
           "names": "worlds/zorza/2026-04-30T08-37-55.n.json"
         },
         {
-          "timestamp": "2026-05-09T19-00-26",
+          "id": "2026-05-09T19-00-26",
+          "startedAt": "2026-05-09T17:00:26.795Z",
           "filters": "worlds/zorza/2026-05-09T19-00-26.f.json",
           "names": "worlds/zorza/2026-05-09T19-00-26.n.json"
         },
         {
-          "timestamp": "2026-05-15T14-25-21",
+          "id": "2026-05-15T14-25-21",
+          "startedAt": "2026-05-15T12:25:21.681Z",
           "filters": "worlds/zorza/2026-05-15T14-25-21.f.json",
           "names": "worlds/zorza/2026-05-15T14-25-21.n.json"
         },
         {
-          "timestamp": "2026-05-28T01-22-32",
+          "id": "2026-05-28T01-22-32",
+          "startedAt": "2026-05-27T23:22:32.839Z",
           "filters": "worlds/zorza/2026-05-28T01-22-32.f.json",
           "names": "worlds/zorza/2026-05-28T01-22-32.n.json"
         },
         {
-          "timestamp": "2026-06-13T14-44-30",
+          "id": "2026-06-13T14-44-30",
+          "startedAt": "2026-06-13T12:44:30.699Z",
           "filters": "worlds/zorza/2026-06-13T14-44-30.f.json",
           "names": "worlds/zorza/2026-06-13T14-44-30.n.json"
         },
         {
-          "timestamp": "2026-06-26T12-59-00",
+          "id": "2026-06-26T12-59-00",
+          "startedAt": "2026-06-26T10:59:00.706Z",
           "filters": "worlds/zorza/2026-06-26T12-59-00.f.json",
           "names": "worlds/zorza/2026-06-26T12-59-00.n.json"
         },
         {
-          "timestamp": "2026-07-09T10-41-38",
+          "id": "2026-07-09T10-41-38",
+          "startedAt": "2026-07-09T08:41:38.203Z",
           "filters": "worlds/zorza/2026-07-09T10-41-38.f.json",
           "names": "worlds/zorza/2026-07-09T10-41-38.n.json"
         },
         {
-          "timestamp": "2026-07-21T23-54-38",
+          "id": "2026-07-21T23-54-38",
+          "startedAt": "2026-07-21T21:54:38.978Z",
           "filters": "worlds/zorza/2026-07-21T23-54-38.f.json",
           "names": "worlds/zorza/2026-07-21T23-54-38.n.json"
         }

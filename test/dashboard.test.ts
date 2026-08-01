@@ -6,8 +6,11 @@ import {
   activityLabel,
   countByActivity,
   countByLevel,
+  daysBetween,
   emptyFilters,
-  formatTimestamp,
+  filtersFromParams,
+  filtersToParams,
+  formatSnapshotDate,
   totalsFromCounts,
   visibleActivityBuckets,
 } from "../public/app.js";
@@ -221,10 +224,74 @@ describe("spójność app.js z index.html", () => {
   });
 });
 
-describe("drobiazgi", () => {
-  test("formatuje znacznik czasu snapshotu", () => {
-    expect(formatTimestamp("2026-04-17T15-24-07")).toBe("17.04.2026 15:24");
-    expect(formatTimestamp("bez-sensu")).toBe("bez-sensu");
+describe("czas migawki", () => {
+  // Identyfikator migawki nie jest datą: do lipca 2026 powstawał z czasu lokalnego
+  // scrapera, później z UTC. Ta sama godzina w nazwie znaczy co innego po obu stronach.
+  const stary = { id: "2026-07-21T22-19-42", startedAt: "2026-07-21T20:19:42.806Z" };
+  const nowy = { id: "2026-08-01T07-48-26", startedAt: "2026-08-01T07:48:26.850Z" };
+
+  test("data liczy się ze startedAt, nie z nazwy pliku", () => {
+    // 20:19 UTC to 22:19 w Warszawie — dla starej migawki nazwa i data zbiegają się
+    // tylko przypadkiem, dla nowej rozjeżdżają o 2 h.
+    const asDate = (e: { startedAt: string }) => new Date(e.startedAt);
+    expect(formatSnapshotDate(stary)).toBe(
+      `21.07.2026 ${String(asDate(stary).getHours()).padStart(2, "0")}:19`,
+    );
+    expect(formatSnapshotDate(nowy)).toBe(
+      `01.08.2026 ${String(asDate(nowy).getHours()).padStart(2, "0")}:48`,
+    );
+  });
+
+  test("odstęp między migawkami liczony z nazw plików mijałby się z prawdą", () => {
+    const realny = daysBetween(stary, nowy)!;
+    expect(realny).toBeCloseTo(10.48, 2);
+
+    const zNazw =
+      (new Date("2026-08-01T07:48:26Z").getTime() - new Date("2026-07-21T22:19:42Z").getTime()) / 86_400_000;
+    expect(Math.abs(realny - zNazw)).toBeCloseTo(2 / 24, 3); // dokładnie strefa czasowa
+  });
+
+  test("bez startedAt data jest oznaczona jako przybliżona", () => {
+    expect(formatSnapshotDate({ id: "2026-04-17T15-24-07" })).toBe("17.04.2026 15:24 (?)");
+    expect(formatSnapshotDate({ id: "bez-sensu" })).toBe("bez-sensu");
+    expect(daysBetween({ id: "a" }, nowy)).toBeNull();
+  });
+});
+
+describe("stan widoku w URL-u", () => {
+  test("domyślny widok nie zaśmieca linku", () => {
+    expect(filtersToParams(emptyFilters()).toString()).toBe("");
+  });
+
+  test("komplet filtrów przechodzi tam i z powrotem", () => {
+    const f = {
+      minLevel: 250,
+      maxLevel: 320,
+      minHonor: -30,
+      maxHonor: 100_000,
+      maxDays: 14,
+      professions: new Set([1, 4]),
+    };
+    const restored = filtersFromParams(new URLSearchParams(filtersToParams(f).toString()));
+    expect(restored).toEqual(f);
+  });
+
+  test("pusty URL daje filtry domyślne", () => {
+    expect(filtersFromParams(new URLSearchParams())).toEqual(emptyFilters());
+  });
+
+  test("śmieci w URL-u nie wywalają widoku", () => {
+    const f = filtersFromParams(new URLSearchParams("minLevel=abc&maxDays=-5&prof=9,x"));
+    expect(f).toEqual(emptyFilters());
+  });
+
+  test("filtry z URL-a dają ten sam wynik co ustawione ręcznie", () => {
+    const f = filtersFromParams(new URLSearchParams("minLevel=200&maxLevel=250&prof=1,4"));
+    const expected = legacyCount(
+      (r) => r[2] >= 200 && r[2] <= 250 && (r[3] === 1 || r[3] === 4),
+    );
+    expect(total(countByLevel(data, f))).toBe(expected);
+    expect(expected).toBeGreaterThan(0);
   });
 });
 

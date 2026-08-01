@@ -17,6 +17,12 @@ export const SNAPSHOT_SCHEMA = 3;
 
 export type SnapshotMeta = {
   world: string;
+  /**
+   * Identyfikator migawki (trzon nazwy pliku), NIE data. Pliki sprzed sierpnia 2026
+   * mają w nim czas lokalny, nowsze UTC — do wyświetlania i liczenia odstępów służy
+   * wyłącznie `startedAt`. Nazwa pola została taka, jaka była w zapisanych danych;
+   * przemianowanie kosztowałoby przepisanie 362 plików dla samej kosmetyki.
+   */
   timestamp: string;
   startedAt?: string;
   finishedAt?: string;
