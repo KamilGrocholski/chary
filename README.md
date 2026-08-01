@@ -97,6 +97,7 @@ Aktualny schemat (`schema: 3`) to dwa pliki o **tej samej kolejności wierszy** 
 ```
 
 - `days` — `0` dla „Mniej niż 24h temu”, `N` dla „N dni temu”, `null` dla konta, które nigdy nie było online (ranking pokazuje wtedy ~20655 dni, czyli datę z 1969 r.).
+- `honor` — bywa **ujemny** (najniższy zaobserwowany: −35), więc pola filtra honoru nie mają dolnego ograniczenia.
 - `charId` — stabilne ID postaci z linku profilu, odporne na zmianę nicku. Brak w snapshotach zmigrowanych z formatu sprzed sierpnia 2026.
 
 Starsze snapshoty (jeden plik na migawkę, z tekstem „Mniej niż 24h temu” i wyliczaną datą ISO) zostały zmigrowane bezstratnie — `bun run rebuild` obsługuje oba stare schematy, gdyby jakiś się jeszcze znalazł.

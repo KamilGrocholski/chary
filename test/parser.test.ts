@@ -99,6 +99,7 @@ describe("parseIntStrict", () => {
   test.each([
     ["378t", 378],
     [" 9550 ", 9550],
+    ["-20", -20],
     ["", null],
     ["-", null],
     ["brak", null],
