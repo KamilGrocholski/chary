@@ -1,6 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
+import { mkdir, rm } from "node:fs/promises";
+import path from "node:path";
 import {
+  checkPopulationDrop,
   isLegacySnapshot,
+  latestSnapshotCount,
   normalizeLegacyRows,
   splitNormalized,
   splitSnapshot,
@@ -99,5 +103,109 @@ describe("rozpoznawanie plików", () => {
     ["2026-07-21T22-04-12.n.json", "2026-07-21T22-04-12"],
   ] as const)("timestampFromFileName(%p) → %p", (name, expected) => {
     expect(timestampFromFileName(name)).toBe(expected);
+  });
+});
+
+describe("strażnik przed obciętym scrapem", () => {
+  // Ranking podczas awarii potrafi oddać mniej stron. Taka migawka jest formalnie
+  // poprawna — zdradza ją dopiero nagły spadek populacji, bo normalnie zmienia się
+  // ona o ułamki procenta na rundę.
+
+  test("normalny odpływ graczy przechodzi bez flagi", () => {
+    expect(checkPopulationDrop(39037, 39287)).toBeNull(); // realny spadek aethera: 0,6%
+    expect(checkPopulationDrop(9600, 10_000)).toBeNull(); // dokładnie 4%
+    expect(checkPopulationDrop(9500, 10_000)).toBeNull(); // dokładnie próg 5%
+  });
+
+  test("spadek powyżej progu ustawia flagę z liczbami", () => {
+    const suspect = checkPopulationDrop(9400, 10_000);
+    expect(suspect).not.toBeNull();
+    expect(suspect!.previousCount).toBe(10_000);
+    expect(suspect!.count).toBe(9400);
+    expect(suspect!.drop).toBeCloseTo(0.06, 5);
+    expect(suspect!.reason).toContain("6.0%");
+  });
+
+  test("obcięty scrape — połowa stron nie doszła", () => {
+    expect(checkPopulationDrop(4000, 8000)!.drop).toBe(0.5);
+  });
+
+  test("wzrost populacji nigdy nie jest podejrzany", () => {
+    expect(checkPopulationDrop(12_000, 10_000)).toBeNull();
+    expect(checkPopulationDrop(10_000, 10_000)).toBeNull();
+  });
+
+  test("nowy świat bez poprzedniej migawki nie jest podejrzany", () => {
+    expect(checkPopulationDrop(5000, null)).toBeNull();
+    expect(checkPopulationDrop(5000, 0)).toBeNull();
+  });
+
+  test("próg da się przestawić", () => {
+    expect(checkPopulationDrop(9900, 10_000, 0.005)).not.toBeNull(); // czulszy: 1% > 0,5%
+    expect(checkPopulationDrop(5000, 10_000, 0.9)).toBeNull(); // luźniejszy: 50% < 90%
+  });
+
+  test("flaga trafia do pliku filtrów, nie do pliku nicków", () => {
+    const suspect = checkPopulationDrop(4000, 8000)!;
+    const { filters, names } = splitSnapshot(rows, { ...META, suspect });
+    expect(filters.suspect).toEqual(suspect);
+    expect(JSON.stringify(names)).not.toContain("suspect");
+  });
+
+  test("zdrowa migawka nie niesie pola suspect", () => {
+    expect(JSON.stringify(splitSnapshot(rows, META).filters)).not.toContain("suspect");
+  });
+});
+
+describe("odczyt poprzedniej migawki", () => {
+  const tmp = path.join(import.meta.dir, "..", "node_modules", ".tmp-snapshot-test");
+
+  async function world(name: string, files: Record<string, unknown>) {
+    const dir = path.join(tmp, name);
+    await mkdir(dir, { recursive: true });
+    for (const [file, content] of Object.entries(files)) {
+      await Bun.write(path.join(dir, file), JSON.stringify(content));
+    }
+    return dir;
+  }
+
+  afterAll(async () => {
+    await rm(tmp, { recursive: true, force: true });
+  });
+
+  test("bierze count z najnowszej migawki, nie z pierwszej lepszej", async () => {
+    const dir = await world("kolejnosc", {
+      "2026-06-01T00-00-00.f.json": { count: 100 },
+      "2026-08-01T00-00-00.f.json": { count: 300 },
+      "2026-07-01T00-00-00.f.json": { count: 200 },
+    });
+    expect(await latestSnapshotCount(dir)).toBe(300);
+  });
+
+  test("pomija pliki nicków", async () => {
+    const dir = await world("nicki", {
+      "2026-08-01T00-00-00.f.json": { count: 42 },
+      "2026-09-01T00-00-00.n.json": { count: 999 },
+    });
+    expect(await latestSnapshotCount(dir)).toBe(42);
+  });
+
+  test("nowy świat, uszkodzony plik i brak katalogu dają null zamiast wyjątku", async () => {
+    expect(await latestSnapshotCount(path.join(tmp, "nie-ma-takiego"))).toBeNull();
+    expect(await latestSnapshotCount(await world("pusty", {}))).toBeNull();
+
+    const uszkodzony = path.join(tmp, "uszkodzony");
+    await mkdir(uszkodzony, { recursive: true });
+    await Bun.write(path.join(uszkodzony, "2026-08-01T00-00-00.f.json"), "{ to nie jest json");
+    expect(await latestSnapshotCount(uszkodzony)).toBeNull();
+  });
+
+  test("razem ze strażnikiem: obcięta migawka zostaje oflagowana", async () => {
+    const dir = await world("obciety", { "2026-07-01T00-00-00.f.json": { count: 7754 } });
+    const suspect = checkPopulationDrop(3900, await latestSnapshotCount(dir));
+
+    expect(suspect).not.toBeNull();
+    expect(suspect!.drop).toBeCloseTo(0.497, 3);
+    expect(suspect!.reason).toContain("7754 → 3900");
   });
 });

@@ -120,6 +120,17 @@
       margin-bottom: 12px;
     }
     .error:empty { margin: 0; }
+    .suspect {
+      margin-bottom: 20px;
+      border-color: #c98500;
+      color: #f2f2ef;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .suspect b { color: #c98500; }
     .source {
       padding: 10px 0;
       color: var(--muted);
@@ -208,6 +219,8 @@
         </div>
       </div>
     </div>
+
+    <div id="suspect" class="suspect card" role="status" hidden></div>
 
     <div class="stats card" id="stats">Ładowanie…</div>
     <div id="error" class="error" role="alert"></div>

@@ -1,3 +1,4 @@
+import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { parseLastOnlineDays, type PlayerRow } from "./parser.ts";
 
@@ -28,7 +29,44 @@ export type SnapshotMeta = {
   finishedAt?: string;
   pages?: number;
   skippedRows?: number;
+  /** Ustawiane, gdy populacja świata spadła podejrzanie mocno — patrz `checkPopulationDrop`. */
+  suspect?: PopulationDrop;
 };
+
+/**
+ * Sygnał, że migawka może być obcięta. Ranking potrafi w czasie awarii zwrócić mniej
+ * stron, a taki snapshot jest formalnie poprawny — jedyne, co go zdradza, to nagły
+ * spadek populacji względem poprzedniej migawki (normalnie ułamki procenta na rundę).
+ */
+export type PopulationDrop = {
+  reason: string;
+  previousCount: number;
+  count: number;
+  /** Udział utraconych graczy, np. 0.12 = −12%. */
+  drop: number;
+};
+
+/** Domyślny próg: spadek powyżej 5% populacji świata między rundami. */
+export const DEFAULT_DROP_THRESHOLD = 0.05;
+
+export function checkPopulationDrop(
+  count: number,
+  previousCount: number | null,
+  threshold = DEFAULT_DROP_THRESHOLD,
+): PopulationDrop | null {
+  // Wzrost populacji jest normalny i niczego nie sygnalizuje — patrzymy tylko na spadki.
+  if (previousCount === null || previousCount <= 0 || count >= previousCount) return null;
+
+  const drop = (previousCount - count) / previousCount;
+  if (drop <= threshold) return null;
+
+  return {
+    reason: `populacja spadła o ${(drop * 100).toFixed(1)}% względem poprzedniej migawki (${previousCount} → ${count}) — migawka może być obcięta`,
+    previousCount,
+    count,
+    drop,
+  };
+}
 
 export type FilterFile = SnapshotMeta & {
   schema: number;
@@ -142,6 +180,24 @@ export function splitNormalized(rows: NormalizedRow[], meta: SnapshotMeta): { fi
       ...(hasCharIds ? { charId: rows.map((r) => r.charId) } : {}),
     },
   };
+}
+
+/**
+ * Liczba graczy w najnowszej migawce świata — punkt odniesienia dla strażnika.
+ * Brak katalogu, brak migawek albo nieczytelny plik to nie błąd: nowy świat
+ * po prostu nie ma z czym się porównać.
+ */
+export async function latestSnapshotCount(dir: string): Promise<number | null> {
+  try {
+    const files = (await readdir(dir)).filter((f) => f.endsWith(".f.json")).sort();
+    const last = files.at(-1);
+    if (!last) return null;
+
+    const { count } = JSON.parse(await Bun.file(path.join(dir, last)).text()) as { count?: number };
+    return typeof count === "number" ? count : null;
+  } catch {
+    return null;
+  }
 }
 
 // ── Ścieżki ───────────────────────────────────────────────────────────────────

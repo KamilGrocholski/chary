@@ -424,6 +424,22 @@ function setupDashboard() {
     `;
   }
 
+  /**
+   * Scraper oznacza migawkę, której populacja spadła podejrzanie mocno — najczęściej
+   * znaczy to, że ranking podczas awarii oddał mniej stron. Bez tego paska flaga
+   * byłaby zapisywana dla nikogo.
+   */
+  function showSuspect(suspect) {
+    const node = el("suspect");
+    if (!suspect) {
+      node.hidden = true;
+      node.textContent = "";
+      return;
+    }
+    node.hidden = false;
+    node.innerHTML = `<span aria-hidden="true">⚠</span><span><b>Ta migawka może być niekompletna.</b> ${suspect.reason}</span>`;
+  }
+
   function render() {
     if (!data) return;
     writeUrlState();
@@ -444,6 +460,7 @@ function setupDashboard() {
 
     el("error").textContent = "";
     el("stats").textContent = "Ładowanie…";
+    showSuspect(null);
     el("sourceInfo").textContent = entry.filters;
 
     try {
@@ -454,6 +471,7 @@ function setupDashboard() {
       if (token !== loadToken) return;
 
       data = json;
+      showSuspect(json.suspect);
       render();
     } catch (e) {
       el("error").textContent = String(e?.message || e);

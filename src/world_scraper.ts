@@ -3,7 +3,15 @@ import { mkdir, appendFile } from "node:fs/promises";
 import path from "node:path";
 import { WORLDS as DEFAULT_WORLDS } from "./worlds.ts";
 import { ParseError, parseTable, parseTotalPages, type PlayerRow } from "./parser.ts";
-import { filterPathFor, namesPathFor, splitSnapshot } from "./snapshot.ts";
+import {
+  DEFAULT_DROP_THRESHOLD,
+  checkPopulationDrop,
+  filterPathFor,
+  latestSnapshotCount,
+  namesPathFor,
+  splitSnapshot,
+  type PopulationDrop,
+} from "./snapshot.ts";
 import { WORLDS_DIR, rebuildManifest } from "./manifest.ts";
 
 // ── Typy błędów ───────────────────────────────────────────────────────────────
@@ -176,7 +184,7 @@ async function scrapePageWithRetry(world: string, page: number): Promise<PageRes
 
 // ── Scrapowanie świata ────────────────────────────────────────────────────────
 
-async function scrapeWorld(world: string, interval: number) {
+async function scrapeWorld(world: string, interval: number): Promise<PopulationDrop | null> {
   const startedAt = new Date();
   const allRows: PlayerRow[] = [];
   const badRows: string[] = [];
@@ -202,6 +210,8 @@ async function scrapeWorld(world: string, interval: number) {
 
   const dir = path.join(WORLDS_DIR, world);
   const timestamp = formatStamp(startedAt);
+  const suspect = checkPopulationDrop(allRows.length, await latestSnapshotCount(dir), dropThreshold);
+
   const { filters, names } = splitSnapshot(allRows, {
     world,
     timestamp,
@@ -209,6 +219,7 @@ async function scrapeWorld(world: string, interval: number) {
     finishedAt: new Date().toISOString(),
     pages: maxPages,
     skippedRows: badRows.length,
+    ...(suspect ? { suspect } : {}),
   });
 
   try {
@@ -223,7 +234,12 @@ async function scrapeWorld(world: string, interval: number) {
     await log("WARN", `Pominięto ${badRows.length} wierszy`, { world, examples: badRows.slice(0, 5) });
   }
 
-  process.stdout.write(`\r✓ ${world}: ${allRows.length} graczy, ${maxPages} stron — zapisano\n`);
+  if (suspect) {
+    await log("WARN", `Podejrzana migawka: ${suspect.reason}`, { world, ...suspect });
+    process.stdout.write(`\r⚠ ${world}: ${allRows.length} graczy — ${suspect.reason}\n`);
+  } else {
+    process.stdout.write(`\r✓ ${world}: ${allRows.length} graczy, ${maxPages} stron — zapisano\n`);
+  }
   await log("INFO", `Koniec`, {
     world,
     rows: allRows.length,
@@ -231,6 +247,8 @@ async function scrapeWorld(world: string, interval: number) {
     skippedRows: badRows.length,
     file: filterPathFor(dir, timestamp),
   });
+
+  return suspect;
 }
 
 // ── Dry-run ───────────────────────────────────────────────────────────────────
@@ -258,6 +276,14 @@ const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const positional = args.filter((a) => !a.startsWith("--"));
 
+// Próg strażnika obciętego scrapu, np. --drop-threshold=0.1 dla 10%.
+const dropThresholdArg = args.find((a) => a.startsWith("--drop-threshold="))?.split("=")[1];
+const dropThreshold = dropThresholdArg === undefined ? DEFAULT_DROP_THRESHOLD : Number(dropThresholdArg);
+if (!Number.isFinite(dropThreshold) || dropThreshold < 0 || dropThreshold > 1) {
+  console.error("--drop-threshold musi być liczbą z zakresu 0-1 (udział, nie procent)");
+  process.exit(1);
+}
+
 const worlds = positional[0]
   ? positional[0].split(",").map((w) => w.trim().toLowerCase()).filter(Boolean)
   : DEFAULT_WORLDS;
@@ -284,10 +310,12 @@ if (dryRun) {
 }
 
 const failures: { world: string; error: string }[] = [];
+const suspects: { world: string; reason: string }[] = [];
 
 for (const world of worlds) {
   try {
-    await scrapeWorld(world, interval);
+    const suspect = await scrapeWorld(world, interval);
+    if (suspect) suspects.push({ world, reason: suspect.reason });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     failures.push({ world, error: message });
@@ -297,6 +325,12 @@ for (const world of worlds) {
 }
 
 await rebuildManifest();
+
+if (suspects.length > 0) {
+  // Migawki są zapisane — to ostrzeżenie do sprawdzenia, nie porażka runu.
+  process.stdout.write(`\n⚠ ${suspects.length} migawek wymaga sprawdzenia:\n`);
+  for (const s of suspects) process.stdout.write(`  ⚠ ${s.world}: ${s.reason}\n`);
+}
 
 if (failures.length > 0) {
   process.stdout.write(`\n${failures.length}/${worlds.length} światów nie zostało pobranych:\n`);

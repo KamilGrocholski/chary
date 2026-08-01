@@ -349,3 +349,21 @@ describe("etykiety rozkładu aktywności", () => {
     expect(activityLabel(1, 1)).toBe("1 dzień");
   });
 });
+
+describe("ostrzeżenie o podejrzanej migawce", () => {
+  test("dashboard czyta flagę ze snapshotu i ma gdzie ją pokazać", () => {
+    // Bez tego scraper zapisywałby `suspect` dla nikogo — dokładnie ten wzorzec,
+    // za który ten sam audyt skasował moduł agregatów.
+    expect(js).toContain("showSuspect(json.suspect)");
+    expect(js).toContain("Ta migawka może być niekompletna");
+    expect(html).toContain('id="suspect"');
+  });
+
+  test("ostrzeżenie znika przy przełączeniu na inną migawkę", () => {
+    const load = js.slice(js.indexOf("async function loadSnapshot"));
+    const reset = load.indexOf("showSuspect(null)");
+    const set = load.indexOf("showSuspect(json.suspect)");
+    expect(reset).toBeGreaterThan(-1);
+    expect(reset).toBeLessThan(set); // czyszczone zanim dojdą nowe dane
+  });
+});
