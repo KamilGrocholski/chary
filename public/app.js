@@ -20,7 +20,40 @@ export const PROF_COLORS = {
   6: "#e66767", // Łowca — czerwony
 };
 
-export const ACTIVITY_LABELS = ["< 24h", "≤ 7 dni", "≤ 30 dni", "> 30 dni", "nigdy"];
+// Zakresy koszyków aktywności (w dniach). Koszyk 4 to konta nigdy nieużywane.
+// Koszyki są rozłączne, nie skumulowane — etykiety muszą to oddawać, bo „≤ 7 dni”
+// przy koszyku 1-7 sugerowało, że to wszyscy z ostatniego tygodnia, a to tylko ci,
+// których nie ma w koszyku „< 24h”.
+export const ACTIVITY_BOUNDS = [
+  [0, 0],
+  [1, 7],
+  [8, 30],
+  [31, Infinity],
+];
+
+/**
+ * Etykieta koszyka przycięta do aktywnego progu — przy filtrze „14 dni” koszyk
+ * 8-30 zawiera realnie 8-14 dni i tak ma być podpisany.
+ */
+export function activityLabel(bucket, maxDays = Infinity) {
+  if (bucket === 4) return "nigdy";
+
+  const [from, to] = ACTIVITY_BOUNDS[bucket];
+  const hi = Math.min(to, maxDays);
+  if (from === 0) return "< 24h";
+  if (hi === Infinity) return `> ${from - 1} dni`;
+  if (from === hi) return from === 1 ? "1 dzień" : `${from} dni`;
+  return `${from}-${hi} dni`;
+}
+
+/**
+ * Koszyki, które przy danym progu mogą być niepuste. Bez tego widok pokazywał
+ * „> 30 dni: 0 · nigdy: 0” — zera z definicji, wyglądające jak zepsute dane.
+ */
+export function visibleActivityBuckets(maxDays = Infinity) {
+  if (maxDays === Infinity) return [0, 1, 2, 3, 4];
+  return ACTIVITY_BOUNDS.map(([from], bucket) => (from <= maxDays ? bucket : null)).filter((b) => b !== null);
+}
 
 /** Ranking pokazuje ~20655 dni dla kont, które nigdy nie były online. */
 const NEVER_ONLINE_DAYS = 10_000;
@@ -282,7 +315,7 @@ function setupDashboard() {
     chart.update();
   }
 
-  function renderStats(counts, activity) {
+  function renderStats(counts, activity, maxDays) {
     const { total, perProfession } = totalsFromCounts(counts);
 
     const badges = Object.entries(PROF)
@@ -291,8 +324,10 @@ function setupDashboard() {
       .map(({ name, color, count }) => `<span style="color:${color};white-space:nowrap">${name}: <b>${count}</b></span>`)
       .join(" · ");
 
+    const visible = new Set(visibleActivityBuckets(maxDays));
     const activityLine = activity
-      .map(([bucket, count]) => `<span>${ACTIVITY_LABELS[bucket]}: <b style="color:var(--text)">${count}</b></span>`)
+      .filter(([bucket]) => visible.has(bucket))
+      .map(([bucket, count]) => `<span>${activityLabel(bucket, maxDays)}: <b style="color:var(--text)">${count}</b></span>`)
       .join(" · ");
 
     el("stats").innerHTML = `
@@ -307,7 +342,7 @@ function setupDashboard() {
     const filters = readFilters();
     const counts = countByLevel(data, filters);
     renderChart(counts);
-    renderStats(counts, countByActivity(data, filters));
+    renderStats(counts, countByActivity(data, filters), filters.maxDays);
   }
 
   function scheduleRender() {

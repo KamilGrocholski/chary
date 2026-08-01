@@ -3,11 +3,13 @@ import path from "node:path";
 import { normalizeLegacyRows, splitNormalized } from "../src/snapshot.ts";
 import {
   activityBucket,
+  activityLabel,
   countByActivity,
   countByLevel,
   emptyFilters,
   formatTimestamp,
   totalsFromCounts,
+  visibleActivityBuckets,
 } from "../public/app.js";
 
 // Wzorcem odniesienia jest próbka prawdziwego snapshotu w starym schemacie v1
@@ -223,5 +225,60 @@ describe("drobiazgi", () => {
   test("formatuje znacznik czasu snapshotu", () => {
     expect(formatTimestamp("2026-04-17T15-24-07")).toBe("17.04.2026 15:24");
     expect(formatTimestamp("bez-sensu")).toBe("bez-sensu");
+  });
+});
+
+describe("etykiety rozkładu aktywności", () => {
+  test("bez filtru opisują rozłączne zakresy, a nie sumy narastające", () => {
+    // „≤ 7 dni” przy koszyku 1-7 sugerowało, że to wszyscy z ostatniego tygodnia.
+    expect(visibleActivityBuckets(Infinity).map((b) => activityLabel(b))).toEqual([
+      "< 24h",
+      "1-7 dni",
+      "8-30 dni",
+      "> 30 dni",
+      "nigdy",
+    ]);
+  });
+
+  test("próg przycina etykietę koszyka, w którym leży", () => {
+    expect(visibleActivityBuckets(14).map((b) => activityLabel(b, 14))).toEqual(["< 24h", "1-7 dni", "8-14 dni"]);
+    expect(visibleActivityBuckets(3).map((b) => activityLabel(b, 3))).toEqual(["< 24h", "1-3 dni"]);
+    expect(visibleActivityBuckets(60).map((b) => activityLabel(b, 60))).toEqual([
+      "< 24h",
+      "1-7 dni",
+      "8-30 dni",
+      "31-60 dni",
+    ]);
+  });
+
+  test("przy progu nie pokazujemy koszyków, które z definicji są puste", () => {
+    // „> 30 dni: 0 · nigdy: 0” wyglądało jak zepsute dane
+    expect(visibleActivityBuckets(0)).toEqual([0]);
+    expect(visibleActivityBuckets(14)).not.toContain(3);
+    expect(visibleActivityBuckets(14)).not.toContain(4);
+    expect(visibleActivityBuckets(60)).not.toContain(4);
+  });
+
+  test("liczby pod etykietami zgadzają się z zakresem, który opisują", () => {
+    const f = filters({ maxDays: 14 });
+    const buckets = new Map<number, number>(
+      countByActivity(data, f).map(([bucket, count]: number[]) => [bucket as number, count as number]),
+    );
+    const visible = visibleActivityBuckets(14);
+
+    expect(buckets.get(visible[0])).toBe(legacyCount((r) => legacyDays(r[5]) === 0));
+    expect(buckets.get(visible[1])).toBe(legacyCount((r) => {
+      const d = legacyDays(r[5]);
+      return d !== null && d >= 1 && d <= 7;
+    }));
+    expect(buckets.get(visible[2])).toBe(legacyCount((r) => {
+      const d = legacyDays(r[5]);
+      return d !== null && d >= 8 && d <= 14;
+    }));
+    expect(visible).toHaveLength(3);
+  });
+
+  test("1 dzień odmienia się poprawnie", () => {
+    expect(activityLabel(1, 1)).toBe("1 dzień");
   });
 });
