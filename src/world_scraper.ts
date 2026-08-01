@@ -1,45 +1,17 @@
 import * as cheerio from "cheerio";
-import { mkdir, readdir, stat, appendFile } from "node:fs/promises";
+import { mkdir, appendFile } from "node:fs/promises";
 import path from "node:path";
 import { WORLDS as DEFAULT_WORLDS } from "./worlds.ts";
+import { ParseError, parseTable, parseTotalPages, type PlayerRow } from "./parser.ts";
+import { filterPathFor, namesPathFor, splitSnapshot } from "./snapshot.ts";
+import { WORLDS_DIR, rebuildManifest } from "./manifest.ts";
 
-type PlayerRow = [
-  rank: number,
-  name: string,
-  level: number,
-  profession: number,
-  honor: number,
-  lastOnlineText: string,
-  lastOnline: string,
-];
-
-type SnapshotFile = {
-  timestamp: string;
-  file: string;
-};
-
-type ManifestWorld = {
-  name: string;
-  files: SnapshotFile[];
-};
-
-type Manifest = {
-  worlds: ManifestWorld[];
-};
-
-// ── Error types ──────────────────────────────────────────────────────────────
+// ── Typy błędów ───────────────────────────────────────────────────────────────
 
 class HttpError extends Error {
   readonly type = "HttpError";
-  constructor(readonly status: number, readonly url: string) {
+  constructor(readonly status: number, readonly url: string, readonly retryAfterMs?: number) {
     super(`HTTP ${status} — ${url}`);
-  }
-}
-
-class ParseError extends Error {
-  readonly type = "ParseError";
-  constructor(message: string, readonly world: string, readonly page: number) {
-    super(`${message} (world=${world}, page=${page})`);
   }
 }
 
@@ -59,7 +31,7 @@ class IoError extends Error {
 
 type ScraperError = HttpError | ParseError | FetchError | IoError;
 
-// ── Logging ──────────────────────────────────────────────────────────────────
+// ── Logowanie ─────────────────────────────────────────────────────────────────
 
 const LOG_DIR = "logs";
 const LOG_FILE = path.join(LOG_DIR, "scraper.log");
@@ -70,12 +42,8 @@ type LogLevel = keyof typeof LOG_LEVELS;
 const LOG_LEVEL_ENV = (process.env.LOG_LEVEL ?? "WARN").toUpperCase() as LogLevel;
 const MIN_LEVEL = LOG_LEVELS[LOG_LEVEL_ENV] ?? LOG_LEVELS.WARN;
 
-function nowIso() {
-  return new Date().toISOString();
-}
-
 function formatLogLine(level: LogLevel, msg: string, extra?: object) {
-  const base = `[${nowIso()}] [${level}] ${msg}`;
+  const base = `[${new Date().toISOString()}] [${level}] ${msg}`;
   return extra ? `${base} ${JSON.stringify(extra)}` : base;
 }
 
@@ -94,332 +62,110 @@ async function log(level: LogLevel, msg: string, extra?: object) {
 function logError(err: ScraperError, context?: object) {
   return log("ERROR", err.message, {
     type: err.type,
-    message: err.message,
     error: err.stack ?? String(err),
     ...context,
   });
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Stałe ─────────────────────────────────────────────────────────────────────
 
 const BASE = "https://www.margonem.pl";
 const FETCH_TIMEOUT_MS = 30_000;
-const PUBLIC_DIR = "public";
-const WORLDS_DIR = path.join(PUBLIC_DIR, "worlds");
-const MANIFEST_FILE = path.join(PUBLIC_DIR, "manifest.json");
+const MAX_PAGE_RETRIES = 3;
+const BACKOFF_BASE_MS = 5_000;
+const MAX_BACKOFF_MS = 120_000;
+const MIN_INTERVAL_MS = 250;
+/** Powyżej tylu procent odrzuconych wierszy na stronie zakładamy zmianę markupu. */
+const MAX_BAD_ROW_RATIO = 0.01;
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Helpery ───────────────────────────────────────────────────────────────────
 
+// Uwaga: stary format `/ladder/players,<świat>?page=N` robi 301 na
+// `/ladder/<Świat>/players` GUBIĄC parametr `page` — pobierałby w kółko stronę 1.
 function buildUrl(world: string, page: number) {
-  return `${BASE}/ladder/players,${world}?page=${page}`;
-}
-
-// Lenient: used for pagination discovery where a missing value falls back to 1.
-function parseNumber(text: string): number {
-  const n = Number(text.replace(/[^\d-]/g, ""));
-  return Number.isFinite(n) ? n : 0;
-}
-
-// Strict: returns null when `text` does not hold a valid integer, so callers
-// can throw with context instead of silently coercing garbage to 0.
-function parseIntStrict(text: string): number | null {
-  const cleaned = text.replace(/[^\d-]/g, "");
-  if (cleaned === "" || cleaned === "-") return null;
-  const n = Number(cleaned);
-  return Number.isInteger(n) ? n : null;
+  return `${BASE}/ladder/${world}/players?page=${page}`;
 }
 
 function formatStamp(d: Date) {
   const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
-}
-
-function parseTotalPages($: cheerio.CheerioAPI): number {
-  const candidates = [
-    $(".pagination .total-pages").first().text().trim(),
-    $("input[name='page'][max]").attr("max") ?? "",
-    $(".pagination a[href*='page=']")
-      .map((_, el) => parseNumber($(el).text()))
-      .get()
-      .filter((n) => n > 0)
-      .join(" "),
-  ];
-
-  for (const c of candidates) {
-    const n = parseNumber(c);
-    if (n > 0) return n;
-  }
-  return 1;
-}
-
-function parseLastOnline(text: string, now = new Date()): Date | null {
-  const t = text.trim().toLowerCase();
-
-  if (t.includes("mniej") && t.includes("24h")) {
-    // store as 1 min before scrape time so the record stays valid for ~24h
-    return new Date(now.getTime() - 60 * 1000);
-  }
-
-  const d = t.match(/(\d+)\s+(?:dni?|dzień)\s+temu/);
-  if (d) {
-    const date = new Date(now);
-    date.setDate(date.getDate() - Number(d[1]));
-    return date;
-  }
-
-  return null;
-}
-
-// Returns null for an unknown profession so the caller can throw with context.
-function professionToInt(name: string): number | null {
-  const m: Record<string, number> = {
-    Wojownik: 1,
-    Mag: 2,
-    Paladyn: 3,
-    Tropiciel: 4,
-    "Tancerz ostrzy": 5,
-    Łowca: 6,
-    owca: 6,
-  };
-  return m[name.trim()] ?? null;
-}
-
-function parseTable($: cheerio.CheerioAPI, world: string, page: number): PlayerRow[] {
-  const rows: PlayerRow[] = [];
-
-  const table = $("table")
-    .filter((_, el) => {
-      const txt = $(el).text();
-      return txt.includes("Gracz") && txt.includes("Poziom") && txt.includes("Profesja");
-    })
-    .first();
-
-  table.find("tbody tr").each((_, tr) => {
-    const tds = $(tr).children("td");
-    if (tds.length < 6) {
-      throw new ParseError(`Row has ${tds.length} columns, expected at least 6`, world, page);
-    }
-
-    const rawRank = $(tds[0]).text();
-    const rawLevel = $(tds[2]).text();
-    const rawProfession = $(tds[3]).text();
-    const rawHonor = $(tds[4]).text();
-
-    const rank = parseIntStrict(rawRank);
-    if (rank === null || rank < 1) {
-      throw new ParseError(`Invalid rank: ${JSON.stringify(rawRank.trim())}`, world, page);
-    }
-
-    const name = $(tds[1]).text().trim();
-    if (!name) {
-      throw new ParseError(`Empty player name (rank ${rank})`, world, page);
-    }
-
-    const level = parseIntStrict(rawLevel);
-    if (level === null || level < 1) {
-      throw new ParseError(`Invalid level for "${name}": ${JSON.stringify(rawLevel.trim())}`, world, page);
-    }
-
-    const profession = professionToInt(rawProfession);
-    if (profession === null) {
-      throw new ParseError(`Unknown profession for "${name}": ${JSON.stringify(rawProfession.trim())}`, world, page);
-    }
-
-    const honor = parseIntStrict(rawHonor);
-    if (honor === null) {
-      throw new ParseError(`Invalid honor for "${name}": ${JSON.stringify(rawHonor.trim())}`, world, page);
-    }
-
-    const lastOnlineText = $(tds[5]).text().trim();
-    if (!lastOnlineText) {
-      throw new ParseError(`Empty last-online for "${name}"`, world, page);
-    }
-
-    const lastOnlineDate = parseLastOnline(lastOnlineText);
-    if (!lastOnlineDate) {
-      throw new ParseError(`Unrecognized last-online for "${name}": ${JSON.stringify(lastOnlineText)}`, world, page);
-    }
-
-    rows.push([
-      rank,
-      name,
-      level,
-      profession,
-      honor,
-      lastOnlineText,
-      lastOnlineDate.toISOString(),
-    ]);
-  });
-
-  if (rows.length === 0) {
-    throw new ParseError("No rows parsed from table", world, page);
-  }
-
-  return rows;
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}T${p(d.getUTCHours())}-${p(d.getUTCMinutes())}-${p(d.getUTCSeconds())}`;
 }
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function toManifestTimestamp(fileName: string) {
-  return fileName.replace(/\.json$/, "");
+function parseRetryAfter(header: string | null): number | undefined {
+  if (!header) return undefined;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const date = Date.parse(header);
+  return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
 }
 
-// ── Manifest ──────────────────────────────────────────────────────────────────
+// ── Pobieranie strony ─────────────────────────────────────────────────────────
 
-async function rebuildManifest() {
-  await mkdir(WORLDS_DIR, { recursive: true });
+async function fetchPage(world: string, page: number): Promise<string> {
+  const url = buildUrl(world, page);
 
-  const worlds = await readdir(WORLDS_DIR, { withFileTypes: true });
-  const manifest: Manifest = { worlds: [] };
-
-  for (const worldDir of worlds) {
-    if (!worldDir.isDirectory()) continue;
-
-    const worldName = worldDir.name;
-    const fullWorldDir = path.join(WORLDS_DIR, worldName);
-    const files = await readdir(fullWorldDir, { withFileTypes: true });
-    const snapshots: SnapshotFile[] = [];
-
-    for (const file of files) {
-      if (!file.isFile() || !file.name.endsWith(".json")) continue;
-      const fullPath = path.join(fullWorldDir, file.name);
-      const s = await stat(fullPath);
-      if (!s.isFile()) continue;
-
-      snapshots.push({
-        timestamp: toManifestTimestamp(file.name.split("__")[0] ?? file.name),
-        file: path.posix.join("worlds", worldName, file.name),
-      });
-    }
-
-    snapshots.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-    manifest.worlds.push({ name: worldName, files: snapshots });
-  }
-
-  manifest.worlds.sort((a, b) => a.name.localeCompare(b.name));
-  await Bun.write(MANIFEST_FILE, JSON.stringify(manifest, null, 2));
-}
-
-// ── Scraper ───────────────────────────────────────────────────────────────────
-
-async function scrapeWorld(world: string, interval: number) {
-  const startedAt = new Date();
-  const allRows: PlayerRow[] = [];
-  let page = 1;
-  let maxPages = 1;
-
-  await log("INFO", `Starting scrape`, { world, interval });
-  process.stdout.write(`\n⟳ ${world} — łączenie...\n`);
-
-  while (page <= maxPages) {
-    const url = buildUrl(world, page);
-
-    let html: string;
-    try {
-      const res = await fetch(url, {
-        headers: { "user-agent": "Mozilla/5.0", accept: "text/html,application/xhtml+xml" },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      });
-
-      if (!res.ok) {
-        const err = new HttpError(res.status, url);
-        await logError(err, { world, page });
-        throw err;
-      }
-
-      html = await res.text();
-    } catch (e) {
-      if (e instanceof HttpError) throw e;
-      const err = new FetchError(e instanceof Error ? e.message : String(e), url, e);
-      await logError(err, { world, page });
-      throw err;
-    }
-
-    let rows: PlayerRow[];
-    try {
-      const $ = cheerio.load(html);
-      if (page === 1) maxPages = parseTotalPages($);
-      rows = parseTable($, world, page);
-    } catch (e) {
-      if (e instanceof ParseError) {
-        await logError(e);
-        throw e;
-      }
-      const err = new ParseError(e instanceof Error ? e.message : String(e), world, page);
-      await logError(err);
-      throw err;
-    }
-
-    allRows.push(...rows);
-    await log("DEBUG", `page ${page}/${maxPages}: ${rows.length} rows`, { world });
-    process.stdout.write(`\r  ${world}: strona ${page}/${maxPages} (${allRows.length} graczy)`);
-    page++;
-
-    if (page <= maxPages) await sleep(interval);
-  }
-
-  const finishedAt = new Date();
-  const dir = path.join(WORLDS_DIR, world);
-  const file = path.join(dir, `${formatStamp(startedAt)}.json`);
-  const payload = {
-    world,
-    startedAt: startedAt.toISOString(),
-    finishedAt: finishedAt.toISOString(),
-    pages: maxPages,
-    rows: allRows,
-  };
-
+  let res: Response;
   try {
-    await mkdir(dir, { recursive: true });
-    await Bun.write(file, JSON.stringify(payload));
+    res = await fetch(url, {
+      headers: { "user-agent": "Mozilla/5.0 (margostat scraper)", accept: "text/html,application/xhtml+xml" },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
   } catch (e) {
-    const err = new IoError(`Failed to save snapshot for ${world}: ${e instanceof Error ? e.message : String(e)}`, e);
-    await logError(err, { world, file });
-    throw err;
+    throw new FetchError(e instanceof Error ? e.message : String(e), url, e);
   }
 
-  process.stdout.write(`\r✓ ${world}: ${allRows.length} graczy, ${maxPages} stron — zapisano\n`);
-  await log("INFO", `Done`, { world, rows: allRows.length, pages: maxPages, file });
-}
-
-// ── CLI ───────────────────────────────────────────────────────────────────────
-
-const worldArg = process.argv[2];
-const worlds = worldArg
-  ? worldArg.split(",").map((w) => w.trim()).filter(Boolean)
-  : DEFAULT_WORLDS;
-let interval = 1000;
-const intervalArg = process.argv[3];
-
-if (intervalArg) {
-  interval = parseInt(intervalArg, 10);
-  if (Number.isNaN(interval) || interval < 0) {
-    console.error("interval must be a non-negative integer (ms)");
-    process.exit(1);
+  if (!res.ok) {
+    throw new HttpError(res.status, url, parseRetryAfter(res.headers.get("retry-after")));
   }
+
+  // Przekierowanie, które zgubiło numer strony, oznacza że pobralibyśmy w kółko
+  // to samo — lepiej wywalić się głośno niż zapisać 400 kopii strony 1.
+  if (page > 1 && !res.url.includes(`page=${page}`)) {
+    throw new FetchError(`Przekierowanie zgubiło paginację (${res.url})`, url);
+  }
+
+  return res.text();
 }
 
-const MAX_RETRIES = 3;
-const BACKOFF_BASE_MS = 5_000;
+type PageResult = { rows: PlayerRow[]; totalPages: number; badRows: string[] };
 
-async function scrapeWithRetry(world: string, interval: number) {
+async function scrapePage(world: string, page: number): Promise<PageResult> {
+  const html = await fetchPage(world, page);
+  const $ = cheerio.load(html);
+  const { rows, errors } = parseTable($, world, page);
+
+  const ratio = errors.length / Math.max(1, rows.length + errors.length);
+  if (ratio > MAX_BAD_ROW_RATIO) {
+    throw new ParseError(
+      `Odrzucono ${errors.length}/${rows.length + errors.length} wierszy — pierwszy: ${errors[0]}`,
+      world,
+      page,
+    );
+  }
+
+  return { rows, totalPages: parseTotalPages($), badRows: errors };
+}
+
+/** Ponawia POJEDYNCZĄ stronę — poprzednio retry cofał cały świat do strony 1. */
+async function scrapePageWithRetry(world: string, page: number): Promise<PageResult> {
   let attempt = 0;
   while (true) {
     try {
-      await scrapeWorld(world, interval);
-      return;
+      return await scrapePage(world, page);
     } catch (e) {
       attempt++;
-      if (attempt > MAX_RETRIES) {
-        await log("FATAL", `All ${MAX_RETRIES} retries exhausted for ${world}, giving up`, { world });
-        return;
-      }
-      const backoff = BACKOFF_BASE_MS * 2 ** (attempt - 1);
-      await log("WARN", `Attempt ${attempt}/${MAX_RETRIES} failed for ${world}, retrying in ${backoff}ms`, {
+      await logError(e as ScraperError, { world, page, attempt });
+      if (attempt > MAX_PAGE_RETRIES) throw e;
+
+      const suggested = e instanceof HttpError ? e.retryAfterMs : undefined;
+      const backoff = Math.min(suggested ?? BACKOFF_BASE_MS * 2 ** (attempt - 1), MAX_BACKOFF_MS);
+      await log("WARN", `Próba ${attempt}/${MAX_PAGE_RETRIES} nieudana (${world} s.${page}), ponawiam za ${backoff}ms`, {
         world,
-        attempt,
+        page,
         backoffMs: backoff,
         error: e instanceof Error ? e.message : String(e),
       });
@@ -428,9 +174,134 @@ async function scrapeWithRetry(world: string, interval: number) {
   }
 }
 
-(async () => {
-  for (const world of worlds) {
-    await scrapeWithRetry(world, interval);
+// ── Scrapowanie świata ────────────────────────────────────────────────────────
+
+async function scrapeWorld(world: string, interval: number) {
+  const startedAt = new Date();
+  const allRows: PlayerRow[] = [];
+  const badRows: string[] = [];
+  let page = 1;
+  let maxPages = 1;
+
+  await log("INFO", `Start`, { world, interval });
+  process.stdout.write(`\n⟳ ${world} — łączenie...\n`);
+
+  while (page <= maxPages) {
+    const result = await scrapePageWithRetry(world, page);
+    if (page === 1) maxPages = result.totalPages;
+
+    allRows.push(...result.rows);
+    badRows.push(...result.badRows.map((e) => `s.${page}: ${e}`));
+
+    await log("DEBUG", `strona ${page}/${maxPages}: ${result.rows.length} wierszy`, { world });
+    process.stdout.write(`\r  ${world}: strona ${page}/${maxPages} (${allRows.length} graczy)`);
+    page++;
+
+    if (page <= maxPages) await sleep(interval);
   }
-  await rebuildManifest();
-})();
+
+  const dir = path.join(WORLDS_DIR, world);
+  const timestamp = formatStamp(startedAt);
+  const { filters, names } = splitSnapshot(allRows, {
+    world,
+    timestamp,
+    startedAt: startedAt.toISOString(),
+    finishedAt: new Date().toISOString(),
+    pages: maxPages,
+    skippedRows: badRows.length,
+  });
+
+  try {
+    await mkdir(dir, { recursive: true });
+    await Bun.write(filterPathFor(dir, timestamp), JSON.stringify(filters));
+    await Bun.write(namesPathFor(dir, timestamp), JSON.stringify(names));
+  } catch (e) {
+    throw new IoError(`Nie udało się zapisać snapshotu ${world}: ${e instanceof Error ? e.message : String(e)}`, e);
+  }
+
+  if (badRows.length > 0) {
+    await log("WARN", `Pominięto ${badRows.length} wierszy`, { world, examples: badRows.slice(0, 5) });
+  }
+
+  process.stdout.write(`\r✓ ${world}: ${allRows.length} graczy, ${maxPages} stron — zapisano\n`);
+  await log("INFO", `Koniec`, {
+    world,
+    rows: allRows.length,
+    pages: maxPages,
+    skippedRows: badRows.length,
+    file: filterPathFor(dir, timestamp),
+  });
+}
+
+// ── Dry-run ───────────────────────────────────────────────────────────────────
+
+/** Pobiera tylko stronę 1 i raportuje, czy parser radzi sobie z aktualnym markupem. */
+async function dryRunWorld(world: string): Promise<boolean> {
+  try {
+    const { rows, totalPages, badRows } = await scrapePage(world, 1);
+    const [first] = rows;
+    process.stdout.write(
+      `✓ ${world.padEnd(9)} ${String(rows.length).padStart(3)} wierszy, ${String(totalPages).padStart(4)} stron` +
+        `${badRows.length ? `, ${badRows.length} pominiętych` : ""}` +
+        `${first ? ` — #1 ${first[1]} (lvl ${first[3]}, prof ${first[4]}, PH ${first[5]})` : ""}\n`,
+    );
+    return true;
+  } catch (e) {
+    process.stdout.write(`✗ ${world.padEnd(9)} ${e instanceof Error ? e.message : String(e)}\n`);
+    return false;
+  }
+}
+
+// ── CLI ───────────────────────────────────────────────────────────────────────
+
+const args = process.argv.slice(2);
+const dryRun = args.includes("--dry-run");
+const positional = args.filter((a) => !a.startsWith("--"));
+
+const worlds = positional[0]
+  ? positional[0].split(",").map((w) => w.trim().toLowerCase()).filter(Boolean)
+  : DEFAULT_WORLDS;
+
+let interval = 1000;
+if (positional[1]) {
+  const parsed = Number.parseInt(positional[1], 10);
+  if (Number.isNaN(parsed) || parsed < MIN_INTERVAL_MS) {
+    console.error(`interval musi być liczbą ≥ ${MIN_INTERVAL_MS} (ms)`);
+    process.exit(1);
+  }
+  interval = parsed;
+}
+
+if (dryRun) {
+  process.stdout.write(`Dry-run: sprawdzam parser na stronie 1 (${worlds.length} światów), nic nie zapisuję.\n\n`);
+  let failed = 0;
+  for (const [i, world] of worlds.entries()) {
+    if (!(await dryRunWorld(world))) failed++;
+    if (i < worlds.length - 1) await sleep(interval);
+  }
+  process.stdout.write(`\n${worlds.length - failed}/${worlds.length} światów OK\n`);
+  process.exit(failed > 0 ? 1 : 0);
+}
+
+const failures: { world: string; error: string }[] = [];
+
+for (const world of worlds) {
+  try {
+    await scrapeWorld(world, interval);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    failures.push({ world, error: message });
+    await log("FATAL", `Świat ${world} nieudany — pomijam`, { world, error: message });
+    process.stdout.write(`\r✗ ${world}: ${message}\n`);
+  }
+}
+
+await rebuildManifest();
+
+if (failures.length > 0) {
+  process.stdout.write(`\n${failures.length}/${worlds.length} światów nie zostało pobranych:\n`);
+  for (const f of failures) process.stdout.write(`  ✗ ${f.world}: ${f.error}\n`);
+  process.exit(1);
+}
+
+process.stdout.write(`\n✓ ${worlds.length}/${worlds.length} światów pobranych\n`);

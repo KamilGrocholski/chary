@@ -14,6 +14,7 @@ export const WORLDS = [
   "jaruna",
   "katahha",
   "lelwani",
+  "luvia",
   "majuna",
   "nomada",
   "perkun",

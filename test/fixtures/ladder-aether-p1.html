@@ -1,0 +1,2403 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="pl" lang="pl">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta name="keywords" content="margonem, mmorpg, free mmo, mmog, massively multiplayer role playing game, browser game, free browser game, free online game, free multiplayer game, free online rpg, free mmorpg, online role playing game, online multiplayer game, internet game, online rpg, rpg, fantasy game, medieval games, fantasy mmorpg, game statistics, game stats, total players, active players, online players, number of players, number of accounts" lang="pl" />		<meta name="description" content="Margonem MMORPG - graficzna gra online w przeglądarce! W sam raz po pracy, a nawet w pracy. Polskie MMORPG. Dynamiczna gra rpg fantasy." lang="pl" />		<meta name="Author" content="Garmory" lang="pl" />
+		<meta name="ROBOTS" content="index,follow,archive" />
+        <meta name="viewport" content="initial-scale=1.0,width=device-width">
+        <meta name="format-detection" content="telephone=no">
+
+        <meta property="og:title" content="Margonem MMORPG - Dynamiczna gra w przeglądarce! Fantasy RPG online. Graj wojownikiem, magiem, łowcą, tropicielem, tancerzem ostrzy lub paladynem! - Gracze i klany">
+        <meta property="og:type" content="website">
+
+        <meta name="application-name" content="Margonem">
+        <link rel="apple-touch-icon" sizes="180x180" href="/_i/pl/favicons/apple-touch-icon.png">
+        <link rel="manifest" href="/manifest.json?v=5">
+        <link rel="mask-icon" href="/_i/pl/favicons/safari-pinned-tab.svg" color="#093101">
+        <meta name="msapplication-TileColor" content="#093101">
+        <meta name="msapplication-config" content="/_i/pl/favicons/browserconfig.xml">
+        <meta name="theme-color" content="#ffffff" />
+        <link rel="shortcut icon" href="/favicon.ico">
+
+
+		<title>Margonem MMORPG - Dynamiczna gra w przeglądarce! Fantasy RPG online. Graj wojownikiem, magiem, łowcą, tropicielem, tancerzem ostrzy lub paladynem! - Gracze i klany</title>
+        <script>
+            window.addEventListener("beforeinstallprompt", (event) => {
+                event.preventDefault();
+            });
+        </script>
+        <!-- Global site tag (gtag.js) - Google Analytics -->
+        <script src="/_js/pl/jquery/jquery.min.js"></script>
+
+                            <script async src="https://www.googletagmanager.com/gtag/js?id=UA-1001120-1"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', 'UA-1001120-1');
+        </script>
+                
+        <style>
+
+            @font-face {
+                font-family: 'Aleo';
+                src:
+                    url('/_f/aleo/Aleo-Regular.ttf') format("truetype");
+            }
+
+            @font-face {
+                font-family: 'Majalla';
+                src: url('/_f/majalla.eot'); /* IE9 Compat Modes */
+                src: url('/_f/majalla.eot?#iefix') format('embedded-opentype'), url('/_f/majalla.ttf') format('truetype');
+            }
+
+            @font-face {
+                font-family: 'Majallab';
+                src: url('/_f/majallab.eot'); /* IE9 Compat Modes */
+                src: url('/_f/majallab.eot?#iefix') format('embedded-opentype'), url('/_f/majallab.ttf') format('truetype');
+            }
+        </style>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+      
+    <link rel="stylesheet" type="text/css" href="/dist/css/style-56f44e4f93.min.css">
+
+            <link href='//fonts.googleapis.com/css?family=Arimo:400,400italic,700,700italic&amp;subset=latin,latin-ext' rel='stylesheet' type='text/css'>
+        <link href='//fonts.googleapis.com/css?family=PT+Serif:400,700,400italic,700italic&amp;subset=latin,latin-ext' rel='stylesheet' type='text/css'>
+        <link href="https://commons.margonem.pl/css/cookieconsent.min.css" rel="stylesheet" type="text/css">
+    <link href="https://commons.margonem.pl/css/tipsParser.min.css" rel="stylesheet" type="text/css">
+    <style>
+        
+                          
+        :root {
+            --bg-gradient: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, rgb(67, 46, 33) 40%, rgb(67, 46, 33) 60%, rgba(0, 0, 0, 0) 100%);
+            --bg-solid: #1D130C;
+        }
+
+        .background-logged-wrapper {
+            background: var(--bg-solid) url('/_i/pl/WebsiteJumbotron/wakacje26/header.webp#3b65f4ecd7f1ad1657e268b8c7075059') no-repeat center top;
+        }
+
+        @media only screen and (max-width: 1120px) {
+            .background-logged-wrapper {
+                background: var(--bg-solid) url('/_i/pl/WebsiteJumbotron/wakacje26/header_960.webp#3b65f4ecd7f1ad1657e268b8c7075059') no-repeat center top;
+            }
+        }
+
+        @media only screen and (max-width: 720px) {
+            .background-logged-wrapper {
+                background: var(--bg-solid) url('/_i/pl/WebsiteJumbotron/wakacje26/header_720.webp#3b65f4ecd7f1ad1657e268b8c7075059') no-repeat center top;
+            }
+        }
+
+        @media only screen and (max-width: 480px) {
+            .background-logged-wrapper {
+                background: var(--bg-solid) url('/_i/pl/WebsiteJumbotron/wakacje26/header_480.webp#3b65f4ecd7f1ad1657e268b8c7075059') no-repeat center top;
+            }
+        }
+    </style>
+  </head>
+
+        <body class="  ">
+		<script>
+            var isClient = false;
+			if (window.self !== window.top && isClient) {
+				document.body.parentNode.className += "ingame";
+			}
+            const isLoggedIn = false;
+		</script>
+
+        
+                    <div class="background-logged-wrapper">
+                <div class="wrapper">
+                    <div class="site-top">
+                        <div class="wrapper">
+    <script>
+        var paidWorlds = {"#pandora":1500};
+    </script>
+
+    <div class="menu-container hide-for-mobile" role="navigation" aria-label="Nawigacja">
+        <ul class="menu">
+            <li><a href="/"><img class="logo-mini" src="/_i/pl/logo-mini.svg" alt="Najmniejsze logo Margonem"></a></li>
+            <li><a href="/art/world">Świat</a></li>
+            <li><a href="/ladder">Gracze</a></li>
+            <li><a href="https://support.garmory.pl/s/margonem.pl/pl">Support</a></li>
+            <li><a href="https://forum.margonem.pl/">Forum</a></li>
+                            <li class="display-menu-item-for-mobile"><a href="/mobile-client-settings">Edytuj ustawienia aplikacji</a></li>
+                <li class="display-menu-item-for-mobile"><a href="https://margonem.com/#mainContent">Przejdź do Margonem.com</a></li>
+                <li class="menu-bold last-item">
+                    <a href="https://www.margonem.pl/intro/">Zarejestruj się</a>
+                </li>
+                        <li class="burger-icon">
+                <img src="/_i/pl/burger-icon.png" alt="burger-icon">
+            </li>
+        </ul>
+    </div>
+            <h1 class="logo-small" role="heading" aria-level="1">
+            <a href="/">
+                <img src="/_i/pl/logo-small.svg?v=2" alt="Małe logo Margonem">
+            </a>
+        </h1>
+
+                  <div class="box-trnsp header-box header-box--unlogged" role="region" aria-label="Panel logowania">
+              <div id="js-login-box">
+                                  <form class="login-form info-container" id="login-form" method="post">
+    <div class="form-group">
+        <label for="login-input">Login</label>
+        <input autocomplete="username" id="login-input" type="text" name="login">
+    </div>
+    <div class="form-group">
+        <label for="login-password">Hasło</label>
+        <input autocomplete="current-password" id="login-password" type="password" name="password">
+        <div class="invalid-info"></div>
+    </div>
+
+    <div class="form-group d-none" id="totp-input-container">
+      <label for="totp-input">Wpisz kod dwuskładnikowego logowania</label>
+      <input class="form-control" autocomplete="off" min="0" max="999999" id="totp-input" type="number" name="totp">
+    </div>
+
+
+    <script>
+      var recaptchaCallback = function() {
+            newMargonem.login(
+                $('#login-form').find('input[name="login"]').val(),
+                $('#login-form').find('input[name="password"]').val(),
+                $('#login-form').find('input[name="totp"]').val(),
+                grecaptcha.getResponse()
+            )
+          }
+          </script>
+      <button
+        aria-label="Zaloguj się"
+        id="js-login-btn"
+        class="c-btn mt-20"
+        type="submit">
+      <span class="btn__label">Zaloguj się</span>
+    </button>
+      <div class="text-divider social-login-divider"><span>lub</span></div>
+
+    <ul class="social-login">  
+        <li class="social-login__item social-login__item--google">
+            <a href="/intro?googlelogin=1">
+                Logowanie Google</a>
+        </li>
+                    </ul>
+    <div class="d-flex justify-content-between font-size-15  login-option-container">
+      <a href="javascript:void(0)" id="totp-show">Logowanie 2FA</a>
+      <a href="javascript:void(0)" id="totp-hide" class="d-none">Domyślne logowanie</a>
+      <a href="javascript:void(0)" class="remind-password">Przypomnij hasło</a>
+    </div>
+</form>
+
+<style>
+    .box-trnsp .form-group input[type=number] {
+        height: 37px;
+        width: 100%;
+        background: rgba(0, 0, 0, .5);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, .25);
+        box-shadow: inset 0 3px 6px #000;
+        padding: 0 10px;
+        display: block;
+        max-width: 100%;
+        border-radius: 3px;
+    }
+
+    @media only screen and (max-width: 720px) {
+        #login-form .login-option-container a{
+            margin-right: 10px;
+        }
+    }
+</style>                            </div>
+            <div class="ban-box" id="js-ban-box" style="display: none;" role="region" aria-label="Kod weryfikacyjny">
+              <div class="ban-box__info" id="js-ban-box-info">
+                Konto zostało zablokowane
+                <div class="c-btn mt-2" id="js-show-ban-details">Szczegóły blokady</div>
+              </div>
+              <div class="ban-box__bottom">
+                <p>W przypadku odwołania od blokady możesz skorzystać z kodu weryfikacyjnego.</p>
+                <div class="c-btn mt-2" id="js-show-ban-verification-code">Wyświetl</div>
+              </div>
+            </div>
+          </div>
+        
+
+    </div>
+                    </div>
+                    <div class="overlay">
+                        <div class="popup-container popup-totp">
+    <div class="close-popup" aria-label="Zamknij">
+    <i class="fa-solid fa-times" aria-hidden="true"></i>
+</div>
+    <div class="light-brown-box text-center">
+        <p class="mb-3" id="login-error-container"></p>
+    </div>
+</div>
+            <div class="popup-container popup-remind-password remind-password-step-1">
+    <div class="close-popup" aria-label="Zamknij">
+    <i class="fa-solid fa-times" aria-hidden="true"></i>
+</div>
+    <div class="light-brown-box">
+        <form autocomplete="off">
+            <div class="header-underline">Odzyskiwanie hasła</div>
+            <div>
+                Link <b>resetujący hasło</b> zostanie wysłany na Twój email, który podałeś w Edycji ustawień. Jeśli go <b>nie podałeś</b>, nie masz możliwości odzyskania hasła.            </div>
+            <div class="form-group mt-3">
+                <label for="mailorlogin">Podaj Login lub adres e-mail:</label>
+                <input class="form-control form-control--block" type="text" id="mailorlogin" name="mailorlogin">
+                <div class="invalid-info"></div>
+            </div>
+            <div class="text-center">
+                <input type="submit" value="Dalej" class="btn remind-password-step-1-submit">
+                <input type="submit" value="Odzyskaj hasło" class="btn-pink2 remind-password-step-2-submit">
+            </div>
+        </form>
+    </div>
+</div>
+            <div class="popup-container popup-recover-password">
+    <div class="close-popup" aria-label="Zamknij">
+    <i class="fa-solid fa-times" aria-hidden="true"></i>
+</div>
+    <div class="light-brown-box">
+        <div class="header-underline">Zmiana hasła</div>
+        <form method="post" id="form-pass-recover">
+            <input type="hidden" id="id_passrecover" name="id" value="0">
+            <input type="hidden" id="hash_passrecover" name="hash" value="0">
+            <div class="account-info">
+                Podaj nowe hasło dla Konta:
+                <div class="account-info-login fw-bold"></div>
+                <br />
+            </div>
+            <div class="form-group">
+                <label for="newpassrecover">Wpisz nowe hasło:</label>
+                <input class="form-control" type="password"  name="newpass" id="newpassrecover" autocomplete="new-password" data-minlength="6" data-minlength-tip="Hasło jest zbyt krótkie" data-maxlength="20" data-maxlength-tip="Hasło jest zbyt długie">
+                <div class="invalid-info"></div>
+            </div>
+            <div class="form-group">
+                <label for="newpass2recover" >Powtórz nowe hasło:</label>
+                <input class="form-control" type="password" name="newpass2" id="newpass2recover" autocomplete="new-password" data-minlength="6" data-minlength-tip="Hasło jest zbyt krótkie" data-maxlength="20" data-maxlength-tip="Hasło jest zbyt długie">
+                <div class="invalid-info"></div>
+            </div>
+            <div class="form-error"></div>
+            <div class="text-center">
+                <input type="submit" value="Zapisz nowe hasło" class="btn remind-password-step-2-submit">
+            </div>
+        </form>
+    </div>
+</div>
+            <div class="popup-container popup-successful-password-change">
+    <div class="close-popup" aria-label="Zamknij">
+    <i class="fa-solid fa-times" aria-hidden="true"></i>
+</div>
+    <div class="light-brown-box">
+        <div class="header-underline">Zmiana hasła</div>
+        <div class="popup-description">
+            Hasło dla Konta            <b class="account-login"></b>
+            zostało zaktualizowane.
+            <br />
+            Możesz się teraz zalogować.
+        </div>
+    </div>
+</div>
+            <div class="popup-container popup-sent-password">
+    <div class="close-popup" aria-label="Zamknij">
+    <i class="fa-solid fa-times" aria-hidden="true"></i>
+</div>
+    <div class="light-brown-box">
+        <div class="header-underline">Odzyskiwanie hasła</div>
+        <div class="popup-description">
+            <div class="account-login"></div>
+        </div>
+    </div>
+</div>
+            <div class="popup-container popup-ban">
+    <div class="close-popup" aria-label="Zamknij">
+    <i class="fa-solid fa-times" aria-hidden="true"></i>
+</div>
+    <div class="light-brown-box">
+        <div class="header-underline">Komunikat</div>
+        <p class="mb-3">
+            Poniższy kod może zostać wykorzystany w procesie weryfikacji Użytkownika Konta, podczas zgłaszania odwołania od blokady. Nie udostępniaj go nikomu!<br />
+            Ważny jest 30 dni od momentu wygenerowania.        </p>
+
+        <div class="form-group">
+            <input class="form-control" id="ban-verification-code" readonly>
+            <div class="invalid-info"></div>
+        </div>
+        <div class="text-center">
+            <button id="js-copy-ban-verification-code" class="btn btn-center" type="submit">
+                <span class="btn__label">Kopiuj</span>
+            </button>
+        </div>
+    </div>
+</div>
+            </div>
+                    <div class="popup-default-overlay">
+    <div class="popup-container popup-default">
+        <div class="close-popup" aria-label="Zamknij">
+    <i class="fa-solid fa-times" aria-hidden="true"></i>
+</div>
+        <div class="light-brown-box box-small">
+            <div class="header-underline"></div>
+            <div class="content">
+
+            </div>
+        </div>
+    </div>
+</div>                    <div class="body-container" role="article">
+                                                    <div class="body-full-width-container ladder-page" role="article">
+    <div class="toplist-header brown-box mb-4">
+		<div class="toplist-left">
+			<div class="selected-world-container">
+				<h2 class="selected-world-name">Aether</h2>
+				<div class="btn js-change-world">Zmień Świat</div>
+			</div>
+		</div>
+        <div class="toplist-right">
+            <label class="player-search-label" for="player-search-input">Szukaj na wszystkich Światach</label>
+            <form class="player-search js-player-search">
+                <div class="player-search-field">
+                    <i class="fa-solid fa-magnifying-glass player-search-icon" aria-hidden="true"></i>
+                    <input
+                        type="text"
+                        id="player-search-input"
+                        class="js-player-search-input"
+                        placeholder="Nick Postaci..."
+                        minlength="3"
+                        maxlength="64"
+                        autocomplete="off"
+                    >
+                </div>
+                <button type="submit" class="btn player-search-submit">Szukaj</button>
+            </form>
+        </div>
+	</div>
+
+    <div class="ladder-tabs">
+        <input type="radio" name="ladder-tab" value="ladder-tab-stats" id="ladder-tab-stats">
+        <input type="radio" name="ladder-tab" value="ladder-tab-players" id="ladder-tab-players" checked="checked">
+        <input type="radio" name="ladder-tab" value="ladder-tab-clans" id="ladder-tab-clans">
+        <input type="radio" name="ladder-tab" value="ladder-tab-pvp" id="ladder-tab-pvp">
+        <a href="/ladder/Aether" class="tabs__nav-item ranking-type-stats">Statystyki</a>
+        <a href="/ladder/Aether/players" class="tabs__nav-item ranking-type-players is-active">Ranking Graczy</a>
+        <a href="/ladder/Aether/clans" class="tabs__nav-item ranking-type-clans">Ranking Klanów</a>
+        <a href="/ladder/Aether/pvp" class="tabs__nav-item ranking-type-pvp">Ranking Otchłani</a>
+    </div>
+
+            <div class="ladder-tab-players">
+    <div class="ranking-container full-table">
+        <div class="light-brown-box mb-4">
+            <div class="ranking-body player-ranking">
+                <table class="table--separators w-100">
+                    <thead>
+                    <tr class="dark-row">
+                        <th class="id">
+                            #
+                        </th>
+                        <th class="long-clan">
+                            Gracz                        </th>
+                        <th class="long-level">
+                            <a class="desc" href="/ladder/Aether/players?order=exp&sort=asc">
+                                Poziom                            </a>
+                        </th>
+                        <th class="long-ph">
+                            <a class="" href="/ladder/Aether/players?order=honor&sort=desc">
+                                PH                            </a>
+                        </th>
+                        <th class="long-last-online">
+                            Ostatnio online                        </th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                                                                                                            <tr>
+                            <td class="dark-cell id">
+                                                                    <span class="player-portrait" style="background-image: url('https://micc.garmory-cdn.cloud/obrazki/postacie/vip/6805038_2.gif');" aria-hidden="true"></span>
+                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,6805038#char_729,aether">
+                                    essobe                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    378t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                9550                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    <span class="player-portrait" style="background-image: url('https://micc.garmory-cdn.cloud/obrazki/postacie/paid/g21-out4-m.gif');" aria-hidden="true"></span>
+                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,8750047#char_32789,aether">
+                                    kamillek kox                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    362p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                4715                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    <span class="player-portrait" style="background-image: url('https://micc.garmory-cdn.cloud/obrazki/postacie/kuf/leg_labedz_3_m.gif');" aria-hidden="true"></span>
+                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,993153#char_731,aether">
+                                    Bandyta Brunt                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    348w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                109715                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    4                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,2709228#char_304984,aether">
+                                    Inutka                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    345w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                4090                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    5                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,2579586#char_17035,aether">
+                                    Dizzard                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tancerz ostrzy">
+                                    335b                                </span>
+                            </td>
+                            <td class="long-ph">
+                                174                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    6                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9751114#char_245604,aether">
+                                    Narberal - Gamma                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    333t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                17521                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    7                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,2806711#char_40448,aether">
+                                    Czerń                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    333w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                1 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    8                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9977369#char_301727,aether">
+                                    Kacperxo                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    331m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    9                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,2897087#char_2165,aether">
+                                    Gorii                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    330t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    10                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,7884950#char_2132,aether">
+                                    Jabłkowe Ciasto                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tancerz ostrzy">
+                                    329b                                </span>
+                            </td>
+                            <td class="long-ph">
+                                126719                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    11                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9306500#char_59624,aether">
+                                    kapilose                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    329p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                100                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    12                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9601567#char_193179,aether">
+                                    Sandacz                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    328w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                100                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    13                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9600653#char_181132,aether">
+                                    Szefowa Thunder                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    323t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                6999                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    14                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9571695#char_145194,aether">
+                                    Benek I                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tancerz ostrzy">
+                                    323b                                </span>
+                            </td>
+                            <td class="long-ph">
+                                350                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    15                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9940458#char_295570,aether">
+                                    fallsaa                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    322w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                350                            </td>
+                            <td class="long-last-online">
+                                63 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    16                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9155394#char_16231,aether">
+                                    Książę Saiyan Vegeta                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    321w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                66112                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    17                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9786791#char_260057,aether">
+                                    Krutka Lanca                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    321m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                157 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    18                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9814591#char_273950,aether">
+                                    Spocony Maciek Fnatic                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    320w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    19                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9842583#char_314622,aether">
+                                    God Infernal                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    318m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                2740                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    20                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,10085191#char_318626,aether">
+                                    Exe Cutor                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    317h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                14077                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    21                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9434311#char_30194,aether">
+                                    Jirenn                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    316h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                89126                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    22                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,1539832#char_26004,aether">
+                                    Farmerama                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    316t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                598                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    23                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9814082#char_274026,aether">
+                                    Master Roshi                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    315m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                150                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    24                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,7066034#char_479,aether">
+                                    The God of Gods                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    315p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    25                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,8638889#char_217893,aether">
+                                    poprostuer                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    315h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                29 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    26                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,3717895#char_306996,aether">
+                                    Król Bujan                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    315w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    27                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9544524#char_191039,aether">
+                                    Generał Devolaj                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    314w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                325463                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    28                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9617289#char_175154,aether">
+                                    Ennzuśś                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    313p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                145                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    29                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9121212#char_85202,aether">
+                                    Etenmeta                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    313h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                100                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    30                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,6418318#char_4892,aether">
+                                    Dasti                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    313t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    31                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,5647357#char_20514,aether">
+                                    Erereiel                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    313m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    32                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,4737882#char_160072,aether">
+                                    Mlem Woj                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    313w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    33                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9291357#char_106798,aether">
+                                    Mr Chudy                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tancerz ostrzy">
+                                    312b                                </span>
+                            </td>
+                            <td class="long-ph">
+                                33778                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    34                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,8339592#char_283849,aether">
+                                    Beduinii                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    312w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    35                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9813898#char_273573,aether">
+                                    Usfremor                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    311h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                5989                            </td>
+                            <td class="long-last-online">
+                                30 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    36                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9003292#char_98959,aether">
+                                    Dark Shadow of Death                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    311m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                4623                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    37                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,1694627#char_299921,aether">
+                                    Supermarine Spitfire                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    311t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                2267                            </td>
+                            <td class="long-last-online">
+                                109 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    38                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,10070817#char_316469,aether">
+                                    Kotka Psotka                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    311h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                100                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    39                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9449613#char_32177,aether">
+                                    dami                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    311p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                42 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    40                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,5663651#char_149655,aether">
+                                    Baythu                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    311m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    41                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9544524#char_119029,aether">
+                                    Ribaberikin Kiribati                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    310w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                529331                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    42                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,3779166#char_35010,aether">
+                                    Monsiur Pulet                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    310p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                209213                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    43                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9594048#char_168740,aether">
+                                    Rimbamberimbim                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    310h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                173895                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    44                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9750109#char_317684,aether">
+                                    Wesoły Marokańczyk                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    310t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                2542                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    45                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9433176#char_172735,aether">
+                                    Ser Podbipięta                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    310w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                2532                            </td>
+                            <td class="long-last-online">
+                                1 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    46                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9815611#char_304531,aether">
+                                    dj wielki V                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    310w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                249                            </td>
+                            <td class="long-last-online">
+                                1 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    47                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,4238939#char_273361,aether">
+                                    Michaszek                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    310t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                100                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    48                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,7832674#char_3796,aether">
+                                    Alberto-Dwutakt                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    310w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                1 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    49                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,1666509#char_294381,aether">
+                                    Gram Na Kodach                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    310p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    50                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9411687#char_11012,aether">
+                                    Wodzuu                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tancerz ostrzy">
+                                    309b                                </span>
+                            </td>
+                            <td class="long-ph">
+                                745910                            </td>
+                            <td class="long-last-online">
+                                2 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    51                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,5026787#char_144,aether">
+                                    Verine                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    309p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                10815                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    52                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9124322#char_25191,aether">
+                                    Kekatur                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    309p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                3696                            </td>
+                            <td class="long-last-online">
+                                1 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    53                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,5848355#char_300626,aether">
+                                    Wojokik                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    309w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                3356                            </td>
+                            <td class="long-last-online">
+                                1 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    54                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9391522#char_223231,aether">
+                                    Majoor Suchodolski                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    309m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                1403                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    55                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9957060#char_298411,aether">
+                                    Luati                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    309t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                347                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    56                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9740606#char_285750,aether">
+                                    Postrach Pięciolatek                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    309m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                99                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    57                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9688898#char_278878,aether">
+                                    gorylek                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    309w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    58                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9565591#char_288394,aether">
+                                    Fikolak                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    309p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    59                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9926808#char_293150,aether">
+                                    Mitsubishi Sony Lexus                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    309m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    60                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,3080701#char_273201,aether">
+                                    Baltazar Gąbkaa                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    308t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                18591                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    61                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9445693#char_23605,aether">
+                                    patijass                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    308p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                12562                            </td>
+                            <td class="long-last-online">
+                                2 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    62                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9624978#char_176742,aether">
+                                    bije babkę                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    308p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                6777                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    63                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9819358#char_276493,aether">
+                                    Roxigar                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    308p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                2640                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    64                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,6332820#char_264165,aether">
+                                    Fast and Chunky                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    308t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                1934                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    65                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9590080#char_155508,aether">
+                                    Pirnerus                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    308h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                952                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    66                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9905855#char_289496,aether">
+                                    Zemsta Morfinki                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tancerz ostrzy">
+                                    308b                                </span>
+                            </td>
+                            <td class="long-ph">
+                                300                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    67                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9456074#char_34233,aether">
+                                    Star Kirito                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    308m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                100                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    68                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9445179#char_24080,aether">
+                                    Detektyw Donald                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    308p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    69                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9447187#char_26670,aether">
+                                    Krzyzmnboli                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    308w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    70                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9719283#char_227485,aether">
+                                    Paasik                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    308m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    71                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9803871#char_279335,aether">
+                                    Sztywny Bandyta                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    308p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    72                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9758251#char_246320,aether">
+                                    Flachowiec                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    307w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                153021                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    73                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9464575#char_117369,aether">
+                                    The Maczakk                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tancerz ostrzy">
+                                    307b                                </span>
+                            </td>
+                            <td class="long-ph">
+                                99043                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    74                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9524596#char_99311,aether">
+                                    Lody kaktus                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    307m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                10373                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    75                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,3623690#char_254533,aether">
+                                    Myasul                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    307h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                7321                            </td>
+                            <td class="long-last-online">
+                                131 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    76                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9896033#char_287964,aether">
+                                    Heresis Templar                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    307p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                5605                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    77                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9663520#char_268182,aether">
+                                    Penkurak                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    307t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                3791                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    78                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9520896#char_136558,aether">
+                                    illililililili                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    307m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                750                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    79                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,6362170#char_23760,aether">
+                                    trzepanie tui zimą                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    307w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                350                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    80                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9960985#char_312183,aether">
+                                    Sigmund                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    307p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                270                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    81                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,7278841#char_163213,aether">
+                                    lilliililililli                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    307t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                100                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    82                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9834161#char_279552,aether">
+                                    Młody Kacperek                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    307h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                100                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    83                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,921005#char_16096,aether">
+                                    Byakuya                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    307w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    84                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,7537998#char_217374,aether">
+                                    Narzeczona Tadka                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    307w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                18 dni temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    85                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9770251#char_251792,aether">
+                                    Mam zaburzenia                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    307m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    86                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,7169813#char_278744,aether">
+                                    Lawetaa                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    307w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    87                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,8984792#char_289114,aether">
+                                    Kwaśne Picie                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    307h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    88                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9951554#char_297415,aether">
+                                    Skorek                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    307p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    89                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,10048438#char_313192,aether">
+                                    Centurions                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    307w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    90                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,10121799#char_323256,aether">
+                                    Szif Kuchni                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    307m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                0                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    91                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9113731#char_23847,aether">
+                                    mitosh                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tancerz ostrzy">
+                                    306b                                </span>
+                            </td>
+                            <td class="long-ph">
+                                382250                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    92                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9788956#char_282837,aether">
+                                    Lectorek                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    306m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                229319                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    93                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,10052349#char_313524,aether">
+                                    bombombini wajchinini                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    306h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                54633                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    94                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9331874#char_17767,aether">
+                                    Emejzing                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    306h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                49437                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    95                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,8034357#char_285087,aether">
+                                    Adi i                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Łowca">
+                                    306h                                </span>
+                            </td>
+                            <td class="long-ph">
+                                38914                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    96                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9945957#char_296466,aether">
+                                    Binerr                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tropiciel">
+                                    306t                                </span>
+                            </td>
+                            <td class="long-ph">
+                                11334                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    97                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9633117#char_181618,aether">
+                                    Kokones                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Paladyn">
+                                    306p                                </span>
+                            </td>
+                            <td class="long-ph">
+                                8673                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    98                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,9440772#char_19055,aether">
+                                    Kelldorro                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Mag">
+                                    306m                                </span>
+                            </td>
+                            <td class="long-ph">
+                                4596                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    99                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,7257604#char_7045,aether">
+                                    Brachol Interwencja                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Tancerz ostrzy">
+                                    306b                                </span>
+                            </td>
+                            <td class="long-ph">
+                                4204                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                                                    <tr>
+                            <td class="dark-cell id">
+                                                                    100                                                            </td>
+                            <td class="long-clan">
+                                <a href="/profile/view,8963726#char_12445,aether">
+                                    Gimme coco                                </a>
+                            </td>
+                            <td class="long-level">
+                                <span title="Wojownik">
+                                    306w                                </span>
+                            </td>
+                            <td class="long-ph">
+                                3449                            </td>
+                            <td class="long-last-online">
+                                Mniej niż 24h temu                            </td>
+                        </tr>
+                                        </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="pagination" role="region" aria-label="Paginacja">
+    <div>
+                                                                                    <div class="current-page btn btn--dark pw-none">
+            1        </div>
+                                                                            <a class="btn" href="/ladder/Aether/players?page=2">
+                        2                    </a>
+                                                                                    <a class="btn" href="/ladder/Aether/players?page=3">
+                        3                    </a>
+                                                                                    <a class="btn" href="/ladder/Aether/players?page=4">
+                        4                    </a>
+                                                    <a class="btn" href="/ladder/Aether/players?page=2" aria-label="Następna strona">
+                &gt;
+            </a>
+                        <a class="btn" href="/ladder/Aether/players?page=390" aria-label="Ostatnia strona">
+                »
+            </a>
+                <div class="page-divider">
+            z        </div>
+        <div class="total-pages">
+                        <a href="/ladder/Aether/players?page=390">
+                390            </a>
+        </div>
+    </div>
+    <form method="get" class="pagination__move-to">
+        <span id="pagination-number">Przejdź do strony</span>:
+                <div class="current-page">
+            <input aria-labelledby="pagination-number" class="btn btn--dark" type="number" min="1" max="390" name="page" value="1">
+        </div>
+        <button type="submit" class="btn">Idź</button>
+    </form>
+</div>
+    </div>
+</div>
+    
+    <div class="overlay ladder-world-overlay">
+        <div class="light-brown-box news-container world-picker-popup">
+            <div class="close-popup" aria-label="Zamknij">
+    <i class="fa-solid fa-times" aria-hidden="true"></i>
+</div>
+            <div class="news-header short-header">
+                <h2>Wybierz Świat</h2>
+            </div>
+            <div class="news-body">
+                                    <h3>Wszystkie Światy</h3>
+                
+                <div class="world-picker-list world-picker-list-all">
+                                            <div class="btn js-select-world world-type-public" data-world="Luvia">
+                                                        Luvia                        </div>
+                                            <div class="btn js-select-world world-type-public world-picker-active" data-world="Aether">
+                                                        Aether                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Aldous">
+                                                        Aldous                        </div>
+                                            <div class="btn js-select-world world-type-spec-pvp" data-world="Berufs">
+                                                            <i class="fa-solid fa-khanda world-icon" title="Świat specjalny PvP"></i>
+                                                        Berufs                        </div>
+                                            <div class="btn js-select-world world-type-spec-pvp" data-world="Brutal">
+                                                            <i class="fa-solid fa-khanda world-icon" title="Świat specjalny PvP"></i>
+                                                        Brutal                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Classic">
+                                                        Classic                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Fobos">
+                                                        Fobos                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Gefion">
+                                                        Gefion                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Gordion">
+                                                        Gordion                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Hutena">
+                                                        Hutena                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Jaruna">
+                                                        Jaruna                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Katahha">
+                                                        Katahha                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Lelwani">
+                                                        Lelwani                        </div>
+                                            <div class="btn js-select-world world-type-spec" data-world="Majuna">
+                                                            <i class="fa-solid fa-star world-icon" title="Świat z niestandardowymi zasadami"></i>
+                                                        Majuna                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Nomada">
+                                                        Nomada                        </div>
+                                            <div class="btn js-select-world world-type-spec-pvp" data-world="Perkun">
+                                                            <i class="fa-solid fa-khanda world-icon" title="Świat specjalny PvP"></i>
+                                                        Perkun                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Tarhuna">
+                                                        Tarhuna                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Telawel">
+                                                        Telawel                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Tempest">
+                                                        Tempest                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Zemyna">
+                                                        Zemyna                        </div>
+                                            <div class="btn js-select-world world-type-public" data-world="Zorza">
+                                                        Zorza                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Alcatraz">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Alcatraz                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Arkantes">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Arkantes                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Asylum">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Asylum                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Ataentsic">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Ataentsic                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Badzior">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Badzior                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Dionizos">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Dionizos                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Dream">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Dream                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Elizjum">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Elizjum                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Ertill">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Ertill                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Eternia">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Eternia                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Hades">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Hades                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Helios">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Helios                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Inferno">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Inferno                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Latimar">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Latimar                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Legion">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Legion                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Lupus">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Lupus                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Mordor">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Mordor                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Narwhals">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Narwhals                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Navis">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Navis                        </div>
+                                            <div class="btn js-select-world world-type-spec" data-world="Nerthus">
+                                                            <i class="fa-solid fa-star world-icon" title="Świat z niestandardowymi zasadami"></i>
+                                                        Nerthus                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Nexos">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Nexos                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Nubes">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Nubes                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Nyras">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Nyras                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Odysea">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Odysea                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Orchidea">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Orchidea                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Pandora">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Pandora                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Regros">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Regros                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Riventia">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Riventia                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Solphyr">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Solphyr                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Stark">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Stark                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Stoners">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Stoners                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Syberia">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Syberia                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Thantos">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Thantos                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Unia">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Unia                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Valhalla">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Valhalla                        </div>
+                                            <div class="btn js-select-world world-type-private" data-world="Whisper">
+                                                            <i class="fa-solid fa-lock world-icon" title="Świat prywatny"></i>
+                                                        Whisper                        </div>
+                                    </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay ladder-search-overlay">
+        <div class="light-brown-box news-container search-popup">
+            <div class="close-popup" aria-label="Zamknij">
+    <i class="fa-solid fa-times" aria-hidden="true"></i>
+</div>
+            <div class="news-header short-header">
+                <h2>Szukaj Postaci <span class="search-scope-chip">wszystkie Światy</span></h2>
+            </div>
+            <form class="player-search js-overlay-search-form">
+                <div class="player-search-field js-overlay-search-field">
+                    <i class="fa-solid fa-magnifying-glass player-search-icon" aria-hidden="true"></i>
+                                    </div>
+                <button type="submit" class="btn player-search-submit">Szukaj</button>
+            </form>
+            <div class="news-body">
+                <div class="ladder-search-results">
+                    <div class="search-results-meta">
+                        <div class="search-results-summary js-search-summary"></div>
+                    </div>
+                    <div class="ranking-body">
+                        <table class="table--separators w-100">
+                            <thead>
+                            <tr class="dark-row">
+                                <th>#</th>
+                                <th>Postać (Świat)</th>
+                                <th>Nazwa Konta</th>
+                            </tr>
+                            </thead>
+                            <tbody class="js-search-tbody"></tbody>
+                        </table>
+                        <div class="search-results-empty js-search-empty" style="display:none;">Nie znaleziono Postaci.</div>
+                        <div class="search-results-error js-search-error" style="display:none;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="news-footer">
+                <div class="js-search-pagination"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(function () {
+    newMargonem.search.players.init({
+        privateWorlds: ["alcatraz","arkantes","asylum","ataentsic","badzior","dev","dionizos","dream","elizjum","ertill","eternia","experimental","hades","helios","inferno","latimar","legion","lupus","mordor","narwhals","navis","nerthus","nexos","nubes","nyras","odysea","orchidea","pandora","regros","riventia","solphyr","stark","stoners","syberia","tabaluga","thantos","unia","valhalla","whisper"],
+        specialWorlds: ["majuna","nerthus"],
+        specialPvpWorlds: ["perkun","berufs","brutal"],
+        l10n: {
+            inputLabel:  'Nick Postaci',
+            error:       'Błąd wyszukiwania.',
+            found:       'Znaleziono',
+            playerForms: ['Postać', 'Postaci'],
+            for:         'dla',
+            page:        'strona',
+            of:          'z',
+            firstPage:   'Pierwsza strona',
+            prevPage:    'Poprzednia strona',
+            nextPage:    'Następna strona',
+            lastPage:    'Ostatnia strona',
+            from:        'z',
+            goToPage:    'Przejdź do strony',
+            go:          'Idź',
+            pagination:  'Paginacja',
+        },
+    });
+});
+</script>
+                                            </div>
+                </div>
+            </div>
+        
+                    <footer class="footer">
+  <div class="footer__content">
+
+    <!-- SOCIAL -->
+    <div class="footer__social">
+      <nav class="footer__social-nav" aria-label="Linki społecznościowe">
+        <ul class="footer__social-list">
+          <li class="footer__social-item">
+              <a href="https://www.facebook.com/margonem" target="_blank" rel="noopener noreferrer" class="footer__social-link" aria-label="Facebook">
+                  <i class="fa-brands fa-facebook-square"></i>
+              </a>
+          </li>
+          <li class="footer__social-item">
+              <a href="https://www.instagram.com/margonem_mmorpg/" target="_blank" rel="noopener noreferrer" class="footer__social-link" aria-label="Instagram">
+                  <i class="fa-brands fa-instagram"></i>
+              </a>
+          </li>
+          <li class="footer__social-item">
+              <a href="https://www.youtube.com/c/Margonem_Official" target="_blank" rel="noopener noreferrer" class="footer__social-link" aria-label="Youtube">
+                  <i class="fa-brands fa-youtube"></i>
+              </a>
+          </li>
+          <li class="footer__social-item">
+              <a href="https://twitter.com/MargonemMMORPG" target="_blank" rel="noopener noreferrer" class="footer__social-link" aria-label="Twitter">
+                  <i class="fa-brands fa-x-twitter"></i>
+              </a>
+          </li>
+          <li class="footer__social-item">
+              <a href="https://discord.gg/margonem" target="_blank" rel="noopener noreferrer" class="footer__social-link" aria-label="Discord">
+                  <i class="fa-brands fa-discord"></i>
+              </a>
+          </li>
+          <li class="footer__social-item">
+              <a href="https://www.tiktok.com/@margonem_mmorpg" target="_blank" rel="noopener noreferrer" class="footer__social-link" aria-label="Tiktok">
+                  <i class="fa-brands fa-tiktok"></i>
+              </a>
+          </li>
+      </ul>
+      </nav>
+    </div>
+
+    <!-- STORES -->
+    <div class="footer__stores">
+      <ul class="footer__stores-list">
+        <li class="footer__stores-item">
+          <a class="footer__stores-link" href="https://apps.apple.com/pl/app/margonem/id6759262292?l=pl" target="_blank" rel="noopener" aria-label="Pobierz w App Store">
+            <img class="footer__stores-badge" src="https://mwc.garmory-cdn.cloud/other/svg/appstore_pl.svg" alt="Pobierz w App Store" width="126" height="42">
+          </a>
+        </li>
+        <li class="footer__stores-item">
+          <a class="footer__stores-link" href="https://play.google.com/store/apps/details?id=pl.margonem&hl=pl" target="_blank" rel="noopener" aria-label="Pobierz z Google Play">
+            <img class="footer__stores-badge" src="https://mwc.garmory-cdn.cloud/other/svg/googleplay_pl.svg" alt="Pobierz z Google Play" width="141" height="42">
+          </a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- NAV -->
+    <nav class="footer__nav" aria-label="Nawigacja stopki">
+      <ul class="footer__nav-list">
+        <li class="footer__nav-item">
+          <a class="footer__nav-link" href="https://pomoc.margonem.pl/index/view,323" target="_blank" rel="dofollow noopener">
+            Regulamin Serwisu          </a>
+        </li>
+        <li class="footer__nav-item">
+          <a class="footer__nav-link" href="https://pomoc.margonem.pl/index/view,325" target="_blank" rel="dofollow noopener">
+            Polityka prywatności          </a>
+        </li>
+        <li class="footer__nav-item">
+          <a class="footer__nav-link" href="/art/view,69" rel="nofollow">
+            Kontakt          </a>
+        </li>
+        <li class="footer__nav-item">
+          <a class="footer__nav-link" href="https://support.garmory.pl/a/margonem.pl/pl/dsa_form" target="_blank" rel="nofollow noopener">
+            Formularz DSA          </a>
+        </li>
+        <li class="footer__nav-item">
+          <a class="footer__nav-link" href="https://pomoc.margonem.pl/index/view,1" target="_blank" rel="dofollow noopener">
+            Dokumentacja          </a>
+        </li>
+        <li class="footer__nav-item">
+          <a class="footer__nav-link" href="/art/view,10" rel="nofollow">
+            Twórcy Gry          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="footer__copyright">
+        Właścicielem Serwisu jest firma <a href="https://www.garmory.pl/" target="_blank" rel="noopener noreferrer">Garmory</a>. Wszystkie prawa zastrzeżone.
+    </div>
+
+  </div>
+</footer>
+                <script>
+            window.host = 'https://micc.garmory-cdn.cloud';
+            window.imgUrl = host+'/obrazki';
+        </script>
+        <script src="/dist/js/vendors-f4957db5e7.min.js"></script>
+        <script src="/dist/js/libraries-ed6ad57774.min.js"></script>
+        <script src="/dist/js/core-34fbb7f35c.min.js"></script>
+        <script src="/dist/js/index-3c181848ec.min.js"></script>
+                                        <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+                <script src="https://commons.margonem.pl/js/iframeCommunication.js"></script>
+        <script src="https://commons.margonem.pl/js/cookiebar-packed.js"></script>
+
+            </body>
+</html>
