@@ -1,4 +1,4 @@
-# ai/ — punkt wejścia dla agenta AI
+# AGENTS.md — punkt wejścia dla agenta AI
 
 Przeczytaj to najpierw. Jeśli po tym pliku dalej nie wiesz, gdzie czegoś szukać, to jest
 błąd tego dokumentu — dopisz brakującą rzecz, zamiast zostawiać następnego z tym samym
@@ -43,8 +43,10 @@ test/
   snapshot.test.ts   format migawki, migracja, strażnik populacji
   dashboard.test.ts  logika dashboardu, filtry, czas migawki, spójność z index.html
   fixtures/          zrzut strony rankingu + próbka snapshotu w starym schemacie
-ai/                  audyty i notatki (ten katalog)
+docs/                audyty i notatki
 .github/workflows/   deploy.yml (check + publikacja), ci.yml (pull requesty)
+AGENTS.md            ten plik — instrukcje dla agenta
+CLAUDE.md            wskaźnik na AGENTS.md (Claude Code)
 ```
 
 Kod ma ~2,4 tys. linii łącznie z testami. Da się go przeczytać w całości i **warto** to
@@ -138,10 +140,10 @@ Pełne uzasadnienia i historia: audyty niżej.
 
 | Plik | Po co |
 |---|---|
-| [`2026-08-01-audyt.md`](2026-08-01-audyt.md) | Audyt #1: czy dane są prawdziwe (są — zweryfikowane wobec żywego rankingu), co było zepsute, co usunięte, czego brakuje. |
-| [`2026-08-01-audyt-2.md`](2026-08-01-audyt-2.md) | Audyt #2 po naprawach: co się obroniło, co poprawione, **dług na przyszłość i lista pomysłów**. |
-| [`2026-08-01-budzet-rozmiaru.md`](2026-08-01-budzet-rozmiaru.md) | Ile rund scrapa zostało do limitu 1 GB na Pages (~65 ≈ 2 lata) i co zrobić, gdy się skończy. |
-| `../README.md` | Instrukcja obsługi dla człowieka. |
+| [`docs/2026-08-01-audyt.md`](docs/2026-08-01-audyt.md) | Audyt #1: czy dane są prawdziwe (są — zweryfikowane wobec żywego rankingu), co było zepsute, co usunięte, czego brakuje. |
+| [`docs/2026-08-01-audyt-2.md`](docs/2026-08-01-audyt-2.md) | Audyt #2 po naprawach: co się obroniło, co poprawione, **dług na przyszłość i lista pomysłów**. |
+| [`docs/2026-08-01-budzet-rozmiaru.md`](docs/2026-08-01-budzet-rozmiaru.md) | Ile rund scrapa zostało do limitu 1 GB na Pages (~65 ≈ 2 lata) i co zrobić, gdy się skończy. |
+| [`README.md`](README.md) | Instrukcja obsługi dla człowieka. |
 
 ---
 
@@ -152,7 +154,7 @@ Pełne uzasadnienia i historia: audyty niżej.
 2. **Przed pełnym scrapem uruchom `bun run scrape:check`.** Margonem już raz zmienił układ
    tabeli i scraper padał na wszystkich 20 światach, kończąc się kodem 0.
 3. **Nie pisz kodu na zapas.** Ten projekt skasował już stałą i cały moduł, które istniały
-   „na przyszłość”. Jeśli coś nie ma dziś konsumenta, opisz pomysł w `ai/` i nie commituj kodu.
+   „na przyszłość”. Jeśli coś nie ma dziś konsumenta, opisz pomysł w `docs/` i nie commituj kodu.
 4. **Szanuj serwis.** 1 req/s to domyślny interwał; przy 400 ms ranking odpowiada `429`.
    `robots.txt` nie zabrania `/ladder`, ale to nie jest zaproszenie do dobijania.
 5. **Dane w `public/worlds/` są nieodtwarzalne.** Ranking nie ma historii — czego nie
@@ -161,8 +163,8 @@ Pełne uzasadnienia i historia: audyty niżej.
 6. **Testy porównują z prawdą, nie z samymi sobą.** Parser jest sprawdzany na zrzucie
    prawdziwej strony, filtry na próbce prawdziwej migawki w starym schemacie. Utrzymaj ten
    układ — test, który sprawdza reimplementację samego siebie, niczego nie pilnuje.
-7. **Notatki i audyty trafiają do `ai/`**, wg schematu `RRRR-MM-DD-<temat>.md`, i są
-   dopisywane do tabeli wyżej.
+7. **Notatki i audyty trafiają do `docs/`**, wg schematu `RRRR-MM-DD-<temat>.md`, i są
+   dopisywane do tabeli w [`docs/README.md`](docs/README.md) oraz do „Co czytać dalej” wyżej.
 
 ---
 

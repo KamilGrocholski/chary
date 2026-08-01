@@ -6,7 +6,7 @@ Statystyki graczy [Margonem](https://www.margonem.pl) — scraper rankingów św
 
 Scraper cyklicznie pobiera rankingi graczy ze wszystkich śledzonych światów, zapisuje migawki (snapshoty) do statycznych plików JSON, a lekki dashboard (bez backendu, sam HTML + Chart.js) pozwala je przeglądać i filtrować.
 
-> **Pracujesz nad tym z agentem AI?** Zacznij od [`ai/README.md`](ai/README.md) — jeden plik
+> **Pracujesz nad tym z agentem AI?** Zacznij od [`AGENTS.md`](AGENTS.md) — jeden plik
 > z całą mapą projektu, formatem danych, pułapkami i uzasadnieniem decyzji.
 
 ---
@@ -150,7 +150,7 @@ git push
 
 Workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) uploaduje katalog `public/` jako artefakt i publikuje go na GitHub Pages. Można też odpalić ręcznie z zakładki **Actions** (`workflow_dispatch`).
 
-> **Uwaga na rozmiar.** Opublikowana strona na GitHub Pages ma twardy limit 1 GB. Stan na 2026-08-01: `public/` waży 118 MB, a każda runda scrape'u dokłada ~14 MB → **zostało ~65 rund, czyli około dwóch lat** przy obecnym tempie. Pełne wyliczenie i co zrobić, gdy zapas się skończy: [`ai/2026-08-01-budzet-rozmiaru.md`](ai/2026-08-01-budzet-rozmiaru.md).
+> **Uwaga na rozmiar.** Opublikowana strona na GitHub Pages ma twardy limit 1 GB. Stan na 2026-08-01: `public/` waży 118 MB, a każda runda scrape'u dokłada ~14 MB → **zostało ~65 rund, czyli około dwóch lat** przy obecnym tempie. Pełne wyliczenie i co zrobić, gdy zapas się skończy: [`docs/2026-08-01-budzet-rozmiaru.md`](docs/2026-08-01-budzet-rozmiaru.md).
 
 ## Struktura projektu
 
@@ -173,10 +173,12 @@ public/              # to, co ląduje na GitHub Pages
   vendor/            # Chart.js 4.4.7 (lokalnie, bez CDN-u)
   manifest.json      # indeks snapshotów
   worlds/            # snapshoty per świat: <ts>.f.json + <ts>.n.json
-ai/                  # README.md (punkt wejścia dla agenta) + audyty i notatki
+docs/                # audyty i notatki
 .github/workflows/
   deploy.yml         # deploy na GitHub Pages
   ci.yml             # typecheck + testy
+AGENTS.md            # punkt wejścia dla agenta AI
+CLAUDE.md            # wskaźnik na AGENTS.md
 ```
 
 ## Stack
