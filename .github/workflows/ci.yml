@@ -1,8 +1,8 @@
 name: CI
 
+# Push na `main` jest sprawdzany w deploy.yml, który bez zielonych testów nie publikuje —
+# tutaj zostają pull requesty, żeby nie mielić tego samego dwa razy.
 on:
-  push:
-    branches: [main]
   pull_request:
 
 jobs:
