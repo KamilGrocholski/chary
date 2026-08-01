@@ -1,4 +1,4 @@
-# START — punkt wejścia dla agenta AI
+# ai/ — punkt wejścia dla agenta AI
 
 Przeczytaj to najpierw. Jeśli po tym pliku dalej nie wiesz, gdzie czegoś szukać, to jest
 błąd tego dokumentu — dopisz brakującą rzecz, zamiast zostawiać następnego z tym samym

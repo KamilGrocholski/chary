@@ -6,7 +6,7 @@ Statystyki graczy [Margonem](https://www.margonem.pl) — scraper rankingów św
 
 Scraper cyklicznie pobiera rankingi graczy ze wszystkich śledzonych światów, zapisuje migawki (snapshoty) do statycznych plików JSON, a lekki dashboard (bez backendu, sam HTML + Chart.js) pozwala je przeglądać i filtrować.
 
-> **Pracujesz nad tym z agentem AI?** Zacznij od [`ai/START.md`](ai/START.md) — jeden plik
+> **Pracujesz nad tym z agentem AI?** Zacznij od [`ai/README.md`](ai/README.md) — jeden plik
 > z całą mapą projektu, formatem danych, pułapkami i uzasadnieniem decyzji.
 
 ---
@@ -173,7 +173,7 @@ public/              # to, co ląduje na GitHub Pages
   vendor/            # Chart.js 4.4.7 (lokalnie, bez CDN-u)
   manifest.json      # indeks snapshotów
   worlds/            # snapshoty per świat: <ts>.f.json + <ts>.n.json
-ai/                  # START.md (punkt wejścia dla agenta) + audyty i notatki
+ai/                  # README.md (punkt wejścia dla agenta) + audyty i notatki
 .github/workflows/
   deploy.yml         # deploy na GitHub Pages
   ci.yml             # typecheck + testy
