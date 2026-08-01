@@ -214,7 +214,13 @@ describe("spójność app.js z index.html", () => {
   test("strona ładuje moduł i lokalny Chart.js zamiast CDN-u", () => {
     expect(html).toContain('<script type="module" src="app.js">');
     expect(html).toContain('src="vendor/chart.umd.min.js"');
-    expect(html).not.toContain("cdn.jsdelivr.net");
+
+    // Chodzi o brak zewnętrznych zasobów, nie o brak samego słowa „cdn” —
+    // adres CDN-u wolno wymienić w komentarzu z instrukcją aktualizacji.
+    const external = [...html.matchAll(/<(?:script|link)[^>]*\s(?:src|href)="([^"]+)"/g)]
+      .map((m) => m[1]!)
+      .filter((url) => /^(https?:)?\/\//.test(url));
+    expect(external).toEqual([]);
   });
 
   test("dashboard nie sięga już po nicki ani po drugi poziom danych", () => {

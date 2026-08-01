@@ -6,6 +6,9 @@ Statystyki graczy [Margonem](https://www.margonem.pl) — scraper rankingów św
 
 Scraper cyklicznie pobiera rankingi graczy ze wszystkich śledzonych światów, zapisuje migawki (snapshoty) do statycznych plików JSON, a lekki dashboard (bez backendu, sam HTML + Chart.js) pozwala je przeglądać i filtrować.
 
+> **Pracujesz nad tym z agentem AI?** Zacznij od [`ai/START.md`](ai/START.md) — jeden plik
+> z całą mapą projektu, formatem danych, pułapkami i uzasadnieniem decyzji.
+
 ---
 
 ## Jak to działa
@@ -111,6 +114,16 @@ bun run rebuild --keep-legacy  # zostawia oryginalne pliki po migracji
 
 Bezpieczne do wielokrotnego uruchamiania.
 
+## Zależności frontu
+
+Chart.js jest wendorowany w `public/vendor/chart.umd.min.js` (wersja **4.4.7**), żeby strona nie zależała od CDN-u ładowanego bez SRI i działała bez internetu. Aktualizacja:
+
+```bash
+curl -sL https://cdn.jsdelivr.net/npm/chart.js@<wersja>/dist/chart.umd.min.js -o public/vendor/chart.umd.min.js
+```
+
+Po podmianie zaktualizuj numer wersji tutaj i w komentarzu w `public/index.html`.
+
 ## Testy
 
 ```bash
@@ -157,10 +170,10 @@ test/
 public/              # to, co ląduje na GitHub Pages
   index.html         # dashboard (markup + style)
   app.js             # logika dashboardu
-  vendor/            # Chart.js (lokalnie, bez CDN-u)
+  vendor/            # Chart.js 4.4.7 (lokalnie, bez CDN-u)
   manifest.json      # indeks snapshotów
   worlds/            # snapshoty per świat: <ts>.f.json + <ts>.n.json
-ai/                  # audyty i notatki
+ai/                  # START.md (punkt wejścia dla agenta) + audyty i notatki
 .github/workflows/
   deploy.yml         # deploy na GitHub Pages
   ci.yml             # typecheck + testy

@@ -6,6 +6,8 @@
   <title>Margostat</title>
   <meta name="description" content="Statystyki graczy Margonem — rozkład poziomów i profesji w rankingach światów, migawki w czasie." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2316161a'/><rect x='6' y='17' width='4' height='9' fill='%233987e5'/><rect x='12' y='12' width='4' height='14' fill='%23199e70'/><rect x='18' y='7' width='4' height='19' fill='%23c98500'/><rect x='24' y='14' width='4' height='12' fill='%23d55181'/></svg>" />
+  <!-- Chart.js 4.4.7, lokalnie zamiast z CDN-u. Aktualizacja:
+       curl -sL https://cdn.jsdelivr.net/npm/chart.js@<wersja>/dist/chart.umd.min.js -o public/vendor/chart.umd.min.js -->
   <script src="vendor/chart.umd.min.js"></script>
   <style>
     :root {
@@ -227,7 +229,7 @@
 
     <div class="card chartBox">
       <div id="chartEmpty" class="empty" hidden>Brak graczy spełniających filtry.</div>
-      <canvas id="professionChart"></canvas>
+      <canvas id="professionChart" role="img" aria-label="Rozkład poziomów według profesji. Liczby dla każdej profesji są wypisane nad wykresem."></canvas>
     </div>
   </div>
 
