@@ -4,7 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Margostat</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta name="description" content="Statystyki graczy Margonem — rozkład poziomów i profesji w rankingach światów, migawki w czasie." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2316161a'/><rect x='6' y='17' width='4' height='9' fill='%233987e5'/><rect x='12' y='12' width='4' height='14' fill='%23199e70'/><rect x='18' y='7' width='4' height='19' fill='%23c98500'/><rect x='24' y='14' width='4' height='12' fill='%23d55181'/></svg>" />
+  <script src="vendor/chart.umd.min.js"></script>
   <style>
     :root {
       /* Motyw margometera: ciepły, ciemny */
@@ -55,18 +57,20 @@
       font-weight: 700;
     }
     button:hover { filter: brightness(1.1); }
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
     .reset-btn {
-        border: 1px solid var(--accent);
-        background: none;
-        color: var(--accent);
+      border: 1px solid var(--accent);
+      background: none;
+      color: var(--accent);
     }
 
-    .toolbar {
-      margin-bottom: 20px;
-    }
+    .toolbar { margin-bottom: 20px; }
     .toolbar-row1 {
       display: grid;
-      grid-template-columns: 200px 180px 1fr auto;
+      grid-template-columns: 200px 180px 1fr;
       gap: 12px;
       align-items: end;
       margin-bottom: 12px;
@@ -76,9 +80,6 @@
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 12px;
       align-items: end;
-    }
-    .prof-filter {
-      grid-column: span 2;
     }
     .prof-checkboxes {
       display: flex;
@@ -103,16 +104,13 @@
     }
 
     .stats {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
       margin: 0 0 20px;
       color: var(--muted);
     }
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 20px;
+    .stats-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
     }
     .chartBox { height: 420px; }
     canvas { width: 100% !important; height: 100% !important; }
@@ -121,13 +119,25 @@
       white-space: pre-wrap;
       margin-bottom: 12px;
     }
-    #fileInfo {
+    .error:empty { margin: 0; }
+    .source {
       padding: 10px 0;
       color: var(--muted);
       font-size: 13px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    }
+    .empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--muted);
+    }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 720px) {
+      .wrap { padding: 14px; }
+      .toolbar-row1 { grid-template-columns: 1fr; }
+      .chartBox { height: 320px; }
     }
   </style>
 </head>
@@ -150,9 +160,9 @@
         </div>
         <div>
           <label>Plik</label>
-          <div style="display:flex;align-items:center;gap:6px;width:fit-content">
-            <div id="fileInfo">—</div>
-            <button id="copyBtn" title="Kopiuj link" style="width:auto;padding:4px 8px;font-size:13px;background:#1e1e22;color:var(--accent);border:1px solid var(--border);flex-shrink:0">⎘</button>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div id="sourceInfo" class="source">—</div>
+            <button id="copyBtn" title="Kopiuj link do tego widoku" style="width:auto;padding:4px 8px;font-size:13px;background:#1e1e22;color:var(--accent);border:1px solid var(--border);flex-shrink:0">⎘</button>
           </div>
         </div>
       </div>
@@ -175,20 +185,17 @@
           <input id="maxHonor" type="number" placeholder="np. 99999" min="0" />
         </div>
         <div style="grid-column: span 2">
-          <label>Ostatnio online</label>
+          <label for="onlineValue">Ostatnio online (maks. dni)</label>
           <div style="display:flex;gap:6px">
-            <input id="onlineValue" type="number" value="" min="0" step="1" style="flex:1;min-width:0" />
-            <span style="padding:10px 4px;color:var(--muted);font-size:13px">dni</span>
-            <select id="onlinePreset" style="width:auto">
-              <option value="">preset</option>
+            <input id="onlineValue" type="number" value="" min="0" step="1" placeholder="wszyscy" style="flex:1;min-width:0" />
+            <select id="onlinePreset" aria-label="Gotowe progi aktywności" style="width:auto">
+              <option value="all">Wszyscy</option>
               <option value="0">&lt; 24h</option>
-              <option value="1">1 dzień temu</option>
-              <option value="2">2 dni temu</option>
-              <option value="3">3 dni temu</option>
-              <option value="7">7 dni temu</option>
-              <option value="14">14 dni temu</option>
-              <option value="30">30 dni temu</option>
-              <option value="" selected>Wszyscy</option>
+              <option value="1">1 dzień</option>
+              <option value="3">3 dni</option>
+              <option value="7">7 dni</option>
+              <option value="14">14 dni</option>
+              <option value="30">30 dni</option>
             </select>
           </div>
         </div>
@@ -196,410 +203,21 @@
           <label>Profesja</label>
           <div class="prof-checkboxes" id="profCheckboxes"></div>
         </div>
-        <div style="min-width:100px;display:flex;flex-direction:row;gap:8px">
-          <button id="applyBtn">Filtruj</button>
-          <button id="resetBtn" class="reset-btn">Resetuj</button>
+        <div>
+          <button id="resetBtn" class="reset-btn">Resetuj filtry</button>
         </div>
       </div>
     </div>
 
     <div class="stats card" id="stats">Ładowanie…</div>
-    <div id="error" class="error"></div>
+    <div id="error" class="error" role="alert"></div>
 
     <div class="card chartBox">
+      <div id="chartEmpty" class="empty" hidden>Brak graczy spełniających filtry.</div>
       <canvas id="professionChart"></canvas>
     </div>
   </div>
 
-  <script>
-    const PROF = {
-      1: "Wojownik",
-      2: "Mag",
-      3: "Paladyn",
-      4: "Tropiciel",
-      5: "Tancerz ostrzy",
-      6: "Łowca",
-    };
-
-    // Paleta serii margometera (walidowana pod kontrast/CVD na ciemnym tle).
-    const PROF_COLORS = {
-      1: "#3987e5", // Wojownik — niebieski
-      2: "#d55181", // Mag — magenta
-      3: "#199e70", // Paladyn — akwamaryna
-      4: "#c98500", // Tropiciel — żółty
-      5: "#9085e9", // Tancerz ostrzy — fioletowy
-      6: "#e66767", // Łowca — czerwony
-    };
-
-    const el = (id) => {
-      const node = document.getElementById(id);
-      if (!node) throw new Error(`Brak elementu #${id}`);
-      return node;
-    };
-
-    let manifest = null;
-    let rawData = [];
-    let professionChart = null;
-
-    // Domyślne kolory Chart.js dopasowane do ciemnego motywu margometera.
-    if (window.Chart) {
-      Chart.defaults.color = "#a0a09a";
-      Chart.defaults.borderColor = "rgba(255, 255, 255, 0.06)";
-      Chart.defaults.font.family = 'ui-sans-serif, system-ui, "Segoe UI", sans-serif';
-    }
-
-    (function buildProfCheckboxes() {
-      const container = el("profCheckboxes");
-      Object.entries(PROF).forEach(([id, name]) => {
-        const color = PROF_COLORS[id];
-        const lbl = document.createElement("label");
-        lbl.style.color = color;
-        const cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.value = id;
-        cb.checked = true;
-        cb.style.accentColor = color;
-        lbl.appendChild(cb);
-        lbl.appendChild(document.createTextNode(name));
-        container.appendChild(lbl);
-      });
-    })();
-
-
-    function isRow(row) {
-      return Array.isArray(row) && row.length >= 7;
-    }
-
-    function getLevel(row) {
-      return isRow(row) ? Number(row[2]) || 0 : Number(row.level) || 0;
-    }
-
-    function getProfession(row) {
-      return isRow(row) ? Number(row[3]) || 0 : Number(row.profession) || 0;
-    }
-
-    function getHonor(row) {
-      return isRow(row) ? Number(row[4]) || 0 : Number(row.honor) || 0;
-    }
-
-    function getLastOnlineText(row) {
-      return isRow(row) ? row[5] : row.lastOnlineText;
-    }
-
-    function parseLastOnlineDays(text) {
-      const t = (text ?? "").trim().toLowerCase();
-      if (t.includes("mniej") && t.includes("24h")) return 0;
-      const m = t.match(/(\d+)\s+(?:dni?|dzień)\s+temu/);
-      if (m) return Number(m[1]);
-      return null;
-    }
-
-    function getWorlds() {
-      return manifest?.worlds || [];
-    }
-
-    function getCurrentWorld() {
-      return el("worldSelect").value;
-    }
-
-    function getCurrentSnapshotFile() {
-      return el("snapshotSelect").value;
-    }
-
-    function getSelectedProfessions() {
-      const checked = el("profCheckboxes").querySelectorAll("input[type=checkbox]:checked");
-      return new Set([...checked].map(cb => Number(cb.value)));
-    }
-
-    function getMaxOfflineDays() {
-      const val = el("onlineValue").value;
-      if (val === "") return Infinity;
-      const n = Number(val);
-      if (!Number.isFinite(n) || n < 0) return Infinity;
-      return n;
-    }
-
-    function filterRows(rows) {
-      const minLevel = el("minLevel").value === "" ? -Infinity : Number(el("minLevel").value);
-      const maxLevel = el("maxLevel").value === "" ? Infinity : Number(el("maxLevel").value);
-      const minHonor = el("minHonor").value === "" ? -Infinity : Number(el("minHonor").value);
-      const maxHonor = el("maxHonor").value === "" ? Infinity : Number(el("maxHonor").value);
-      const maxOfflineDays = getMaxOfflineDays();
-      const selectedProfs = new Set(
-        [...el("profCheckboxes").querySelectorAll("input:checked")].map(cb => Number(cb.value))
-      );
-
-      return rows.filter((r) => {
-        const level = getLevel(r);
-        if (level < minLevel || level > maxLevel) return false;
-
-        const honor = getHonor(r);
-        if (honor < minHonor || honor > maxHonor) return false;
-
-        if (!selectedProfs.has(getProfession(r))) return false;
-
-        const days = parseLastOnlineDays(getLastOnlineText(r));
-        if (days === null) return false;
-
-        return days <= maxOfflineDays;
-      });
-    }
-
-    function resetFilter() {
-      el("minLevel").value = "";
-      el("maxLevel").value = "";
-      el("minHonor").value = "";
-      el("maxHonor").value = "";
-      el("onlineValue").value = "";
-      el("onlinePreset").value = "";
-      const profCheckboxes = el("profCheckboxes").querySelectorAll("input");
-      for (const profCheckbox of profCheckboxes) {
-          profCheckbox.checked = "true";
-      }
-    }
-
-    function buildProfessionDatasets(rows) {
-      const levelSet = new Set();
-      for (const row of rows) {
-        const lvl = getLevel(row);
-        if (lvl) levelSet.add(lvl);
-      }
-      const labels = [...levelSet].sort((a, b) => a - b);
-
-      const buckets = {};
-      for (const row of rows) {
-        const p = getProfession(row);
-        const lvl = getLevel(row);
-        if (!lvl) continue;
-        if (!buckets[p]) buckets[p] = {};
-        buckets[p][lvl] = (buckets[p][lvl] || 0) + 1;
-      }
-
-      const datasets = Object.entries(PROF).map(([id, name]) => ({
-        label: name,
-        data: labels.map(lvl => buckets[id]?.[lvl] || 0),
-        backgroundColor: PROF_COLORS[id],
-        barPercentage: 1.0,
-        categoryPercentage: 1.0,
-      }));
-
-      return { labels, datasets };
-    }
-
-    function renderCharts(rows) {
-      const filtered = filterRows(rows);
-      const profData = buildProfessionDatasets(filtered);
-
-      if (professionChart) professionChart.destroy();
-
-      professionChart = new Chart(el("professionChart"), {
-        type: "bar",
-        data: profData,
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            title: { display: true, text: "Level według profesji", color: "#f2f2ef", font: { size: 14, weight: "600" } },
-            legend: { display: false },
-            tooltip: {
-              enabled: false,
-              external({ chart, tooltip }) {
-                let el = document.getElementById("profTooltip");
-                if (!el) {
-                  el = document.createElement("div");
-                  el.id = "profTooltip";
-                  el.style.cssText = "position:fixed;pointer-events:none;background:#1e1e22;border:1px solid #35353b;border-radius:10px;padding:10px 14px;font-size:13px;color:#f2f2ef;min-width:180px;z-index:999;transition:opacity .1s";
-                  document.body.appendChild(el);
-                }
-                if (tooltip.opacity === 0) { el.style.opacity = 0; return; }
-
-                const dataIndex = tooltip.dataPoints?.[0]?.dataIndex;
-                if (dataIndex == null) { el.style.opacity = 0; return; }
-                const total = chart.data.datasets.reduce((sum, ds) => sum + (ds.data[dataIndex] || 0), 0);
-                const level = chart.data.labels[dataIndex];
-
-                const entries = chart.data.datasets
-                  .map(ds => ({ label: ds.label, color: ds.backgroundColor, val: ds.data[dataIndex] || 0 }))
-                  .filter(e => e.val > 0)
-                  .sort((a, b) => b.val - a.val);
-
-                const rows = entries.map(e => {
-                  const pct = ((e.val / total) * 100).toFixed(1);
-                  return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
-                    <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${e.color};flex-shrink:0"></span>
-                    <span style="flex:1">${e.label}</span>
-                    <span style="color:#a0a09a;margin-left:8px">${e.val}</span>
-                    <span style="color:#3987e5;min-width:48px;text-align:right">${pct}%</span>
-                  </div>`;
-                }).join("");
-
-                el.innerHTML = `
-                  <div style="font-weight:700;margin-bottom:6px;color:#3987e5">Level ${level}</div>
-                  ${rows}
-                  <div style="border-top:1px solid #35353b;margin-top:6px;padding-top:6px;color:#a0a09a">Razem: <b style="color:#f2f2ef">${total}</b></div>
-                `;
-
-                const pos = chart.canvas.getBoundingClientRect();
-                el.style.opacity = 1;
-
-                let x = pos.left + tooltip.caretX + 12;
-                let y = pos.top + tooltip.caretY - 10;
-
-                // measure after render
-                const tw = el.offsetWidth;
-                const th = el.offsetHeight;
-                if (x + tw > window.innerWidth - 8) x = pos.left + tooltip.caretX - tw - 12;
-                if (y + th > window.innerHeight - 8) y = window.innerHeight - th - 8;
-                if (y < 8) y = 8;
-
-                el.style.left = x + "px";
-                el.style.top = y + "px";
-              },
-            },
-          },
-          scales: {
-            y: { beginAtZero: true, stacked: true, ticks: { precision: 0 }, grid: { color: "rgba(255, 255, 255, 0.06)" } },
-            x: { stacked: true, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 50 }, grid: { color: "rgba(255, 255, 255, 0.04)" } },
-          },
-        },
-      });
-
-      const counts = Object.fromEntries(Object.entries(PROF).map(([id, n]) => [id, { name: n, color: PROF_COLORS[id], count: 0 }]));
-      for (const row of filtered) {
-        const id = getProfession(row);
-        if (counts[id]) counts[id].count++;
-      }
-
-      const sorted = Object.values(counts).sort((a, b) => b.count - a.count);
-      const profBadges = sorted.map(({ name, color, count }) =>
-        `<span style="color:${color};white-space:nowrap">${name}: <b>${count}</b></span>`
-      ).join(" · ");
-
-      el("stats").innerHTML = `
-        <div style="margin-bottom:6px">Razem: <b>${filtered.length}</b></div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px 16px">${profBadges}</div>
-      `;
-    }
-
-    function capitalize(s) {
-      return s ? s[0].toUpperCase() + s.slice(1) : s;
-    }
-
-    function formatTimestamp(ts) {
-      // "2026-04-17T15-24-07" → "17.04.2026 15:24:07"
-      const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})/);
-      if (!m) return ts;
-      return `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]}:${m[6]}`;
-    }
-
-    function fillWorldSelect() {
-      const worlds = getWorlds();
-      el("worldSelect").innerHTML = worlds.map(w =>
-        `<option value="${w.name}">${capitalize(w.name)}</option>`
-      ).join("");
-    }
-
-    function fillSnapshotSelect() {
-      const worldName = getCurrentWorld();
-      const world = getWorlds().find(w => w.name === worldName);
-      const files = world?.files || [];
-
-      el("snapshotSelect").innerHTML = [...files].reverse().map(f => {
-        const raw = f.timestamp || (f.file.split("/").pop() || f.file).replace(/\.json$/, "");
-        return `<option value="${f.file}">${formatTimestamp(raw)}</option>`;
-      }).join("");
-
-      el("fileInfo").textContent = files[0]?.file || "—";
-    }
-
-    async function loadSnapshot(file) {
-      if (!file) return;
-      el("fileInfo").textContent = file;
-      el("error").textContent = "";
-
-      const res = await fetch(file);
-      if (!res.ok) throw new Error(`HTTP ${res.status} dla ${file}`);
-
-      const json = await res.json();
-      rawData = json.rows ?? json.data ?? json;
-      renderCharts(rawData);
-    }
-
-    async function init() {
-      try {
-        const res = await fetch("manifest.json");
-        if (!res.ok) throw new Error(`HTTP ${res.status} dla manifest.json`);
-
-        manifest = await res.json();
-        fillWorldSelect();
-        fillSnapshotSelect();
-        await loadSnapshot(getCurrentSnapshotFile());
-      } catch (e) {
-        el("error").textContent = String(e?.message || e);
-      }
-    }
-
-    el("worldSelect").addEventListener("change", async () => {
-      fillSnapshotSelect();
-      try {
-        await loadSnapshot(getCurrentSnapshotFile());
-      } catch (e) {
-        el("error").textContent = String(e?.message || e);
-      }
-    });
-
-    el("snapshotSelect").addEventListener("change", async () => {
-      try {
-        await loadSnapshot(getCurrentSnapshotFile());
-      } catch (e) {
-        el("error").textContent = String(e?.message || e);
-      }
-    });
-
-    el("onlinePreset").addEventListener("change", () => {
-      const val = el("onlinePreset").value;
-      el("onlineValue").value = val;
-      rerender();
-    });
-
-    function rerender() { if (rawData.length) renderCharts(rawData); }
-
-    ["minLevel", "maxLevel", "minHonor", "maxHonor", "onlineValue"]
-      .forEach(id => el(id).addEventListener("input", rerender));
-    el("profCheckboxes").addEventListener("change", rerender);
-
-
-    el("copyBtn").addEventListener("click", async () => {
-      const file = getCurrentSnapshotFile();
-      if (!file) return;
-      const url = new URL(file, location.href).href;
-      await navigator.clipboard.writeText(url);
-      const btn = el("copyBtn");
-      btn.textContent = "✓";
-      setTimeout(() => { btn.textContent = "⎘"; }, 1500);
-    });
-
-    el("applyBtn").addEventListener("click", () => {
-      try {
-        renderCharts(rawData);
-      } catch (e) {
-        el("error").textContent = String(e?.message || e);
-      }
-    });
-
-    el("resetBtn").addEventListener("click", () => {
-      try {
-        resetFilter();
-        renderCharts(rawData);
-      } catch (e) {
-        el("error").textContent = String(e?.message || e);
-      }
-    });
-
-
-    window.addEventListener("DOMContentLoaded", () => {
-      init();
-    });
-  </script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
