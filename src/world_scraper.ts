@@ -14,6 +14,8 @@ import {
 } from "./snapshot.ts";
 import { WORLDS_DIR, rebuildManifest } from "./manifest.ts";
 import { rebuildTrends } from "./trends.ts";
+import { writeAtomic } from "./atomic.ts";
+import { MAX_PAGE_RETRIES, backoffFor, parseRetryAfter } from "./retry.ts";
 
 // ── Typy błędów ───────────────────────────────────────────────────────────────
 
@@ -80,14 +82,16 @@ function logError(err: ScraperError, context?: object) {
 
 const BASE = "https://www.margonem.pl";
 const FETCH_TIMEOUT_MS = 30_000;
-const MAX_PAGE_RETRIES = 3;
-const BACKOFF_BASE_MS = 5_000;
-const MAX_BACKOFF_MS = 120_000;
+
 const MIN_INTERVAL_MS = 250;
 /** Powyżej tylu procent odrzuconych wierszy na stronie zakładamy zmianę markupu. */
 const MAX_BAD_ROW_RATIO = 0.01;
 
+/** Nazwa świata trafia i do URL-a, i do ścieżki pliku — musi być nudna. */
+const WORLD_NAME = /^[a-z0-9-]+$/;
+
 // ── Helpery ───────────────────────────────────────────────────────────────────
+
 
 // Uwaga: stary format `/ladder/players,<świat>?page=N` robi 301 na
 // `/ladder/<Świat>/players` GUBIĄC parametr `page` — pobierałby w kółko stronę 1.
@@ -102,14 +106,6 @@ function formatStamp(d: Date) {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function parseRetryAfter(header: string | null): number | undefined {
-  if (!header) return undefined;
-  const seconds = Number(header);
-  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
-  const date = Date.parse(header);
-  return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
 }
 
 // ── Pobieranie strony ─────────────────────────────────────────────────────────
@@ -171,7 +167,7 @@ async function scrapePageWithRetry(world: string, page: number): Promise<PageRes
       if (attempt > MAX_PAGE_RETRIES) throw e;
 
       const suggested = e instanceof HttpError ? e.retryAfterMs : undefined;
-      const backoff = Math.min(suggested ?? BACKOFF_BASE_MS * 2 ** (attempt - 1), MAX_BACKOFF_MS);
+      const backoff = backoffFor(attempt, suggested);
       await log("WARN", `Próba ${attempt}/${MAX_PAGE_RETRIES} nieudana (${world} s.${page}), ponawiam za ${backoff}ms`, {
         world,
         page,
@@ -225,8 +221,8 @@ async function scrapeWorld(world: string, interval: number): Promise<PopulationD
 
   try {
     await mkdir(dir, { recursive: true });
-    await Bun.write(filterPathFor(dir, timestamp), JSON.stringify(filters));
-    await Bun.write(namesPathFor(dir, timestamp), JSON.stringify(names));
+    await writeAtomic(filterPathFor(dir, timestamp), JSON.stringify(filters));
+    await writeAtomic(namesPathFor(dir, timestamp), JSON.stringify(names));
   } catch (e) {
     throw new IoError(`Nie udało się zapisać snapshotu ${world}: ${e instanceof Error ? e.message : String(e)}`, e);
   }
@@ -277,6 +273,14 @@ const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const positional = args.filter((a) => !a.startsWith("--"));
 
+// Nieznana flaga nie może być po cichu wyrzucona z `positional`: literówka
+// w `--dry-run` uruchamiała wtedy PEŁNY scrape — ~1,6 h i 202 nadpisane pliki.
+const unknownFlags = args.filter((a) => a.startsWith("--") && a !== "--dry-run" && !a.startsWith("--drop-threshold="));
+if (unknownFlags.length > 0) {
+  console.error(`nieznane opcje: ${unknownFlags.join(", ")}\nznane: --dry-run, --drop-threshold=<0-1>`);
+  process.exit(1);
+}
+
 // Próg strażnika obciętego scrapu, np. --drop-threshold=0.1 dla 10%.
 const dropThresholdArg = args.find((a) => a.startsWith("--drop-threshold="))?.split("=")[1];
 const dropThreshold = dropThresholdArg === undefined ? DEFAULT_DROP_THRESHOLD : Number(dropThresholdArg);
@@ -288,6 +292,21 @@ if (!Number.isFinite(dropThreshold) || dropThreshold < 0 || dropThreshold > 1) {
 const worlds = positional[0]
   ? positional[0].split(",").map((w) => w.trim().toLowerCase()).filter(Boolean)
   : DEFAULT_WORLDS;
+
+// Nazwa świata idzie do URL-a ORAZ do `path.join(WORLDS_DIR, world)`, więc bez
+// walidacji `scrape ../../tmp/x` zapisywał migawki poza `public/`.
+const badWorlds = worlds.filter((w) => !WORLD_NAME.test(w));
+if (badWorlds.length > 0) {
+  console.error(`nazwa świata może zawierać tylko [a-z0-9-]: ${badWorlds.join(", ")}`);
+  process.exit(1);
+}
+
+// `scrape ,` dawało pustą listę, pętla nie robiła nic, a proces kończył się
+// kodem 0 i komunikatem „✓ 0/0 światów” — dokładnie klasa błędu z zasady #2.
+if (worlds.length === 0) {
+  console.error("nie podano żadnego świata");
+  process.exit(1);
+}
 
 let interval = 1000;
 if (positional[1]) {

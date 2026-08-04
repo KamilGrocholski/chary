@@ -10,6 +10,7 @@ import {
   timestampFromFileName,
 } from "./snapshot.ts";
 import { rebuildTrends } from "./trends.ts";
+import { writeAtomic } from "./atomic.ts";
 
 // Utrzymanie danych w public/:
 //   - migracja snapshotów z jednego pliku do pary `.f.json` / `.n.json`,
@@ -56,8 +57,8 @@ for (const world of worldDirs) {
 
     const filterFile = filterPathFor(dir, timestamp);
     const namesFile = namesPathFor(dir, timestamp);
-    await Bun.write(filterFile, JSON.stringify(filters));
-    await Bun.write(namesFile, JSON.stringify(names));
+    await writeAtomic(filterFile, JSON.stringify(filters));
+    await writeAtomic(namesFile, JSON.stringify(names));
     after += (await stat(filterFile)).size + (await stat(namesFile)).size;
 
     if (!keepLegacy) await unlink(file);

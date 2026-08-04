@@ -197,15 +197,33 @@ export function loadedCount(store, entries) {
   return entries.reduce((n, e) => n + (store.has(e.id) ? 1 : 0), 0);
 }
 
+// Trwające pobrania, po jednym na świat.
+//
+// Bez tego każde zdarzenie `input` w polu filtra startowało własny przelot: lista
+// brakujących migawek jest liczona w momencie startu, więc trzy znaki wpisane w „Min
+// level” ciągnęły ten sam komplet plików trzy razy. Dla gordiona to 5,7 MB zamiast
+// 1,9 MB — czyli dokładne zaprzeczenie obietnicy, że transfer kupuje się świadomie.
+const inFlight = new Map();
+
 /**
- * Dociąga brakujące migawki świata, `concurrency` naraz.
+ * Dociąga brakujące migawki świata, `concurrency` naraz. Drugie wywołanie dla tego
+ * samego świata dostaje trwający przelot zamiast startować własny.
  *
  * `isStale()` pozwala porzucić robotę, gdy użytkownik zdążył przełączyć świat —
  * bez tego wolniejsza odpowiedź dosypywałaby dane do widoku, którego już nie ma.
  * Migawka, której nie udało się pobrać, ląduje w `failed` i po prostu nie ma jej
  * na wykresie: jedna zepsuta odpowiedź nie może wywalić całej historii.
  */
-export async function loadHistory(world, entries, options = {}) {
+export function loadHistory(world, entries, options = {}) {
+  const running = inFlight.get(world);
+  if (running) return running;
+
+  const run = fetchMissing(world, entries, options).finally(() => inFlight.delete(world));
+  inFlight.set(world, run);
+  return run;
+}
+
+async function fetchMissing(world, entries, options) {
   const { concurrency = 4, onProgress = () => {}, isStale = () => false } = options;
   const store = cachedSnapshots(world);
   const missing = entries.filter((e) => !store.has(e.id));

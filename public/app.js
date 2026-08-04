@@ -14,6 +14,7 @@ import {
   activityLabel,
   countByActivity,
   countByLevel,
+  describeFilters,
   filtersFromParams,
   filtersToParams,
   isDefaultFilters,
@@ -243,7 +244,10 @@ function setupView() {
     let y = pos.top + tooltip.caretY - 10;
     if (x + node.offsetWidth > window.innerWidth - 8) x = pos.left + tooltip.caretX - node.offsetWidth - 12;
     if (y + node.offsetHeight > window.innerHeight - 8) y = window.innerHeight - node.offsetHeight - 8;
-    if (y < 8) y = 8;
+    // Pasek filtrów jest przyklejony i ma wyższy z-index niż dymek, więc górna klamra
+    // musi kończyć się pod nim, a nie na 8 px od krawędzi okna.
+    const barBottom = el("filterBar").getBoundingClientRect().bottom || 0;
+    if (y < barBottom + 8) y = barBottom + 8;
 
     node.style.left = `${x}px`;
     node.style.top = `${y}px`;
@@ -423,11 +427,53 @@ function setupView() {
 
   // ── Renderowanie tekstu ───────────────────────────────────────────────────
 
+  // Grupy, które kasuje krzyżyk na chipie. Nigdy pojedyncze pole: „Poziom 250-400”
+  // to jeden byt dla czytającego, choć dwa `<input>` dla kodu.
+  const FILTER_GROUPS = {
+    level: ["minLevel", "maxLevel"],
+    honor: ["minHonor", "maxHonor"],
+    days: ["onlineValue"],
+  };
+
+  function clearFilterGroup(key) {
+    if (key === "prof") {
+      for (const cb of el("profCheckboxes").querySelectorAll("input")) cb.checked = true;
+    } else {
+      for (const id of FILTER_GROUPS[key] ?? []) el(id).value = "";
+      if (key === "days") el("onlinePreset").value = "all";
+    }
+    scheduleRender();
+  }
+
+  /**
+   * Chipy aktywnych filtrów w pasku. Baymard: strony pokazujące aktywne filtry naraz
+   * w panelu i jako podsumowanie nad wynikami mają wyraźnie mniej błędów użytkownika
+   * niż te z jednym z tych wzorców — więc mamy oba.
+   *
+   * Chipy są widokiem `readFilters()`, nie własnym stanem: etykiety liczy
+   * `describeFilters`, a krzyżyk pisze z powrotem do tych samych pól formularza.
+   */
+  function renderChips(filters) {
+    const chips = describeFilters(filters);
+    el("filterChips").innerHTML = chips
+      .map(
+        ({ key, label }) =>
+          `<span class="chip">${label}<button type="button" data-clear="${key}" aria-label="Usuń filtr: ${label}">×</button></span>`,
+      )
+      .join("");
+    el("filtersToggle").textContent = chips.length > 0 ? `Filtry (${chips.length})` : "Filtry";
+  }
+
+  function setFieldsOpen(open) {
+    el("filterFields").hidden = !open;
+    el("filtersToggle").setAttribute("aria-expanded", String(open));
+  }
+
   function renderMatchLine(matched, population) {
     const share = population > 0 ? (matched / population) * 100 : 0;
     el("matchLine").innerHTML =
       `<span>Pasuje: <b>${num(matched)}</b></span>` +
-      `<span>z ${num(population)} w tej migawce</span>` +
+      `<span>z ${num(population)}<span class="wide-only"> w tej migawce</span></span>` +
       `<span>(${dec(share, 1)}%)</span>`;
   }
 
@@ -524,11 +570,16 @@ function setupView() {
   function fillThresholdSelect(maxDays, preferred) {
     const usable = usableThresholds(maxDays);
     const keys = usable.map((t) => t.key).join(",");
+    // Wybór czytamy PRZED podmianą opcji. `innerHTML` na `<select>` zeruje wartość
+    // na pierwszą opcję, więc odczyt po podmianie zawsze dawałby „< 24h” — czyli
+    // cofałby użytkownika na serię wahającą się o 14,7% i utrwalał to w linku.
+    const wanted = preferred ?? el("thresholdSelect").value;
+
     if (keys !== thresholdKeys) {
       thresholdKeys = keys;
       el("thresholdSelect").innerHTML = usable.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
     }
-    const chosen = thresholdByKey(preferred ?? el("thresholdSelect").value, maxDays);
+    const chosen = thresholdByKey(wanted, maxDays);
     if (chosen) el("thresholdSelect").value = chosen.key;
 
     el("thresholdSelect").disabled = usable.length === 0;
@@ -553,14 +604,33 @@ function setupView() {
       return;
     }
     if (loaded >= expected) {
-      const failed = progress.failed > 0 ? ` · ${progress.failed} nie wczytano` : "";
-      node.textContent = `${expected} ${expected === 1 ? "migawka" : "migawek"}${failed}`;
+      node.textContent = `${expected} ${expected === 1 ? "migawka" : "migawek"}`;
       return;
     }
-    node.textContent = `wczytywanie dokładnych danych… ${loaded} z ${expected} migawek`;
+    // Komplet się nie zebrał. „Wczytywanie…” wolno napisać tylko wtedy, gdy coś
+    // jeszcze leci — inaczej status zostaje na zawsze na pasku postępu, który stoi.
+    node.textContent = progress.running
+      ? `wczytywanie dokładnych danych… ${loaded} z ${expected} migawek`
+      : `${loaded} z ${expected} migawek · ${progress.failed} nie wczytano`;
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  /**
+   * Czyści wykresy historii. Bez tego wczesne wyjścia z `renderHistory` zostawiały
+   * na ekranie serie **poprzedniego świata** pod nagłówkiem i tabelą nowego — razem
+   * z dymkami pokazującymi daty tamtych migawek.
+   */
+  function clearHistoryCharts() {
+    tickValues = [];
+    entriesByTime = new Map();
+    for (const id of ["popChart", "actChart", "profChart"]) {
+      if (!charts[id]) continue;
+      charts[id].data.datasets = [];
+      charts[id].update();
+    }
+    el("changeTable").innerHTML = "";
+  }
 
   function renderCrossSection(filters) {
     const data = currentSnapshot();
@@ -568,6 +638,12 @@ function setupView() {
     if (!data) {
       el("stats").textContent = "Ładowanie…";
       el("matchLine").textContent = "Ładowanie…";
+      // Histogram też jest z poprzedniej migawki, dopóki nowa nie dojdzie.
+      if (charts.professionChart) {
+        charts.professionChart.data.labels = [];
+        charts.professionChart.data.datasets = [];
+        charts.professionChart.update();
+      }
       return;
     }
 
@@ -584,6 +660,8 @@ function setupView() {
     const base = baseTrend();
     if (!base) {
       el("historyStatus").textContent = "brak historii dla tego świata";
+      el("summary").textContent = "—";
+      clearHistoryCharts();
       return;
     }
 
@@ -596,11 +674,18 @@ function setupView() {
     );
 
     renderHistoryStatus(loaded, expected);
-    el("partialNote").hidden = !progress.running || loaded >= expected;
+    // Notka wisi na tym, ile realnie brakuje — nie na tym, czy coś jeszcze leci.
+    // Inaczej przy nieudanym pobraniu znikała, zostawiając niepełny wykres bez słowa.
+    el("partialNote").hidden = loaded >= expected;
     if (!el("partialNote").hidden) {
+      const stalled = !progress.running;
       el("partialNote").innerHTML =
-        `<span aria-hidden="true">⏳</span><span><b>Historia dopełnia się w tle.</b> ` +
-        `Narysowane są tylko migawki już wczytane (${loaded} z ${expected}) — brakującym punktom nie podstawiamy niczego zmyślonego.</span>`;
+        `<span aria-hidden="true">${stalled ? "⚠" : "⏳"}</span><span><b>` +
+        (stalled ? "Historia jest niepełna." : "Historia dopełnia się w tle.") +
+        `</b> Narysowane są tylko migawki już wczytane (${loaded} z ${expected}) — ` +
+        `brakującym punktom nie podstawiamy niczego zmyślonego.` +
+        (stalled && progress.failed > 0 ? ` ${progress.failed} nie udało się pobrać.` : "") +
+        `</span>`;
     }
 
     const usable = fillThresholdSelect(filters.maxDays);
@@ -613,7 +698,7 @@ function setupView() {
 
     if (trend.id.length === 0) {
       el("summary").textContent = "—";
-      el("changeTable").innerHTML = "";
+      clearHistoryCharts();
       return;
     }
 
@@ -628,19 +713,22 @@ function setupView() {
     if (!manifest || !trends) return;
     writeUrlState();
     const filters = readFilters();
+    renderChips(filters);
     renderCrossSection(filters);
     renderHistory(filters);
   }
 
+  /**
+   * Render i ewentualne dociągnięcie historii idą **razem, za tym samym debounce'em**.
+   * Pobieranie wywoływane wprost z handlera `input` startowało jeden przelot na każdy
+   * wciśnięty klawisz — patrz `inFlight` w history.js.
+   */
   function scheduleRender() {
     clearTimeout(renderTimer);
-    renderTimer = setTimeout(render, 150);
-  }
-
-  /** Zmiana filtra to moment, w którym agregat przestaje wystarczać. */
-  function onFilterChange() {
-    scheduleRender();
-    void ensureHistory();
+    renderTimer = setTimeout(() => {
+      render();
+      void ensureHistory();
+    }, 150);
   }
 
   // ── Pobieranie ────────────────────────────────────────────────────────────
@@ -654,13 +742,16 @@ function setupView() {
     el("sourceInfo").textContent = entry.filters;
     el("snapshotMeta").textContent = formatSnapshotDate(entry);
 
+    // Błąd poprzedniej migawki nie opisuje tej — czyszczony na obu ścieżkach,
+    // także wtedy, gdy dane są już w pamięci i nic nie pobieramy.
+    el("error").textContent = "";
+
     if (store.has(entry.id)) {
       showSuspect(store.get(entry.id).suspect);
       render();
       return;
     }
 
-    el("error").textContent = "";
     el("stats").textContent = "Ładowanie…";
     showSuspect(null);
 
@@ -675,6 +766,9 @@ function setupView() {
       showSuspect(json.suspect);
       render();
     } catch (e) {
+      // Ten sam strażnik co przy sukcesie: odrzucenie porzuconego żądania nie może
+      // skasować poprawnie wyrenderowanego przekroju innej migawki.
+      if (token !== snapshotToken) return;
       el("error").textContent = String(e?.message || e);
       el("stats").textContent = "—";
     }
@@ -685,7 +779,15 @@ function setupView() {
    * każdej zmianie filtra, ale robi coś tylko raz na świat — reszta to sprawdzenie mapy.
    */
   async function ensureHistory() {
-    if (isDefaultFilters(readFilters())) return;
+    if (isDefaultFilters(readFilters())) {
+      // Historia idzie wtedy z kompletnego agregatu, więc licznik porażek
+      // z poprzedniego filtra nie ma prawa jej opisywać.
+      if (progress.expected !== 0 || progress.failed !== 0) {
+        progress = { loaded: 0, expected: 0, failed: 0, running: false };
+        render();
+      }
+      return;
+    }
     if (!manifest || !trends) return;
 
     const world = currentWorld();
@@ -707,10 +809,10 @@ function setupView() {
     });
 
     if (token !== worldToken) return;
+    // Nieudane migawki opisuje `#partialNote` w sekcji HISTORIA, a nie `#error` nad
+    // PRZEKROJEM: tamten pasek dotyczy migawki przekroju i stoi 1500 px od danych,
+    // o których mowa.
     progress = { loaded: loadedCount(store, entries), expected: entries.length, failed: failed.length, running: false };
-    if (failed.length > 0) {
-      el("error").textContent = `Nie udało się pobrać ${failed.length} migawek — historia jest niepełna.`;
-    }
     render();
   }
 
@@ -753,6 +855,11 @@ function setupView() {
       fillThresholdSelect(readFilters().maxDays, view.threshold);
       el("modeSelect").value = view.share ? "udzial" : "liczba";
 
+      // Na wąskim ekranie panel z polami zajmuje 581 px, czyli 87% ekranu iPhone'a SE —
+      // pierwszy ekran ma zaczynać się od danych, nie od formularza. Sam pasek zostaje,
+      // więc filtry nie znikają z oczu, tylko czekają zwinięte.
+      setFieldsOpen(!window.matchMedia?.("(max-width: 720px)")?.matches);
+
       // Link z filtrami ma działać od razu — historia startuje bez czekania na ruch myszą.
       await selectAndLoad();
     } catch (e) {
@@ -767,6 +874,11 @@ function setupView() {
   el("worldSelect").addEventListener("change", async () => {
     worldToken += 1; // porzuca historię poprzedniego świata
     progress = { loaded: 0, expected: 0, failed: 0, running: false };
+    // Gasimy wykresy od razu, synchronicznie. Pierwszy render nowego świata przychodzi
+    // dopiero po pobraniu migawki, więc bez tego przez kilkaset milisekund pod nowym
+    // nagłówkiem stoją serie poprzedniego świata — z dymkami pokazującymi tamte daty.
+    clearHistoryCharts();
+    el("historyStatus").textContent = "—";
     fillSnapshotSelect();
     await selectAndLoad();
   });
@@ -775,13 +887,13 @@ function setupView() {
   el("onlinePreset").addEventListener("change", () => {
     const value = el("onlinePreset").value;
     el("onlineValue").value = value === "all" ? "" : value;
-    onFilterChange();
+    scheduleRender();
   });
 
   for (const id of ["minLevel", "maxLevel", "minHonor", "maxHonor", "onlineValue"]) {
-    el(id).addEventListener("input", onFilterChange);
+    el(id).addEventListener("input", scheduleRender);
   }
-  el("profCheckboxes").addEventListener("change", onFilterChange);
+  el("profCheckboxes").addEventListener("change", scheduleRender);
 
   for (const id of ["thresholdSelect", "modeSelect"]) {
     el(id).addEventListener("change", scheduleRender);
@@ -800,6 +912,18 @@ function setupView() {
     setTimeout(() => {
       btn.textContent = "⎘";
     }, 1500);
+  });
+
+  // Listenery paska rejestrujemy NA KOŃCU. `test/dom_smoke.ts` wywołuje pierwszy
+  // zarejestrowany listener węzła (`handlers[0]`), więc wepchnięcie czegokolwiek przed
+  // istniejące podpięcia zmieniłoby to, co test naprawdę uruchamia.
+  el("filtersToggle").addEventListener("click", () => {
+    setFieldsOpen(el("filterFields").hidden);
+  });
+
+  el("filterChips").addEventListener("click", (event) => {
+    const key = event.target?.dataset?.clear;
+    if (key) clearFilterGroup(key);
   });
 
   init();

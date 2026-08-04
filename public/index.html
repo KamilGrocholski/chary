@@ -69,10 +69,86 @@
       color: var(--accent);
     }
 
+    /* Pasek filtrów — jedyny egzemplarz wyboru świata i licznika trafień, przyklejony
+       do góry. Filtr steruje dwiema sekcjami, a od niego do pierwszego wykresu historii
+       jest 961 px, czyli więcej niż ekran: bez tego paska nie da się zobaczyć naraz
+       tego, co się ustawia, i tego, na co to działa.
+       Budżet wysokości: ≤ 64 px, czyli ≤ 7% ekranu 900 px (próg NN/g to 10%). */
+    .filterbar {
+      position: sticky;
+      top: 0;
+      /* nad #profTooltip, który jest fixed z z-index 999 (public/app.js) */
+      z-index: 1000;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 14px;
+      padding: 10px 16px;
+      margin-bottom: 16px;
+      border-top: none;
+      border-radius: 0 0 14px 14px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+    }
+    .filterbar select {
+      width: auto;
+      min-width: 150px;
+      padding: 6px 10px;
+    }
+    .filterbar-nav {
+      display: flex;
+      gap: 10px;
+      margin-left: auto;
+    }
+    .filterbar-nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .filterbar-nav a:hover { color: var(--text); }
+    .filterbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ghost-btn {
+      width: auto;
+      padding: 6px 11px;
+      font-size: 13px;
+      background: var(--surface-2);
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 4px 3px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .chip button {
+      width: auto;
+      padding: 0 4px;
+      border: none;
+      background: none;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1;
+      font-weight: 700;
+    }
+    .chip button:hover { color: #e66767; filter: none; }
+
     .toolbar { margin-bottom: 20px; }
     .toolbar-row1 {
       display: grid;
-      grid-template-columns: 200px 180px 1fr;
+      grid-template-columns: 200px 1fr;
       gap: 12px;
       align-items: end;
       margin-bottom: 12px;
@@ -83,6 +159,8 @@
       gap: 12px;
       align-items: end;
     }
+    .col-2 { grid-column: span 2; }
+    .col-full { grid-column: 1 / -1; }
     .prof-checkboxes {
       display: flex;
       flex-wrap: wrap;
@@ -105,19 +183,24 @@
       accent-color: var(--accent);
     }
 
-    /* Pasek trafień — jedyna liczba, która odpowiada na „ile ich w ogóle jest”. */
+    /* Licznik trafień — jedyna liczba, która odpowiada na „ile ich w ogóle jest”.
+       Mieszka w pasku, więc jest widoczny przez całe 2806 px strony, a nie przez
+       pierwsze 390. */
     .match {
-      margin-bottom: 20px;
-      font-size: 15px;
+      margin: 0;
+      font-size: 13px;
       color: var(--muted);
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
-      gap: 6px 12px;
+      gap: 4px 8px;
+      white-space: nowrap;
     }
-    .match b { color: var(--text); font-size: 19px; }
+    .match b { color: var(--text); font-size: 16px; }
 
     .section-head {
+      /* kotwice z paska nie mogą wjeżdżać pod pasek */
+      scroll-margin-top: 76px;
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
@@ -211,6 +294,22 @@
       .history-controls { grid-template-columns: 1fr; margin-left: 0; width: 100%; }
       .chartBox { height: 320px; }
       .chartBox.short { height: 260px; }
+
+      /* Bez tego siatka schodzi do jednej kolumny, a `.col-2` wymusza drugą —
+         panel wychodził poza kartę poniżej ~352 px szerokości. */
+      .toolbar-row2 { grid-template-columns: repeat(2, 1fr); }
+      .col-2 { grid-column: 1 / -1; }
+      /* Dwie linie zamiast trzech: świat + akcje, pod spodem licznik i kotwice.
+         Przy trzech pasek miał 148 px = 22% ekranu 667 px, czyli więcej niż wytyczna
+         15% dla urządzeń dotykowych. */
+      .filterbar { gap: 6px 8px; padding: 8px 12px; }
+      .filterbar select { order: 1; flex: 1 1 auto; min-width: 0; }
+      .filterbar-actions { order: 2; margin-left: auto; }
+      .filterbar .match { order: 3; font-size: 12px; }
+      .filterbar-nav { order: 4; margin-left: auto; }
+      .chips { order: 5; }
+      /* „w tej migawce” to doprecyzowanie, bez którego liczba nadal się broni */
+      .wide-only { display: none; }
     }
   </style>
 </head>
@@ -221,22 +320,29 @@
       <span style="color:var(--muted);font-size:13px">statystyki graczy Margonem</span>
     </header>
 
-    <div class="card toolbar">
+    <div class="filterbar card" id="filterBar">
+      <select id="worldSelect" aria-label="Świat"></select>
+      <div id="matchLine" class="match" role="status">Ładowanie…</div>
+      <div id="filterChips" class="chips"></div>
+      <nav class="filterbar-nav" aria-label="Sekcje">
+        <a href="#przekroj">Przekrój</a>
+        <a href="#historia">Historia</a>
+      </nav>
+      <div class="filterbar-actions">
+        <button id="filtersToggle" class="ghost-btn" aria-expanded="true" aria-controls="filterFields">Filtry</button>
+        <button id="copyBtn" class="ghost-btn" title="Kopiuj link do tego widoku" aria-label="Kopiuj link do tego widoku">⎘</button>
+      </div>
+    </div>
+
+    <div class="card toolbar" id="filterFields">
       <div class="toolbar-row1">
-        <div>
-          <label for="worldSelect">Świat</label>
-          <select id="worldSelect"></select>
-        </div>
         <div>
           <label for="snapshotSelect">Migawka przekroju</label>
           <select id="snapshotSelect"></select>
         </div>
         <div>
           <label>Plik</label>
-          <div style="display:flex;align-items:center;gap:8px">
-            <div id="sourceInfo" class="source">—</div>
-            <button id="copyBtn" title="Kopiuj link do tego widoku" style="width:auto;padding:4px 8px;font-size:13px;background:#1e1e22;color:var(--accent);border:1px solid var(--border);flex-shrink:0">⎘</button>
-          </div>
+          <div id="sourceInfo" class="source">—</div>
         </div>
       </div>
 
@@ -257,7 +363,7 @@
           <label for="maxHonor">Max honor</label>
           <input id="maxHonor" type="number" placeholder="np. 99999" />
         </div>
-        <div style="grid-column: span 2">
+        <div class="col-2">
           <label for="onlineValue">Ostatnio online (maks. dni)</label>
           <div style="display:flex;gap:6px">
             <input id="onlineValue" type="number" value="" min="0" step="1" placeholder="wszyscy" style="flex:1;min-width:0" />
@@ -272,7 +378,7 @@
             </select>
           </div>
         </div>
-        <div style="grid-column: 1 / -1">
+        <div class="col-full">
           <label>Profesja</label>
           <div class="prof-checkboxes" id="profCheckboxes"></div>
         </div>
@@ -282,10 +388,9 @@
       </div>
     </div>
 
-    <div id="matchLine" class="match">Ładowanie…</div>
     <div id="error" class="error" role="alert"></div>
 
-    <div class="section-head">
+    <div class="section-head" id="przekroj">
       <h2>Przekrój</h2>
       <span id="snapshotMeta" class="meta">—</span>
     </div>
@@ -299,7 +404,7 @@
       <canvas id="professionChart" role="img" aria-label="Rozkład poziomów według profesji w wybranej migawce."></canvas>
     </div>
 
-    <div class="section-head">
+    <div class="section-head" id="historia">
       <h2>Historia</h2>
       <span id="historyStatus" class="meta">—</span>
       <div class="history-controls">

@@ -29,12 +29,14 @@ src/
   parser.ts          parsowanie HTML-a rankingu — czyste funkcje, zero I/O
   snapshot.ts        format migawki: podział .f/.n, migracja starych, strażnik populacji
   manifest.ts        budowa public/manifest.json
+  atomic.ts          zapis przez plik tymczasowy + rename — albo w całości, albo wcale
+  retry.ts           backoff i Retry-After — czyste, bo world_scraper.ts odpala się przy imporcie
   trends.ts          agregat historii świata → public/trends.json
   rebuild_data.ts    CLI utrzymania danych (migracja + manifest + trendy)
   worlds.ts          lista śledzonych światów — edytowana ręcznie
   server.ts          lokalny serwer statyczny do podglądu
 public/              dokładnie to, co ląduje na GitHub Pages
-  index.html         markup i style całego widoku: przekrój migawki + historia
+  index.html         markup i style: przyklejony pasek filtrów + przekrój + historia
   app.js             jedyny moduł dotykający DOM-u — orkiestracja i rysowanie
   filters.js         filtr i zliczanie: matches, countByLevel, summarizeFiltered, stan w URL-u
   history.js         historia świata: progi, serie, tablice typowane, pobieranie migawek
@@ -73,7 +75,7 @@ bun run scrape aether  # jeden świat
 bun run scrape aether,tempest 2000   # wybrane światy, własny interwał w ms (min. 250)
 
 bun run serve          # http://localhost:3000 — dashboard lokalnie
-bun test               # 165 testów
+bun test               # 184 testy
 bun run typecheck
 bun run rebuild        # utrzymanie danych: migracja starych schematów + manifest + trendy
 ```
@@ -174,9 +176,17 @@ Pułapki tej ścieżki:
   tych samych graczy, co wykres pasujących. `usableThresholds` je usuwa.
 - Pamięć trzyma najwyżej **dwa światy**, a `HISTORY_WINDOW` (12) ogranicza liczbę migawek.
   Dziś okno niczego nie ucina — najdłuższa historia ma 11 migawek.
+- **Pobieranie startuje wyłącznie zza debounce'a, i tylko raz na świat.** `loadHistory`
+  trzyma mapę `świat → Promise`; wywoływanie go z handlera `input` ciągnęło ten sam
+  komplet plików raz na każdy wciśnięty klawisz. Test liczy pobrania per adres.
+- **Podmiana `innerHTML` na `<select>` zeruje wybór** — przeglądarka ustawia pierwszą
+  opcję, nawet gdy poprzednia wartość nadal jest na liście. Wartość trzeba odczytać
+  **przed** podmianą. Atrapa DOM-u robi teraz to samo; wcześniej była łagodniejsza
+  i przez to ukrywała ten błąd.
 
 Pomiary, budżet transferu i uzasadnienie scalenia widoków:
 [`docs/2026-08-04-spec-widok-swiata.md`](docs/2026-08-04-spec-widok-swiata.md).
+Osiem błędów, których nie łapało 165 testów: [`docs/2026-08-04-audyt-3.md`](docs/2026-08-04-audyt-3.md).
 
 ---
 
@@ -190,6 +200,7 @@ Decyzje, które wyglądają dziwnie, dopóki nie znasz powodu:
 | `trends.json` liczy tylko to, co rysuje widok | Poprzedni moduł agregatów skasowano za pola bez konsumenta. Ten ma populację, aktywność i profesje — bez rozkładu poziomów (43× większy plik) i bez honoru, których widok historii nie czyta. |
 | Trendy w osobnym pliku, nie w manifeście | Manifest jest pobierany przy każdym wejściu, a historii bez filtra można nie rysować wcale. 9 KB dokładane wszystkim to koszt bez pokrycia. |
 | Jeden widok zamiast dwóch stron | Przekrój i historia pod tym samym filtrem to jedyne pytanie, na które nie dało się odpowiedzieć wcześniej. Przy okazji znikła duplikacja CSS i drugi stan URL. `trends.html` został przekierowaniem, żeby rozesłane linki działały. |
+| Wybór świata i licznik trafień w przyklejonym pasku | Strona ma ~2900 px, a od filtra do pierwszego wykresu historii jest 961 px — więcej niż ekran. Pasek trzyma **jedyny egzemplarz** obu kontrolek, więc nie ma czego synchronizować; pola filtrów zostają niżej i zwijają się na wąskim ekranie. |
 | Historia dociągana leniwie, dopiero po ruchu filtrem | Filtr domyślny obsługuje `trends.json` za 9 KB. Kto nie filtruje, nie płaci za 1,9 MB gordiona. |
 | Filtrowanie u klienta zamiast prekompilowanego cube'a | Przelot po 813 tys. wierszy to 2,8-7 ms — koszykowanie kosztowałoby dokładność i nie objęłoby honoru (−35 .. 1,2 mln). |
 | Logika w `filters.js`/`history.js`, nie w `app.js` | `app.js` startuje widok od razu po imporcie, więc modułu z nim zszytego nie da się przetestować poza przeglądarką. Pilnuje tego test. |
@@ -212,6 +223,8 @@ Pełne uzasadnienia i historia: audyty niżej.
 | [`docs/2026-08-01-budzet-rozmiaru.md`](docs/2026-08-01-budzet-rozmiaru.md) | Ile rund scrapa zostało do limitu 1 GB na Pages (~65 ≈ 2 lata) i co zrobić, gdy się skończy. |
 | [`docs/2026-08-04-spec-trendy.md`](docs/2026-08-04-spec-trendy.md) | Spec widoku trendów jednego świata w czasie: co pokazać, `trends.json` (**9,0 KB gzip na całą historię**), pułapki metryki „ostatnio online”. |
 | [`docs/2026-08-04-spec-widok-swiata.md`](docs/2026-08-04-spec-widok-swiata.md) | Spec scalenia `index.html` i `trends.html` w jeden widok per świat, z filtrowaniem **całej historii** u klienta: pomiary (**7 ms na 813 tys. wierszy**), leniwe pobieranie, pułapki i próg okna migawek. |
+| [`docs/2026-08-04-audyt-3.md`](docs/2026-08-04-audyt-3.md) | Audyt #3: **osiem błędów, których nie łapało 165 testów**, atrapa DOM-u łagodniejsza od przeglądarki, `Retry-After: 0`, nieatomowy zapis, walidacja CLI — plus dług i pomysły. |
+| [`docs/2026-08-04-spec-pasek-filtrow.md`](docs/2026-08-04-spec-pasek-filtrow.md) | Spec przypiętego paska filtrów: geometria strony (**2806 px**, filtr 961 px od pierwszego wykresu historii, **87% ekranu na telefonie**), warianty, badania i pułapki `position: sticky` w tym markupie. |
 | [`README.md`](README.md) | Instrukcja obsługi dla człowieka. |
 
 ---

@@ -12,6 +12,8 @@ import {
   SNAPSHOT_SCHEMA,
 } from "../src/snapshot.ts";
 import type { PlayerRow } from "../src/parser.ts";
+import { writeAtomic } from "../src/atomic.ts";
+import { BACKOFF_BASE_MS, MAX_BACKOFF_MS, backoffFor, parseRetryAfter } from "../src/retry.ts";
 
 const META = { world: "aether", timestamp: "2026-08-01T10-00-00" };
 
@@ -207,5 +209,63 @@ describe("odczyt poprzedniej migawki", () => {
     expect(suspect).not.toBeNull();
     expect(suspect!.drop).toBeCloseTo(0.497, 3);
     expect(suspect!.reason).toContain("7754 → 3900");
+  });
+
+  describe("zapis albo w całości, albo wcale", () => {
+    // `Bun.write` to obcięcie + zapis: przerwanie zostawiało obcięty `.f.json`,
+    // przez który `JSON.parse` wywalał i ogon rundy, i `bun run rebuild`.
+    test("podmienia zawartość i nie zostawia pliku tymczasowego", async () => {
+      const dir = await world("atomowy", { "plik.json": { stary: true } });
+      const file = path.join(dir, "plik.json");
+
+      await writeAtomic(file, JSON.stringify({ nowy: true }));
+      expect(await Bun.file(file).json()).toEqual({ nowy: true });
+      expect(await Bun.file(`${file}.tmp`).exists()).toBe(false);
+    });
+
+    test("nieudany zapis nie rusza poprzedniej zawartości ani nie zostawia śmiecia", async () => {
+      const dir = await world("atomowy-blad", { "plik.json": { stary: true } });
+      const file = path.join(dir, "plik.json");
+
+      // Katalog w miejscu pliku tymczasowego — `Bun.write` nie ma gdzie zapisać.
+      await mkdir(`${file}.tmp`, { recursive: true });
+      await expect(writeAtomic(file, JSON.stringify({ nowy: true }))).rejects.toThrow();
+
+      // Stara zawartość ma przeżyć: to jest cały sens tej funkcji.
+      expect(await Bun.file(file).json()).toEqual({ stary: true });
+      await rm(`${file}.tmp`, { recursive: true, force: true });
+    });
+  });
+});
+
+describe("polityka ponawiania", () => {
+  test("`Retry-After: 0` nie kasuje pauzy", () => {
+    // `0 ?? x` to `0`, nie `x` — przez tę jedną gwiazdkę cztery żądania szły pod
+    // rząd bez pauzy, wprost przeciw zasadzie „szanuj serwis”.
+    expect(parseRetryAfter("0")).toBe(0);
+    expect(backoffFor(1, parseRetryAfter("0"))).toBe(BACKOFF_BASE_MS);
+    expect(backoffFor(1, 0)).toBeGreaterThanOrEqual(BACKOFF_BASE_MS);
+  });
+
+  test("bez podpowiedzi backoff rośnie wykładniczo i ma sufit", () => {
+    expect(backoffFor(1)).toBe(BACKOFF_BASE_MS);
+    expect(backoffFor(2)).toBe(BACKOFF_BASE_MS * 2);
+    expect(backoffFor(3)).toBe(BACKOFF_BASE_MS * 4);
+    expect(backoffFor(99)).toBe(MAX_BACKOFF_MS);
+  });
+
+  test("podpowiedź serwera może pauzę wydłużyć, ale nie skrócić", () => {
+    expect(backoffFor(1, 60_000)).toBe(60_000); // dłuższa niż nasza — honorujemy
+    expect(backoffFor(3, 1_000)).toBe(BACKOFF_BASE_MS * 4); // krótsza — ignorujemy
+    expect(backoffFor(1, 999_999)).toBe(MAX_BACKOFF_MS); // absurdalna — sufit
+  });
+
+  test("nagłówek bywa datą, a śmieci nie mogą wywalać scrapera", () => {
+    const now = Date.parse("2026-08-04T12:00:00Z");
+    expect(parseRetryAfter("Tue, 04 Aug 2026 12:00:30 GMT", now)).toBe(30_000);
+    expect(parseRetryAfter(null)).toBeUndefined();
+    expect(parseRetryAfter("bez sensu")).toBeUndefined();
+    // data w przeszłości nie może dać ujemnej pauzy
+    expect(parseRetryAfter("Tue, 04 Aug 2026 11:00:00 GMT", now)).toBe(0);
   });
 });

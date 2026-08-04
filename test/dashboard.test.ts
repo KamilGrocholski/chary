@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { normalizeLegacyRows, splitNormalized } from "../src/snapshot.ts";
 import {
   activityLabel,
   countByActivity,
   countByLevel,
+  describeFilters,
   emptyFilters,
   filtersFromParams,
   filtersToParams,
@@ -388,6 +390,58 @@ describe("stan filtrów w URL-u", () => {
   });
 });
 
+describe("opis aktywnych filtrów", () => {
+  // Separator tysięcy w pl-PL to spacja nierozdzielająca — porównujemy bez białych znaków.
+  const flat = (s: string) => s.replace(/\s/g, "");
+  const labels = (overrides: Record<string, unknown>) => describeFilters(filters(overrides)).map((c) => flat(c.label));
+  const keys = (overrides: Record<string, unknown>) => describeFilters(filters(overrides)).map((c) => c.key);
+
+  test("filtr domyślny nie ma czego opisać", () => {
+    expect(describeFilters(emptyFilters())).toEqual([]);
+  });
+
+  test("zakresy otwarte i domknięte czyta się inaczej", () => {
+    expect(labels({ minLevel: 250 })).toEqual(["Poziom≥250"]);
+    expect(labels({ maxLevel: 400 })).toEqual(["Poziom≤400"]);
+    expect(labels({ minLevel: 250, maxLevel: 400 })).toEqual(["Poziom250-400"]);
+    expect(labels({ maxHonor: 50_000 })).toEqual(["Honor≤50000"]);
+    // honor bywa ujemny — etykieta nie może tego gubić
+    expect(labels({ minHonor: -35 })).toEqual(["Honor≥-35"]);
+  });
+
+  test("próg aktywności odmienia się i zna „< 24h”", () => {
+    expect(labels({ maxDays: 0 })).toEqual(["Online<24h"]);
+    expect(labels({ maxDays: 1 })).toEqual(["Online≤1dzień"]);
+    expect(labels({ maxDays: 14 })).toEqual(["Online≤14dni"]);
+  });
+
+  test("profesje: nazwy do dwóch, potem sama liczba", () => {
+    expect(labels({ professions: new Set([2, 3]) })).toEqual(["Mag,Paladyn"]);
+    expect(labels({ professions: new Set([1, 2, 3, 4]) })).toEqual(["4z6profesji"]);
+    expect(labels({ professions: new Set() })).toEqual(["Żadnaprofesja"]);
+    // komplet profesji to brak filtra, nie chip „6 z 6”
+    expect(labels({ professions: new Set([1, 2, 3, 4, 5, 6]) })).toEqual([]);
+  });
+
+  test("klucz chipa wskazuje grupę pól, nie pojedyncze pole", () => {
+    // „Poziom 250-400” to jeden byt dla czytającego, choć dwa <input> dla kodu.
+    expect(keys({ minLevel: 250, maxLevel: 400 })).toEqual(["level"]);
+    expect(keys({ minHonor: 1, maxHonor: 2, maxDays: 7, professions: new Set([1]) })).toEqual([
+      "honor",
+      "days",
+      "prof",
+    ]);
+  });
+
+  test("liczba chipów zgadza się z tym, co odróżnia filtr od domyślnego", () => {
+    // Na tej równoważności stoi licznik „Filtry (N)” w pasku.
+    const f = filters({ minLevel: 250, maxHonor: 50_000, maxDays: 14, professions: new Set([2, 3]) });
+    expect(describeFilters(f)).toHaveLength(4);
+    expect(isDefaultFilters(f)).toBe(false);
+    expect(describeFilters(emptyFilters()).length === 0).toBe(isDefaultFilters(emptyFilters()));
+  });
+});
+
 describe("etykiety rozkładu aktywności", () => {
   test("bez filtru opisują rozłączne zakresy, a nie sumy narastające", () => {
     // „≤ 7 dni” przy koszyku 1-7 sugerowało, że to wszyscy z ostatniego tygodnia.
@@ -493,7 +547,19 @@ describe("widok składa się w całość — filtr domyślny", () => {
   });
 
   test("podsumowanie i tabela pokazują realne liczby", () => {
-    expect(out.summary).toContain("−5,3%"); // fobos wyludnia się najszybciej
+    // Zmiana liczona z opublikowanego agregatu, nie zaszyta literałem: „−5,3%” było
+    // policzone z dzisiejszych danych fobosa i pierwszy `bun run scrape` robił z tego
+    // czerwone CI na commicie z danymi.
+    const fobos = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.fobos;
+    const percent = ((fobos.total.at(-1) - fobos.total[0]) / fobos.total[0]) * 100;
+    const sign = percent > 0 ? "+" : percent < 0 ? "−" : "";
+    const formatted = Math.abs(percent).toLocaleString("pl-PL", {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+
+    expect(out.summary).toContain(`${sign}${formatted}%`);
+    expect(percent).toBeLessThan(0); // fobos wyludnia się najszybciej ze wszystkich
     expect(out.tableRows).toBe(out.charts.popChart.points); // nagłówek + n-1 wierszy zmian
     expect(out.singlePointHidden).toBe(true);
     expect(out.suspectNoteHidden).toBe(true);
@@ -568,6 +634,74 @@ describe("widok składa się w całość — filtr ustawiony", () => {
 
   test("wykres profesji pokazuje tylko profesje z filtra", () => {
     expect(out.charts.profChart.series).toBe(2);
+  });
+
+  test("pasek streszcza filtr, który przewinął się poza ekran", () => {
+    // Od filtra do pierwszego wykresu historii jest 961 px — więcej niż ekran. Pasek
+    // jest jedynym miejscem, w którym widać naraz, co jest ustawione i na co działa.
+    expect(out.bar.chips).toEqual(["Poziom 200-250", "Wojownik, Tropiciel"]);
+    expect(out.bar.toggle).toBe("Filtry (2)");
+    expect(out.bar.fieldsHidden).toBe(false); // na szerokim ekranie pola są otwarte
+    expect(out.bar.expanded).toBe("true");
+  });
+
+  test("zwinięcie panelu chowa pola, ale nie rusza filtrów", () => {
+    expect(out.afterCollapse.fieldsHidden).toBe(true);
+    expect(out.afterCollapse.expanded).toBe("false");
+    expect(out.afterCollapse.chips).toEqual(out.bar.chips);
+  });
+
+  test("krzyżyk na chipie kasuje całą grupę pól, nie jedno", () => {
+    // „Poziom 200-250” to jeden byt dla czytającego, a dwa `<input>` dla kodu.
+    expect(out.afterChipClear.minLevel).toBe("");
+    expect(out.afterChipClear.maxLevel).toBe("");
+    expect(out.afterChipClear.chips).toEqual(["Wojownik, Tropiciel"]);
+    expect(out.afterChipClear.toggle).toBe("Filtry (1)");
+  });
+
+  test("każda migawka jest pobierana dokładnie raz, mimo serii zdarzeń filtra", () => {
+    // Historia gordiona to 1,9 MB. Wywoływanie pobierania wprost z handlera `input`
+    // startowało własny przelot na każdy wciśnięty klawisz, bo lista brakujących
+    // migawek jest liczona w momencie startu — a to zamienia „kupujesz 1,9 MB
+    // świadomie” w kilkukrotność tej liczby bez wiedzy użytkownika.
+    expect(out.fetches.duplicated).toEqual([]);
+    expect(out.fetches.maxPerFile).toBe(1);
+    expect(out.fetches.files).toBeGreaterThan(15); // aether + brutal, dwa światy
+  });
+
+  test("przełączenie świata gasi wykresy poprzedniego, zamiast trzymać je na ekranie", () => {
+    // Pierwszy render nowego świata przychodzi dopiero po pobraniu migawki. Bez
+    // synchronicznego wyczyszczenia pod nowym nagłówkiem stały przez kilkaset
+    // milisekund serie poprzedniego świata — łącznie z dymkami z tamtymi datami.
+    expect(out.afterWorldSwitch).toEqual({ popSeries: 0, profSeries: 0, tableRows: 0 });
+  });
+
+  test("niepełna historia mówi o sobie, i przestaje, gdy przestaje być niepełna", () => {
+    // Migawka, która nie doszła, nie ma punktu — i widok ma to powiedzieć w sekcji
+    // HISTORIA, a nie w pasku błędu 1500 px wyżej, dotyczącym migawki przekroju.
+    expect(out.partialHistory.status).toBe("10 z 11 migawek · 1 nie wczytano");
+    expect(out.partialHistory.noteHidden).toBe(false);
+    expect(out.partialHistory.note).toContain("Historia jest niepełna");
+    expect(out.partialHistory.error).toBe("");
+
+    // Po powrocie do filtra domyślnego historia idzie z kompletnego agregatu.
+    // Licznik porażek z poprzedniego filtra nie ma prawa jej dalej opisywać.
+    expect(out.afterReset).toEqual({ status: "11 migawek", noteHidden: true, points: 11 });
+  });
+
+  test("wybrany próg przeżywa przebudowę listy opcji", () => {
+    // Podmiana `innerHTML` na `<select>` zeruje wartość, więc odczytanie jej PO
+    // podmianie cofa użytkownika na pierwszą opcję. Efekt: ktoś, kto wybrał
+    // „≤ 30 dni”, ląduje na „< 24h” — serii wahającej się o 14,7% przy populacji
+    // stabilnej na 0,6% — i dostaje to jeszcze utrwalone w skopiowanym linku.
+    expect(out.thresholdSurvival.picked).toEqual({ value: "30d", options: 3 });
+
+    // przy „≤ 14 dni” próg 30d jest nieosiągalny, ale schodzimy na najszerszy
+    // sensowny (7d), nie na najwęższy z listy
+    expect(out.thresholdSurvival.narrowed).toEqual({ value: "7d", options: 2 });
+
+    // lista wraca do trzech opcji — wybór ma zostać, a nie skoczyć na pierwszą
+    expect(out.thresholdSurvival.widened).toEqual({ value: "7d", options: 3 });
   });
 
   test("filtr aktywności zabiera progi, które pod nim nic już nie mówią", () => {

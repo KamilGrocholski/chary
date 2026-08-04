@@ -2,6 +2,7 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { PUBLIC_DIR, WORLDS_DIR } from "./manifest.ts";
 import { timestampFromFileName, type FilterFile } from "./snapshot.ts";
+import { writeAtomic } from "./atomic.ts";
 
 // Zwinięta historia jednego świata: po jednej liczbie na migawkę zamiast setek tysięcy
 // wierszy. Cała historia (202 migawki, 21 światów) mieści się w ~24 KB, czyli 9 KB po
@@ -125,7 +126,16 @@ export async function rebuildTrends(): Promise<{ trends: Trends; skipped: number
 
     const snapshots: { id: string; filters: FilterFile }[] = [];
     for (const file of files) {
-      const filters = JSON.parse(await Bun.file(path.join(dir, file)).text()) as FilterFile;
+      // Nieczytelny plik pomijamy z ostrzeżeniem zamiast wywalać całą przebudowę —
+      // inaczej jedna migawka obcięta przez Ctrl-C blokuje `bun run rebuild`, czyli
+      // dokładnie to polecenie, którym miałoby się ją naprawić.
+      let filters: FilterFile;
+      try {
+        filters = JSON.parse(await Bun.file(path.join(dir, file)).text()) as FilterFile;
+      } catch (e) {
+        console.warn(`⚠ pominięto nieczytelny snapshot ${world}/${file}: ${e instanceof Error ? e.message : e}`);
+        continue;
+      }
       snapshots.push({ id: timestampFromFileName(file), filters });
     }
 
@@ -136,6 +146,6 @@ export async function rebuildTrends(): Promise<{ trends: Trends; skipped: number
   }
 
   const trends: Trends = { schema: TRENDS_SCHEMA, builtAt: new Date().toISOString(), worlds };
-  await Bun.write(TRENDS_FILE, JSON.stringify(trends));
+  await writeAtomic(TRENDS_FILE, JSON.stringify(trends));
   return { trends, skipped };
 }

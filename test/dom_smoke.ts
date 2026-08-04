@@ -25,8 +25,13 @@ function makeNode(id = "", tag = "") {
     disabled: false,
     checked: true,
     style: {},
+    dataset: {} as Record<string, string>,
+    attributes: {} as Record<string, string>,
     children: [] as any[],
     handlers: [] as ((...args: unknown[]) => void)[],
+    setAttribute(name: string, value: string) {
+      node.attributes[name] = value;
+    },
     addEventListener(_event: string, fn: (...args: unknown[]) => void) {
       node.handlers.push(fn);
     },
@@ -47,8 +52,12 @@ function makeNode(id = "", tag = "") {
     get: () => html,
     set(value: string) {
       html = value;
+      // Podmiana opcji zeruje wybór — przeglądarka ustawia wtedy pierwszą opcję,
+      // NAWET gdy poprzednio wybrana nadal jest na liście. Atrapa musi być tak samo
+      // bezwzględna: łagodniejsza wersja („zeruj tylko gdy wybór zniknął z listy”)
+      // ukryła błąd, przez który widok gubił wybrany próg aktywności.
       const first = value.match(/<option value="([^"]*)"/);
-      if (first && !value.includes(`value="${node.value}"`)) node.value = first[1]!;
+      if (first) node.value = first[1]!;
     },
   });
   return node;
@@ -57,6 +66,15 @@ function makeNode(id = "", tag = "") {
 const markup = await Bun.file("public/index.html").text();
 const nodes: Record<string, any> = {};
 for (const [, id] of markup.matchAll(/id="([^"]+)"/g)) nodes[id!] = makeNode(id!);
+
+// Ile razy pobrano każdy adres. Migawka pobrana dwa razy to nie jest drobiazg:
+// historia gordiona to 1,9 MB, a bez strażnika „już leci” każdy wciśnięty klawisz
+// w polu filtra startował własny komplet pobrań.
+const fetchCounts = new Map<string, number>();
+
+// Adresy, które mają odpowiedzieć błędem — ścieżka „część historii nie doszła”
+// nie była wykonywana ani razu, bo atrapa zawsze zwracała `ok: true`.
+const failUrls = new Set<string>();
 
 const charts: Record<string, any> = {};
 class FakeChart {
@@ -92,11 +110,19 @@ Object.assign(globalThis, {
   Chart: FakeChart,
   location: { search, pathname: "/index.html", href: "" },
   history: { replaceState() {} },
-  fetch: async (url: string) => ({
-    ok: true,
-    status: 200,
-    json: async () => JSON.parse(await Bun.file(`public/${url}`).text()),
-  }),
+  fetch: async (url: string) => {
+    fetchCounts.set(url, (fetchCounts.get(url) ?? 0) + 1);
+    // Migawki dostają sztuczne opóźnienie. Z dysku wracają w mikrosekundach, a cały
+    // problem równoległych pobrań istnieje tylko wtedy, gdy pobieranie TRWA — bez tego
+    // test przechodzi także z zepsutym kodem i niczego nie pilnuje.
+    if (url.endsWith(".f.json")) await new Promise((resolve) => setTimeout(resolve, 100));
+    if (failUrls.has(url)) return { ok: false, status: 503, json: async () => ({}) };
+    return {
+      ok: true,
+      status: 200,
+      json: async () => JSON.parse(await Bun.file(`public/${url}`).text()),
+    };
+  },
 });
 
 const trends = JSON.parse(await Bun.file("public/trends.json").text());
@@ -187,16 +213,126 @@ if (scenario === "default") {
     table: nodes.changeTable!.innerHTML,
   };
 } else {
-  // Filtr aktywności węższy niż progi — wykres aktywnych nie ma czego pokazać.
-  nodes.onlineValue!.value = "3";
-  nodes.onlineValue!.handlers[0]!();
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  const chipLabels = () =>
+    [...nodes.filterChips!.innerHTML.matchAll(/<span class="chip">([^<]*)</g)].map((m) => m[1]);
 
+  result.bar = {
+    chips: chipLabels(),
+    toggle: nodes.filtersToggle!.textContent,
+    fieldsHidden: nodes.filterFields!.hidden,
+    expanded: nodes.filtersToggle!.attributes["aria-expanded"],
+  };
+
+  // Zwinięcie panelu nie może ruszyć filtrów — pasek zostaje, pola się chowają.
+  nodes.filtersToggle!.handlers[0]!();
+  result.afterCollapse = {
+    fieldsHidden: nodes.filterFields!.hidden,
+    expanded: nodes.filtersToggle!.attributes["aria-expanded"],
+    chips: chipLabels(),
+  };
+  nodes.filtersToggle!.handlers[0]!();
+
+  // Krzyżyk na chipie kasuje CAŁĄ grupę pól, nie jedno. Atrapa nie ma prawdziwej
+  // delegacji zdarzeń, więc wołamy handler z takim `target`, jaki dałby DOM.
+  nodes.filterChips!.handlers[0]!({ target: { dataset: { clear: "level" } } });
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  result.afterChipClear = {
+    minLevel: nodes.minLevel!.value,
+    maxLevel: nodes.maxLevel!.value,
+    chips: chipLabels(),
+    toggle: nodes.filtersToggle!.textContent,
+  };
+
+  const setOnline = async (value: string) => {
+    nodes.onlineValue!.value = value;
+    nodes.onlineValue!.handlers[0]!();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  };
+  const threshold = () => ({
+    value: nodes.thresholdSelect!.value,
+    options: (nodes.thresholdSelect!.innerHTML.match(/<option/g) ?? []).length,
+  });
+
+  // Wybór progu musi przeżyć przebudowę listy opcji. Podmiana `innerHTML` zeruje
+  // wartość selecta, więc kod, który czyta ją PO podmianie, cofa użytkownika na
+  // pierwszą opcję — czyli na „< 24h”, serię wahającą się o 14,7%.
+  nodes.thresholdSelect!.value = "30d";
+  nodes.thresholdSelect!.handlers[0]!();
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const picked = threshold();
+
+  // Zawężenie: „≤ 30 dni” przestaje być osiągalne, ale zejść należy na najszerszy
+  // wciąż sensowny próg, a nie na najwęższy z listy.
+  await setOnline("14");
+  const narrowed = threshold();
+
+  // Rozszerzenie z powrotem: lista wraca do trzech opcji, wybór ma zostać.
+  await setOnline("");
+  const widened = threshold();
+
+  // Filtr węższy niż każdy próg — wykres aktywnych nie ma czego pokazać.
+  await setOnline("3");
+
+  result.thresholdSurvival = { picked, narrowed, widened };
   result.afterActivityFilter = {
     thresholdOptions: (nodes.thresholdSelect!.innerHTML.match(/<option/g) ?? []).length,
     noteHidden: nodes.thresholdNote!.hidden,
     note: text("thresholdNote"),
     actHidden: nodes.actChartBox!.hidden,
+  };
+
+  // Przełączenie świata i natychmiastowa seria zdarzeń filtra — najgorszy realny
+  // przypadek: użytkownik wybiera świat i od razu wpisuje próg poziomu. Każde
+  // z tych zdarzeń chce historii, a żadne nie ma prawa startować drugiego pobrania.
+  // Jedna migawka nie do pobrania — ścieżka niepełnej historii.
+  failUrls.add("worlds/brutal/2026-05-09T17-24-18.f.json");
+
+  nodes.worldSelect!.value = "brutal";
+  const switching = nodes.worldSelect!.handlers[0]!();
+
+  // Próbka pobrana natychmiast po wywołaniu handlera, czyli zanim dojdzie
+  // jakikolwiek bajt nowego świata: wykresy poprzedniego mają być już zgaszone.
+  result.afterWorldSwitch = {
+    popSeries: charts.popChart?.data.datasets.length ?? -1,
+    profSeries: charts.profChart?.data.datasets.length ?? -1,
+    tableRows: (nodes.changeTable!.innerHTML.match(/<tr>/g) ?? []).length,
+  };
+
+  // Zdarzenia rozstawione POZA debounce'em (150 ms), więc każde dojeżdża do
+  // `ensureHistory` osobno — i każde trafia w trwające jeszcze pobieranie.
+  for (const value of ["2", "25", "250"]) {
+    nodes.minLevel!.value = value;
+    nodes.minLevel!.handlers[0]!();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  await switching;
+  await waitFor(() => (charts.popChart?.data.datasets[0]?.data.length ?? 0) > 1);
+  await new Promise((resolve) => setTimeout(resolve, 600));
+
+  result.partialHistory = {
+    status: nodes.historyStatus!.textContent,
+    noteHidden: nodes.partialNote!.hidden,
+    note: text("partialNote"),
+    error: nodes.error!.textContent,
+  };
+
+  // Powrót do filtra domyślnego: historia znów idzie z kompletnego agregatu,
+  // więc licznik porażek nie ma prawa jej dalej opisywać.
+  nodes.resetBtn!.handlers[0]!();
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  result.afterReset = {
+    status: nodes.historyStatus!.textContent,
+    noteHidden: nodes.partialNote!.hidden,
+    points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
+  };
+
+  // Migawka, która padła, nie trafia do pamięci, więc kolejna zmiana filtra
+  // ponawia ją celowo — z licznika duplikatów jest wyłączona.
+  const snapshotFetches = [...fetchCounts].filter(([url]) => url.endsWith(".f.json") && !failUrls.has(url));
+  result.fetches = {
+    files: snapshotFetches.length,
+    maxPerFile: Math.max(...snapshotFetches.map(([, n]) => n)),
+    duplicated: snapshotFetches.filter(([, n]) => n > 1).map(([url]) => url),
   };
 }
 

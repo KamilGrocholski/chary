@@ -1,6 +1,7 @@
 import { mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 import { isLegacySnapshot, timestampFromFileName } from "./snapshot.ts";
+import { writeAtomic } from "./atomic.ts";
 
 export const PUBLIC_DIR = "public";
 export const WORLDS_DIR = path.join(PUBLIC_DIR, "worlds");
@@ -55,9 +56,19 @@ export async function rebuildManifest(): Promise<Manifest> {
       const source = present.has(filters) ? filters : legacy;
       // `startedAt` mieszka w samym snapshocie; manifest go wyciąga, żeby dashboard
       // nie musiał pobierać kilkuset kilobajtów tylko po to, by pokazać datę.
-      const { startedAt } = JSON.parse(
-        await Bun.file(path.join(WORLDS_DIR, worldName, source)).text(),
-      ) as { startedAt?: string };
+      //
+      // Jeden uszkodzony plik nie może zabrać ze sobą pozostałych 201: bez tego
+      // `JSON.parse` wywalał całą przebudowę, czyli także polecenie, którym miałoby
+      // się to naprawić. Migawka bez daty i tak jest obsłużona (`startedAt` opcjonalne).
+      let startedAt: string | undefined;
+      try {
+        ({ startedAt } = JSON.parse(await Bun.file(path.join(WORLDS_DIR, worldName, source)).text()) as {
+          startedAt?: string;
+        });
+      } catch (e) {
+        console.warn(`⚠ pominięto nieczytelny snapshot ${worldName}/${source}: ${e instanceof Error ? e.message : e}`);
+        continue;
+      }
 
       snapshots.push({
         id,
@@ -75,7 +86,7 @@ export async function rebuildManifest(): Promise<Manifest> {
   }
 
   manifest.worlds.sort((a, b) => a.name.localeCompare(b.name));
-  await Bun.write(MANIFEST_FILE, JSON.stringify(manifest, null, 2));
+  await writeAtomic(MANIFEST_FILE, JSON.stringify(manifest, null, 2));
   return manifest;
 }
 

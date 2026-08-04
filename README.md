@@ -33,7 +33,7 @@ margonem.pl/ladder  ──scrape──►  public/worlds/<świat>/<ts>.f.json   
 - **Podział snapshotu** (`src/snapshot.ts`) — zapis do dwóch plików o tej samej kolejności wierszy.
 - **Manifest** (`public/manifest.json`) — indeks snapshotów per świat, z linkiem do obu plików.
 - **Trendy** (`src/trends.ts` → `public/trends.json`) — zwinięta historia każdego świata, po jednej liczbie na migawkę.
-- **Widok świata** (`public/index.html` + `public/app.js`) — wybór świata, jeden panel filtrów (poziom, honor, profesja, ostatnia aktywność), a pod nim dwie sekcje: **przekrój** wybranej migawki (rozkład poziomów wg profesji) i **historia** wszystkich migawek (populacja, aktywność, profesje, tabela zmian). Filtr rządzi obiema.
+- **Widok świata** (`public/index.html` + `public/app.js`) — przyklejony u góry pasek (świat, licznik trafień, chipy aktywnych filtrów, kotwice sekcji), pod nim pola filtrów (poziom, honor, profesja, ostatnia aktywność), a niżej dwie sekcje: **przekrój** wybranej migawki (rozkład poziomów wg profesji) i **historia** wszystkich migawek (populacja, aktywność, profesje, tabela zmian). Filtr rządzi obiema.
 - **Logika** (`public/filters.js`, `public/history.js`, `public/shared.js`) — filtrowanie, zliczanie i budowa serii, bez DOM-u, testowane bez przeglądarki.
 
 Cały `public/` jest statyczny — nie ma serwera aplikacyjnego, więc idealnie nadaje się pod Pages.

@@ -6,7 +6,7 @@
 //   • migawka po konwersji w `history.js` — tablice typowane, `null` zapisany jako −1
 // Różnicę zna wyłącznie `isNeverOnline` z `shared.js`, więc jest tu jedna ścieżka kodu.
 
-import { activityBucket, isNeverOnline } from "./shared.js";
+import { PROF, activityBucket, isNeverOnline } from "./shared.js";
 
 // Zakresy koszyków aktywności (w dniach). Koszyk 4 to konta nigdy nieużywane.
 // Koszyki są rozłączne, nie skumulowane — etykiety muszą to oddawać, bo „≤ 7 dni”
@@ -70,6 +70,50 @@ export function isDefaultFilters(f) {
     f.maxDays === Infinity &&
     f.professions.size === 6
   );
+}
+
+/**
+ * Aktywne filtry jako lista chipów — jedyne miejsce zamieniające filtr na etykiety.
+ *
+ * `key` mówi, którą **grupę** kontrolek czyści krzyżyk na chipie; nigdy pojedyncze pole,
+ * bo „Poziom 250-400” to jeden byt dla czytającego, choć dwa `<input>` dla kodu.
+ *
+ * Chipy są widokiem `readFilters()`, nie osobnym stanem — inaczej byłoby to drugie
+ * miejsce, które może rozjechać się z formularzem.
+ */
+export function describeFilters(f) {
+  const n = (value) => value.toLocaleString("pl-PL");
+  const chips = [];
+
+  const range = (key, name, min, max) => {
+    const hasMin = Number.isFinite(min);
+    const hasMax = Number.isFinite(max);
+    if (!hasMin && !hasMax) return;
+    chips.push({
+      key,
+      label: hasMin && hasMax ? `${name} ${n(min)}-${n(max)}` : hasMin ? `${name} ≥ ${n(min)}` : `${name} ≤ ${n(max)}`,
+    });
+  };
+
+  range("level", "Poziom", f.minLevel, f.maxLevel);
+  range("honor", "Honor", f.minHonor, f.maxHonor);
+
+  if (Number.isFinite(f.maxDays)) {
+    const dni = f.maxDays === 1 ? "1 dzień" : `${n(f.maxDays)} dni`;
+    chips.push({ key: "days", label: f.maxDays === 0 ? "Online < 24h" : `Online ≤ ${dni}` });
+  }
+
+  if (f.professions.size !== 6) {
+    const names = [...f.professions].sort((a, b) => a - b).map((p) => PROF[p]);
+    chips.push({
+      key: "prof",
+      // Powyżej dwóch nazw etykieta rozpycha pasek ponad jedną linię, a i tak nikt jej
+      // nie czyta w całości — wtedy liczy się sama liczba.
+      label: names.length === 0 ? "Żadna profesja" : names.length <= 2 ? names.join(", ") : `${names.length} z 6 profesji`,
+    });
+  }
+
+  return chips;
 }
 
 export function matches(data, i, f) {
