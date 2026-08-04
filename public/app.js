@@ -855,10 +855,6 @@ function setupView() {
       fillThresholdSelect(readFilters().maxDays, view.threshold);
       el("modeSelect").value = view.share ? "udzial" : "liczba";
 
-      // Na wąskim ekranie panel z polami zajmuje 581 px, czyli 87% ekranu iPhone'a SE —
-      // pierwszy ekran ma zaczynać się od danych, nie od formularza. Sam pasek zostaje,
-      // więc filtry nie znikają z oczu, tylko czekają zwinięte.
-      setFieldsOpen(!window.matchMedia?.("(max-width: 720px)")?.matches);
 
       // Link z filtrami ma działać od razu — historia startuje bez czekania na ruch myszą.
       await selectAndLoad();
@@ -917,8 +913,19 @@ function setupView() {
   // Listenery paska rejestrujemy NA KOŃCU. `test/dom_smoke.ts` wywołuje pierwszy
   // zarejestrowany listener węzła (`handlers[0]`), więc wepchnięcie czegokolwiek przed
   // istniejące podpięcia zmieniłoby to, co test naprawdę uruchamia.
-  el("filtersToggle").addEventListener("click", () => {
+  el("filtersToggle").addEventListener("click", (event) => {
+    event.stopPropagation?.();
     setFieldsOpen(el("filterFields").hidden);
+  });
+
+  // Szuflada zamyka się jak każda inna: Escape albo klik poza nią. Bez tego zasłania
+  // wykresy, a jedyne wyjście to trafienie w ten sam przycisk.
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !el("filterFields").hidden) setFieldsOpen(false);
+  });
+  document.addEventListener("click", (event) => {
+    if (el("filterFields").hidden) return;
+    if (!el("filterBar").contains?.(event.target)) setFieldsOpen(false);
   });
 
   el("filterChips").addEventListener("click", (event) => {

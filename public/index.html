@@ -80,19 +80,41 @@
       /* nad #profTooltip, który jest fixed z z-index 999 (public/app.js) */
       z-index: 1000;
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       align-items: center;
       gap: 8px 14px;
-      padding: 10px 16px;
+      /* Stała wysokość, zawsze jeden rząd. Pasek, który rośnie po dojściu danych,
+         przesuwa całą stronę pod kursorem — a przy przeładowaniu przywrócona pozycja
+         scrolla ląda gdzie indziej. Dlatego nic tutaj nie zawija się do drugiej linii. */
+      height: 56px;
+      padding: 0 16px;
       margin-bottom: 16px;
       border-top: none;
       border-radius: 0 0 14px 14px;
       box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
     }
-    .filterbar select {
+    .filterbar > select {
       width: auto;
-      min-width: 150px;
+      flex: 0 0 auto;
+      min-width: 140px;
       padding: 6px 10px;
+    }
+
+    /* Szuflada filtrów wypada SPOD paska, nie z góry dokumentu. Dzięki temu „Filtry”
+       otwiera pola tam, gdzie właśnie jesteś — wcześniej panel siedział na górze
+       strony i po przewinięciu przycisk nie pokazywał niczego widocznego.
+       Pozycjonowanie bezwzględne oznacza też, że otwarcie i zamknięcie NIE rusza
+       układu strony ani o piksel. */
+    #filterFields {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      right: 0;
+      z-index: 1001;
+      max-height: calc(100vh - 90px);
+      overflow-y: auto;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+      margin: 0;
     }
     .filterbar-nav {
       display: flex;
@@ -110,7 +132,9 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      flex: 0 0 auto;
     }
+    .filterbar .match { flex: 0 0 auto; }
     .ghost-btn {
       width: auto;
       padding: 6px 11px;
@@ -120,7 +144,16 @@
       border: 1px solid var(--border);
     }
 
-    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    /* Chipy dostają całą resztę linii i są przycinane, zamiast zawijać pasek.
+       Komplet aktywnych filtrów i tak stoi w liczniku przy „Filtry (N)”. */
+    .chips {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 6px;
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+    }
     .chip {
       display: inline-flex;
       align-items: center;
@@ -299,15 +332,26 @@
          panel wychodził poza kartę poniżej ~352 px szerokości. */
       .toolbar-row2 { grid-template-columns: repeat(2, 1fr); }
       .col-2 { grid-column: 1 / -1; }
-      /* Dwie linie zamiast trzech: świat + akcje, pod spodem licznik i kotwice.
-         Przy trzech pasek miał 148 px = 22% ekranu 667 px, czyli więcej niż wytyczna
-         15% dla urządzeń dotykowych. */
-      .filterbar { gap: 6px 8px; padding: 8px 12px; }
-      .filterbar select { order: 1; flex: 1 1 auto; min-width: 0; }
-      .filterbar-actions { order: 2; margin-left: auto; }
-      .filterbar .match { order: 3; font-size: 12px; }
-      .filterbar-nav { order: 4; margin-left: auto; }
-      .chips { order: 5; }
+      /* Na telefonie zostaje jeden rząd o tej samej wysokości co na desktopie:
+         świat, licznik i przycisk filtrów. Kotwice i chipy nie mieszczą się w linii,
+         a rozpychanie paska do dwóch rzędów kosztowało 22% ekranu 667 px. */
+      /* Przy 375 px na jeden rząd nie ma miejsca: świat, licznik i dwa przyciski nie
+         mieszczą się razem, a przycinanie kończyło się „Pasuje: 79” zamiast 79 528 —
+         ucięta liczba czyta się jako inna liczba. Stąd dwa rzędy, ale o **stałej**
+         wysokości, więc pasek nadal nie przesuwa strony. 88 px to 13% ekranu 667 px. */
+      .filterbar {
+        height: 88px;
+        gap: 4px 8px;
+        padding: 0 12px;
+        flex-wrap: wrap;
+        align-content: center;
+      }
+      /* Rząd 1: świat i przyciski. Rząd 2: licznik na pełnej szerokości. */
+      .filterbar > select { order: 1; flex: 1 1 auto; min-width: 0; }
+      .filterbar-actions { order: 2; flex: 0 0 auto; }
+      .filterbar .match { order: 3; font-size: 12px; flex: 1 1 100%; flex-wrap: nowrap; }
+      .filterbar-nav, .chips { display: none; }
+      #filterFields { top: calc(100% + 6px); }
       /* „w tej migawce” to doprecyzowanie, bez którego liczba nadal się broni */
       .wide-only { display: none; }
     }
@@ -329,12 +373,11 @@
         <a href="#historia">Historia</a>
       </nav>
       <div class="filterbar-actions">
-        <button id="filtersToggle" class="ghost-btn" aria-expanded="true" aria-controls="filterFields">Filtry</button>
+        <button id="filtersToggle" class="ghost-btn" aria-expanded="false" aria-controls="filterFields">Filtry</button>
         <button id="copyBtn" class="ghost-btn" title="Kopiuj link do tego widoku" aria-label="Kopiuj link do tego widoku">⎘</button>
       </div>
-    </div>
 
-    <div class="card toolbar" id="filterFields">
+      <div class="card toolbar" id="filterFields" hidden>
       <div class="toolbar-row1">
         <div>
           <label for="snapshotSelect">Migawka przekroju</label>
@@ -385,6 +428,7 @@
         <div>
           <button id="resetBtn" class="reset-btn">Resetuj filtry</button>
         </div>
+      </div>
       </div>
     </div>
 

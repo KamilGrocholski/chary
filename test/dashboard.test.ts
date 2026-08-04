@@ -641,14 +641,19 @@ describe("widok składa się w całość — filtr ustawiony", () => {
     // jest jedynym miejscem, w którym widać naraz, co jest ustawione i na co działa.
     expect(out.bar.chips).toEqual(["Poziom 200-250", "Wojownik, Tropiciel"]);
     expect(out.bar.toggle).toBe("Filtry (2)");
-    expect(out.bar.fieldsHidden).toBe(false); // na szerokim ekranie pola są otwarte
-    expect(out.bar.expanded).toBe("true");
   });
 
-  test("zwinięcie panelu chowa pola, ale nie rusza filtrów", () => {
-    expect(out.afterCollapse.fieldsHidden).toBe(true);
-    expect(out.afterCollapse.expanded).toBe("false");
-    expect(out.afterCollapse.chips).toEqual(out.bar.chips);
+  test("szuflada startuje zamknięta i nic jej nie przełącza po dojściu danych", () => {
+    // Panel przełączany z JS-a dopiero po `fetch`ach przesuwał stronę o własną wysokość
+    // w trakcie ładowania — a przy przeładowaniu przywrócona pozycja scrolla lądowała
+    // gdzie indziej. Stan początkowy jest teraz wyłącznie w markupie.
+    expect(out.bar.fieldsHidden).toBe(true);
+    expect(out.afterOpen.fieldsHidden).toBe(false);
+    expect(out.afterOpen.expanded).toBe("true");
+    expect(out.afterClose.fieldsHidden).toBe(true);
+    expect(out.afterClose.expanded).toBe("false");
+    // otwieranie i zamykanie nie rusza filtrów
+    expect(out.afterOpen.chips).toEqual(out.bar.chips);
   });
 
   test("krzyżyk na chipie kasuje całą grupę pól, nie jedno", () => {

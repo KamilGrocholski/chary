@@ -67,6 +67,13 @@ const markup = await Bun.file("public/index.html").text();
 const nodes: Record<string, any> = {};
 for (const [, id] of markup.matchAll(/id="([^"]+)"/g)) nodes[id!] = makeNode(id!);
 
+// Atrapa musi znać atrybut `hidden` z markupu. Bez tego element schowany w HTML-u
+// startuje jako widoczny, a asercje `hidden === true` przechodzą tylko dlatego, że
+// taka jest wartość domyślna węzła — czyli nie pilnują niczego.
+for (const tag of markup.matchAll(/<[a-z][^>]*\bid="([^"]+)"[^>]*>/g)) {
+  if (/\shidden[\s>/]/.test(tag[0])) nodes[tag[1]!]!.hidden = true;
+}
+
 // Ile razy pobrano każdy adres. Migawka pobrana dwa razy to nie jest drobiazg:
 // historia gordiona to 1,9 MB, a bez strażnika „już leci” każdy wciśnięty klawisz
 // w polu filtra startował własny komplet pobrań.
@@ -216,21 +223,26 @@ if (scenario === "default") {
   const chipLabels = () =>
     [...nodes.filterChips!.innerHTML.matchAll(/<span class="chip">([^<]*)</g)].map((m) => m[1]);
 
+  // Szuflada startuje zamknięta i nikt jej nie przełącza po dojściu danych — inaczej
+  // strona przeskakiwałaby o wysokość panelu w trakcie ładowania.
   result.bar = {
     chips: chipLabels(),
     toggle: nodes.filtersToggle!.textContent,
     fieldsHidden: nodes.filterFields!.hidden,
-    expanded: nodes.filtersToggle!.attributes["aria-expanded"],
   };
 
-  // Zwinięcie panelu nie może ruszyć filtrów — pasek zostaje, pola się chowają.
-  nodes.filtersToggle!.handlers[0]!();
-  result.afterCollapse = {
+  nodes.filtersToggle!.handlers[0]!({});
+  result.afterOpen = {
     fieldsHidden: nodes.filterFields!.hidden,
     expanded: nodes.filtersToggle!.attributes["aria-expanded"],
     chips: chipLabels(),
   };
-  nodes.filtersToggle!.handlers[0]!();
+
+  nodes.filtersToggle!.handlers[0]!({});
+  result.afterClose = {
+    fieldsHidden: nodes.filterFields!.hidden,
+    expanded: nodes.filtersToggle!.attributes["aria-expanded"],
+  };
 
   // Krzyżyk na chipie kasuje CAŁĄ grupę pól, nie jedno. Atrapa nie ma prawdziwej
   // delegacji zdarzeń, więc wołamy handler z takim `target`, jaki dałby DOM.

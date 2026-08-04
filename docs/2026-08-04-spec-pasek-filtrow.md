@@ -213,6 +213,36 @@ pasek nie zastąpi.
 
 ---
 
+## Co ostatecznie weszło — dwa odstępstwa od tego, co wyżej
+
+Dopisane po implementacji. Spec zostaje niezmieniony powyżej; to jest sprostowanie,
+nie przepisanie.
+
+**1. Świat i licznik trafień nie są kopiowane do paska — one się do niego przeniosły.**
+Spec zakładał, że pełny panel zostaje na górze, a po przewinięciu dokleja się osobny
+pasek ze streszczeniem. To dawałoby dwa miejsca pokazujące ten sam stan, czyli dokładnie
+wadę, którą sam wpisał do „Przeciw”. W kodzie pasek trzyma **jedyny egzemplarz** obu
+kontrolek, więc nie ma czego synchronizować i nie ma `IntersectionObserver` ani wartownika.
+
+**2. Panel filtrów jest szufladą wypadającą spod paska, nie blokiem na górze strony.**
+Pierwsza wersja zostawiła pola tam, gdzie były, i przełączała je atrybutem `hidden`.
+Miało to dwie wady, obie zgłoszone od razu po zobaczeniu:
+
+- przycisk „Filtry” po przewinięciu **nie pokazywał niczego** — panel rozwijał się na
+  górze dokumentu, poza ekranem;
+- panel przełączany z JS-a dopiero po dojściu danych **przesuwał stronę** o własną
+  wysokość, a przy przeładowaniu przywrócona pozycja scrolla lądowała gdzie indziej.
+
+Szuflada jest `position: absolute` wewnątrz przyklejonego paska, więc otwiera się tam,
+gdzie użytkownik akurat patrzy, i **nie zajmuje miejsca w układzie** — dokument ma tyle
+samo pikseli otwarta i zamknięta. Stan początkowy siedzi wyłącznie w markupie
+(`hidden`), więc JS nie rusza go po załadowaniu i nie ma czym przesunąć strony.
+
+Zmierzone po zmianie: pasek **56 px** (6,2% ekranu 900 px) na desktopie i **88 px**
+(13,2% ekranu 667 px) na telefonie, gdzie potrzebne są dwa rzędy — przy jednym licznik
+ucinał się w środku liczby, a ucięta liczba czyta się jako inna liczba. Wysokość
+dokumentu spadła z 2930 do **2561 px**, bo panel przestał zajmować miejsce.
+
 ## Czego świadomie nie ma
 
 Przepisania układu na lewy pasek boczny — zostaje jako droga odwrotu, gdy grup filtrów
