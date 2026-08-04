@@ -1,8 +1,9 @@
-// Kawałki wspólne dla dashboardu migawki (app.js) i widoku trendów (trends.js).
+// Wspólne słownictwo całego frontu: stałe, czas i koszykowanie aktywności.
 //
-// Ten moduł nie może dotykać DOM-u ani niczego uruchamiać przy imporcie: app.js
-// startuje `setupDashboard()` od razu po załadowaniu i wywaliłby się na brakujących
-// elementach, gdyby trends.js zaimportował go tylko po to, żeby pożyczyć funkcję.
+// Ten moduł nie może dotykać DOM-u ani niczego uruchamiać przy imporcie — importują
+// go moduły czyste (`filters.js`, `history.js`) i warstwa widoku (`app.js`), a widok
+// startuje sam po załadowaniu. Gdyby cokolwiek tutaj sięgnęło po `document`, testy
+// modułów czystych przestałyby się dać uruchomić poza przeglądarką. Pilnuje tego test.
 
 export const PROF = {
   1: "Wojownik",
@@ -24,13 +25,32 @@ export const PROF_COLORS = {
 };
 
 /**
+ * Konto nigdy nieużywane — ranking pokazuje dla niego datę z 1969 r.
+ *
+ * Surowy `.f.json` zapisuje taki wiersz jako `null`, ale tablice typowane nie umieją
+ * `null`-a, więc po konwersji w `history.js` jest to **−1**. Oba zapisy znaczą to samo
+ * i muszą wypadać z każdego progu aktywności.
+ *
+ * **To sprawdzenie musi iść przed porównaniem `days > maxDays`.** `−1 > cokolwiek`
+ * jest fałszem, więc filtr, który zapyta najpierw o próg, wpuści konta nigdy nieużywane
+ * do *każdego* progu aktywności — dokładnie odwrotnie, niż wynika z danych.
+ */
+export function isNeverOnline(days) {
+  return days === null || days === undefined || days < 0;
+}
+
+/**
  * Koszyk aktywności: 0 = <24h, 1 = 1-7 dni, 2 = 8-30 dni, 3 = >30 dni, 4 = nigdy.
- * Koszyki są rozłączne, nie skumulowane. Ta sama funkcja co `activityBucket`
- * w `src/trends.ts` — rozjazd dałby wykres trendów niezgodny z dashboardem migawki,
- * więc pilnuje tego test.
+ * Koszyki są **rozłączne**, nie skumulowane — skumulowane progi mieszkają
+ * w `ACTIVITY_THRESHOLDS` w `history.js` i to są dwie różne skale.
+ *
+ * Ta sama funkcja co `activityBucket` w `src/trends.ts`, z jedną różnicą: tamta nie
+ * zna wartownika −1, bo po stronie serwera nie ma tablic typowanych i nie ma go skąd
+ * dostać. Na wartościach, które scraper potrafi wyprodukować, obie muszą dawać to
+ * samo — rozjazd dałby historię niezgodną z przekrojem. Pilnuje tego test.
  */
 export function activityBucket(days) {
-  if (days === null || days === undefined) return 4;
+  if (isNeverOnline(days)) return 4;
   if (days === 0) return 0;
   if (days <= 7) return 1;
   if (days <= 30) return 2;
@@ -60,6 +80,21 @@ export function formatSnapshotDate(entry) {
 
   const m = String(entry?.id ?? "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})/);
   return m ? `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]} (?)` : String(entry?.id ?? "—");
+}
+
+/** Podpis podziałki osi czasu — `DD.MM` w czasie lokalnym. */
+export function shortDate(ms) {
+  const d = new Date(ms);
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Godzina UTC migawki — jedyne miejsce, gdzie świadomie pokazujemy czas nie-lokalny.
+ * To ona tłumaczy skoki metryki „ostatnio online”: rundy schodzą raz o 4 rano, raz o 21.
+ */
+export function utcTime(startedAt) {
+  const d = new Date(startedAt);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(11, 16);
 }
 
 /** Odstęp między migawkami w dniach — liczony wyłącznie z `startedAt`. */

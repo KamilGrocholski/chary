@@ -8,10 +8,11 @@ import {
   emptyFilters,
   filtersFromParams,
   filtersToParams,
+  isDefaultFilters,
   totalsFromCounts,
   visibleActivityBuckets,
-} from "../public/app.js";
-import { activityBucket, daysBetween, formatSnapshotDate } from "../public/shared.js";
+} from "../public/filters.js";
+import { activityBucket, daysBetween, formatSnapshotDate, isNeverOnline } from "../public/shared.js";
 
 // Wzorcem odniesienia jest próbka prawdziwego snapshotu w starym schemacie v1
 // (test/fixtures/legacy-snapshot-aether.json — co 12. wiersz oryginału, więc pokrywa
@@ -19,7 +20,7 @@ import { activityBucket, daysBetween, formatSnapshotDate } from "../public/share
 //
 // Test przepuszcza ją przez produkcyjną migrację, po czym każdy filtr porównuje
 // z policzonym wprost na oryginalnych wierszach. Dzięki temu sprawdza naraz, czy
-// migracja niczego nie gubi i czy dashboard liczy dokładnie.
+// migracja niczego nie gubi i czy widok liczy dokładnie.
 
 const PUBLIC_DIR = path.resolve(import.meta.dir, "../public");
 
@@ -130,6 +131,46 @@ describe("filtrowanie — zawsze dokładne", () => {
   });
 });
 
+describe("konto nigdy nieużywane wypada z każdego progu", () => {
+  // Najgroźniejsza pułapka tablic typowanych: `null` zapisujemy jako −1, a `−1 > maxDays`
+  // jest fałszem. Filtr, który pyta najpierw o próg, wpuściłby konta nigdy nieużywane
+  // do każdego progu aktywności — odwrotnie, niż wynika z danych.
+  const withSentinel = {
+    count: 4,
+    level: Int16Array.from([10, 10, 10, 10]),
+    profession: Uint8Array.from([1, 1, 1, 1]),
+    honor: Int32Array.from([0, 0, 0, 0]),
+    days: Int32Array.from([0, 5, 40, -1]),
+  };
+
+  test("obie reprezentacje „nigdy” znaczą to samo", () => {
+    expect(isNeverOnline(null)).toBe(true);
+    expect(isNeverOnline(undefined)).toBe(true);
+    expect(isNeverOnline(-1)).toBe(true);
+    expect(isNeverOnline(0)).toBe(false);
+    expect(activityBucket(-1)).toBe(4);
+    expect(activityBucket(null)).toBe(4);
+  });
+
+  test("wartownik −1 nie przechodzi progu, mimo że jest mniejszy od każdego", () => {
+    for (const maxDays of [0, 1, 7, 30, 365, 100_000]) {
+      expect(total(countByLevel(withSentinel, filters({ maxDays })))).toBe(
+        [0, 5, 40].filter((d) => d <= maxDays).length,
+      );
+    }
+    // bez progu wchodzą wszyscy, łącznie z kontem nigdy nieużywanym
+    expect(total(countByLevel(withSentinel, filters()))).toBe(4);
+  });
+
+  test("konto nigdy nieużywane siedzi w koszyku „nigdy”, nie wśród > 30 dni", () => {
+    const buckets = new Map<number, number>(
+      countByActivity(withSentinel, filters()).map(([b, c]: number[]) => [b as number, c as number]),
+    );
+    expect(buckets.get(4)).toBe(1);
+    expect(buckets.get(3)).toBe(1);
+  });
+});
+
 describe("rozkład aktywności", () => {
   test("zgadza się z surowymi danymi i sumuje do populacji", () => {
     const buckets = countByActivity(data, filters());
@@ -199,6 +240,10 @@ describe("opublikowane dane", () => {
 
 const html = await Bun.file(path.join(PUBLIC_DIR, "index.html")).text();
 const js = await Bun.file(path.join(PUBLIC_DIR, "app.js")).text();
+const sharedJs = await Bun.file(path.join(PUBLIC_DIR, "shared.js")).text();
+const filtersJs = await Bun.file(path.join(PUBLIC_DIR, "filters.js")).text();
+const historyJs = await Bun.file(path.join(PUBLIC_DIR, "history.js")).text();
+const trendsHtml = await Bun.file(path.join(PUBLIC_DIR, "trends.html")).text();
 
 describe("spójność app.js z index.html", () => {
   test("każdy element pobierany przez el() istnieje w markupie", () => {
@@ -215,16 +260,47 @@ describe("spójność app.js z index.html", () => {
 
     // Chodzi o brak zewnętrznych zasobów, nie o brak samego słowa „cdn” —
     // adres CDN-u wolno wymienić w komentarzu z instrukcją aktualizacji.
-    const external = [...html.matchAll(/<(?:script|link)[^>]*\s(?:src|href)="([^"]+)"/g)]
-      .map((m) => m[1]!)
-      .filter((url) => /^(https?:)?\/\//.test(url));
-    expect(external).toEqual([]);
+    for (const markup of [html, trendsHtml]) {
+      const external = [...markup.matchAll(/<(?:script|link)[^>]*\s(?:src|href)="([^"]+)"/g)]
+        .map((m) => m[1]!)
+        .filter((url) => /^(https?:)?\/\//.test(url));
+      expect(external).toEqual([]);
+    }
   });
 
-  test("dashboard nie sięga już po nicki ani po drugi poziom danych", () => {
-    expect(js).not.toContain("needsRawData");
+  test("widok nie sięga po nicki", () => {
+    // `.n.json` nie ma dziś konsumenta i dopóki nie powstanie wyszukiwarka gracza,
+    // pobieranie go byłoby dwiema trzecimi transferu na darmo.
     expect(js).toContain("entry.filters");
     expect(js).not.toContain("entry.names");
+  });
+
+  test("pobiera agregat i migawki, i nic spoza katalogu", () => {
+    // Historia z surowych `.f.json` jest tu nowa i celowa, ale lista adresów ma
+    // zostać zamknięta: żadnych zewnętrznych zależności, żadnego drugiego agregatu.
+    const literals = [...js.matchAll(/fetch\(\s*["'`]([^"'`]+)/g)].map((m) => m[1]);
+    expect(literals.sort()).toEqual(["manifest.json", "trends.json"]);
+    // pozostałe adresy biorą się z manifestu, nie z kodu
+    expect(historyJs).toContain("fetch(entry.filters)");
+    expect(js).toContain("fetch(entry.filters)");
+  });
+});
+
+describe("moduły czyste nie mogą niczego uruchamiać", () => {
+  // Komentarze wycinamy, bo test ma pilnować kodu, a nie prozy: akapit tłumaczący,
+  // dlaczego moduł nie sięga po `document`, sam zawiera to słowo.
+  const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+  test("logika liczenia nie dotyka DOM-u", () => {
+    // app.js startuje widok od razu po załadowaniu, więc gdyby moduł czysty
+    // importował z niego cokolwiek, testów nie dałoby się odpalić poza przeglądarką.
+    for (const module of [sharedJs, filtersJs, historyJs]) {
+      expect(code(module)).not.toMatch(/\bdocument\b|\bwindow\b/);
+      expect(module).not.toContain('from "./app.js"');
+    }
+    expect(js).toContain('from "./shared.js"');
+    expect(js).toContain('from "./filters.js"');
+    expect(js).toContain('from "./history.js"');
   });
 });
 
@@ -262,7 +338,7 @@ describe("czas migawki", () => {
   });
 });
 
-describe("stan widoku w URL-u", () => {
+describe("stan filtrów w URL-u", () => {
   test("domyślny widok nie zaśmieca linku", () => {
     expect(filtersToParams(emptyFilters()).toString()).toBe("");
   });
@@ -296,6 +372,19 @@ describe("stan widoku w URL-u", () => {
     );
     expect(total(countByLevel(data, f))).toBe(expected);
     expect(expected).toBeGreaterThan(0);
+  });
+
+  test("„filtr domyślny” rozpoznaje dokładnie te filtry, które niczego nie odrzucają", () => {
+    // Na tym wisi cała leniwa ścieżka: przy filtrze domyślnym historia idzie
+    // z 9 KB agregatu, a nie z megabajtów surowych migawek.
+    expect(isDefaultFilters(emptyFilters())).toBe(true);
+    expect(isDefaultFilters(filtersFromParams(new URLSearchParams()))).toBe(true);
+    expect(isDefaultFilters(filtersFromParams(new URLSearchParams("prof=1,2,3,4,5,6")))).toBe(true);
+
+    expect(isDefaultFilters(filters({ minLevel: 1 }))).toBe(false);
+    expect(isDefaultFilters(filters({ maxDays: 30 }))).toBe(false);
+    expect(isDefaultFilters(filters({ minHonor: 0 }))).toBe(false);
+    expect(isDefaultFilters(filters({ professions: new Set([1, 2, 3, 4, 5]) }))).toBe(false);
   });
 });
 
@@ -354,23 +443,99 @@ describe("etykiety rozkładu aktywności", () => {
   });
 });
 
-describe("dashboard składa się w całość", () => {
-  // Warstwa DOM-u przepuszczona przez atrapę w osobnym procesie (test/dom_smoke.ts).
-  // Filtry przychodzą z URL-a, więc wynik da się porównać wprost z `.f.json` —
-  // to jedyny test, który przechodzi całą drogę manifest → fetch → filtry → wykres.
-  const repo = path.resolve(import.meta.dir, "..");
-  const proc = Bun.spawnSync(["bun", path.join(repo, "test/dom_smoke.ts"), "app"], { cwd: repo });
-  const out = proc.exitCode === 0 ? JSON.parse(proc.stdout.toString()) : null;
+// ── Widok w całości ─────────────────────────────────────────────────────────
+//
+// Warstwa DOM-u przepuszczona przez atrapę w osobnym procesie (test/dom_smoke.ts).
+// Dwa scenariusze, bo widok ma dwie ścieżki danych i tylko razem pokrywają obie:
+// filtr domyślny (historia z trends.json) i filtr ustawiony (historia z `.f.json`).
+
+const repo = path.resolve(import.meta.dir, "..");
+const smoke = (scenario: string) => {
+  const proc = Bun.spawnSync(["bun", path.join(repo, "test/dom_smoke.ts"), scenario], { cwd: repo });
+  return {
+    proc,
+    out: proc.exitCode === 0 && proc.stdout.length > 0 ? JSON.parse(proc.stdout.toString()) : null,
+  };
+};
+
+describe("widok składa się w całość — filtr domyślny", () => {
+  const { proc, out } = smoke("default");
 
   test("render przechodzi bez wyjątku", () => {
     expect(proc.stderr.toString()).toBe("");
     expect(proc.exitCode).toBe(0);
     expect(out.error).toBe("");
     expect(out.professionCheckboxes).toBe(6);
-    expect(out.series).toBe(6);
   });
 
-  test("filtry z URL-a dają na wykresie to, co siedzi w migawce", async () => {
+  test("przekrój pokazuje całą migawkę, bo filtr niczego nie odrzuca", () => {
+    expect(out.matched).toBeGreaterThan(0);
+    expect(out.levels).toBeGreaterThan(0);
+    expect(out.matchLine).toMatch(/\(100,0%\)/);
+    expect(out.suspectHidden).toBe(true);
+  });
+
+  test("historia idzie z agregatu i nie dociąga migawek", () => {
+    // Ścieżka, za którą nikt niefiltrujący nie płaci: 9 KB zamiast 1,9 MB.
+    expect(out.charts.popChart.title).toBe("Populacja świata w czasie");
+    expect(out.charts.popChart.label).toBe("Populacja");
+    expect(out.partialNoteHidden).toBe(true);
+    expect(out.historyStatus).toMatch(/^\d+ migawek$/);
+  });
+
+  test("każdy wykres dostaje punkty ustawione w czasie, nie w kolejności migawek", () => {
+    for (const [id, expectedSeries] of [["popChart", 1], ["actChart", 1], ["profChart", 6]] as const) {
+      expect(out.charts[id].series).toBe(expectedSeries);
+      expect(out.charts[id].points).toBe(out.charts.popChart.points);
+    }
+    // Oś X w milisekundach epoki — inaczej odstępy 3-17 dni wyglądałyby na równe.
+    expect(out.charts.popChart.firstX).toBeGreaterThan(0);
+  });
+
+  test("podsumowanie i tabela pokazują realne liczby", () => {
+    expect(out.summary).toContain("−5,3%"); // fobos wyludnia się najszybciej
+    expect(out.tableRows).toBe(out.charts.popChart.points); // nagłówek + n-1 wierszy zmian
+    expect(out.singlePointHidden).toBe(true);
+    expect(out.suspectNoteHidden).toBe(true);
+  });
+
+  test("liczby są po polsku, bez mieszania przecinka z kropką", () => {
+    // Daty mają kropki z definicji — sprawdzamy ułamki, nie 04.08.2026.
+    const fractions = (s: string) => s.replace(/\d{2}\.\d{2}\.\d{4}/g, "");
+    expect(fractions(out.summary)).not.toMatch(/\d\.\d/);
+    expect(fractions(out.table)).not.toMatch(/\d\.\d/);
+    expect(out.table).toMatch(/\d,\d/);
+  });
+
+  test("przełączenie progu i skali przelicza wykres, a nie tworzy nowego", () => {
+    expect(out.afterToggle.title).toBe("Udział aktywnych < 24h w populacji");
+    expect(out.afterToggle.updates).toBe(1);
+    expect(out.afterToggle.values.every((v: number) => v > 0 && v < 100)).toBe(true);
+  });
+
+  test("udział populacji w populacji to nie jest metryka", () => {
+    // Bez filtra „udział” dla wykresu populacji dałby płaską linię 100% — wykres
+    // zostaje wtedy w liczbach zamiast udawać, że coś pokazuje.
+    expect(out.afterToggle.popTitle).toBe("Populacja świata w czasie");
+  });
+
+  test("świat z jedną migawką pokazuje punkt i notkę zamiast pustego wykresu", () => {
+    expect(out.singleSnapshotWorld.points).toBe(1);
+    expect(out.singleSnapshotWorld.noticeHidden).toBe(false);
+    expect(out.singleSnapshotWorld.table).toBe("");
+  });
+});
+
+describe("widok składa się w całość — filtr ustawiony", () => {
+  const { proc, out } = smoke("filtered");
+
+  test("render przechodzi bez wyjątku", () => {
+    expect(proc.stderr.toString()).toBe("");
+    expect(proc.exitCode).toBe(0);
+    expect(out.error).toBe("");
+  });
+
+  test("filtry z URL-a dają na histogramie to, co siedzi w migawce", async () => {
     const latest = manifest.worlds.find((w: { name: string }) => w.name === "aether").files.at(-1);
     expect(out.source).toBe(latest.filters);
 
@@ -384,19 +549,41 @@ describe("dashboard składa się w całość", () => {
 
     expect(out.matched).toBe(expected);
     expect(expected).toBeGreaterThan(0);
-    expect(out.stats).toContain(`Razem: ${expected}`);
-    expect(out.levels).toBeGreaterThan(0);
+    expect(out.matchLine).toContain(`Pasuje: ${expected.toLocaleString("pl-PL")}`);
   });
 
-  test("pasek podejrzanej migawki jest schowany, dopóki flagi nie ma", () => {
-    expect(out.suspectHidden).toBe(true);
+  test("link z filtrami dociąga historię bez czekania na ruch myszą", () => {
+    expect(out.charts.popChart.title).toBe("Pasujących filtrowi w czasie");
+    expect(out.charts.popChart.points).toBeGreaterThan(1);
+    expect(out.partialNoteHidden).toBe(true); // komplet zdążył dojść
+    expect(out.historyStatus).toMatch(/^\d+ migawek$/);
+  });
+
+  test("ostatni punkt historii to ta sama liczba, co przekrój tej samej migawki", () => {
+    // Dwie niezależne drogi do jednej liczby: histogram sumowany po seriach
+    // i agregat policzony przez summarizeFiltered. Rozjazd znaczyłby, że któraś
+    // z nich filtruje inaczej.
+    expect(out.charts.popChart.lastY).toBe(out.matched);
+  });
+
+  test("wykres profesji pokazuje tylko profesje z filtra", () => {
+    expect(out.charts.profChart.series).toBe(2);
+  });
+
+  test("filtr aktywności zabiera progi, które pod nim nic już nie mówią", () => {
+    // Przy „≤ 3 dni” próg „≤ 7 dni” liczyłby dokładnie tych samych graczy, co wykres
+    // pasujących — trzy linie jedna na drugiej wyglądają jak potwierdzenie czegoś.
+    expect(out.afterActivityFilter.thresholdOptions).toBe(1);
+    expect(out.afterActivityFilter.noteHidden).toBe(false);
+    expect(out.afterActivityFilter.note).toContain("≤ 3 dni");
+    expect(out.afterActivityFilter.actHidden).toBe(false);
   });
 });
 
 describe("ostrzeżenie o podejrzanej migawce", () => {
-  test("dashboard czyta flagę ze snapshotu i ma gdzie ją pokazać", () => {
+  test("widok czyta flagę ze snapshotu i ma gdzie ją pokazać", () => {
     // Bez tego scraper zapisywałby `suspect` dla nikogo — dokładnie ten wzorzec,
-    // za który ten sam audyt skasował moduł agregatów.
+    // za który audyt skasował moduł agregatów.
     expect(js).toContain("showSuspect(json.suspect)");
     expect(js).toContain("Ta migawka może być niekompletna");
     expect(html).toContain('id="suspect"');

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Margostat</title>
-  <meta name="description" content="Statystyki graczy Margonem — rozkład poziomów i profesji w rankingach światów, migawki w czasie." />
+  <meta name="description" content="Statystyki graczy Margonem — rozkład poziomów i profesji w rankingach światów oraz historia populacji, aktywności i profesji w czasie." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2316161a'/><rect x='6' y='17' width='4' height='9' fill='%233987e5'/><rect x='12' y='12' width='4' height='14' fill='%23199e70'/><rect x='18' y='7' width='4' height='19' fill='%23c98500'/><rect x='24' y='14' width='4' height='12' fill='%23d55181'/></svg>" />
   <!-- Chart.js 4.4.7, lokalnie zamiast z CDN-u. Aktualizacja:
        curl -sL https://cdn.jsdelivr.net/npm/chart.js@<wersja>/dist/chart.umd.min.js -o public/vendor/chart.umd.min.js -->
@@ -68,15 +68,6 @@
       background: none;
       color: var(--accent);
     }
-    .nav {
-      display: flex;
-      gap: 14px;
-      margin-left: auto;
-      font-size: 13px;
-    }
-    .nav a { color: var(--muted); text-decoration: none; }
-    .nav a:hover { color: var(--text); }
-    .nav a[aria-current="page"] { color: var(--accent); font-weight: 700; }
 
     .toolbar { margin-bottom: 20px; }
     .toolbar-row1 {
@@ -114,6 +105,44 @@
       accent-color: var(--accent);
     }
 
+    /* Pasek trafień — jedyna liczba, która odpowiada na „ile ich w ogóle jest”. */
+    .match {
+      margin-bottom: 20px;
+      font-size: 15px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px 12px;
+    }
+    .match b { color: var(--text); font-size: 19px; }
+
+    .section-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px 14px;
+      margin: 28px 0 14px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+    .section-head h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+    .section-head .meta { font-size: 13px; color: var(--muted); }
+    .history-controls {
+      display: grid;
+      grid-template-columns: 180px 200px;
+      gap: 12px;
+      align-items: end;
+      margin-left: auto;
+    }
+
     .stats {
       margin: 0 0 20px;
       color: var(--muted);
@@ -123,7 +152,8 @@
       flex-wrap: wrap;
       gap: 6px 16px;
     }
-    .chartBox { height: 420px; }
+    .chartBox { height: 420px; margin-bottom: 20px; }
+    .chartBox.short { height: 320px; }
     canvas { width: 100% !important; height: 100% !important; }
     .error {
       color: #e66767;
@@ -131,6 +161,18 @@
       margin-bottom: 12px;
     }
     .error:empty { margin: 0; }
+    .note {
+      margin-bottom: 20px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--muted);
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .note b { color: var(--text); }
+    .note.warn { border-color: #c98500; }
+    .note.warn b { color: #c98500; }
     .suspect {
       margin-bottom: 20px;
       border-color: #c98500;
@@ -154,12 +196,21 @@
       height: 100%;
       color: var(--muted);
     }
+
+    .tableBox { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    th { color: var(--muted); font-weight: 600; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tbody tr:last-child td { border-bottom: none; }
     [hidden] { display: none !important; }
 
     @media (max-width: 720px) {
       .wrap { padding: 14px; }
       .toolbar-row1 { grid-template-columns: 1fr; }
+      .history-controls { grid-template-columns: 1fr; margin-left: 0; width: 100%; }
       .chartBox { height: 320px; }
+      .chartBox.short { height: 260px; }
     }
   </style>
 </head>
@@ -168,10 +219,6 @@
     <header style="display:flex;align-items:baseline;gap:10px;margin-bottom:20px;flex-wrap:wrap">
       <h1 style="margin:0;font-size:22px;letter-spacing:0.02em;font-weight:700">margostat</h1>
       <span style="color:var(--muted);font-size:13px">statystyki graczy Margonem</span>
-      <nav class="nav">
-        <a href="index.html" aria-current="page">Migawka</a>
-        <a href="trends.html">Trendy</a>
-      </nav>
     </header>
 
     <div class="card toolbar">
@@ -181,7 +228,7 @@
           <select id="worldSelect"></select>
         </div>
         <div>
-          <label for="snapshotSelect">Data</label>
+          <label for="snapshotSelect">Migawka przekroju</label>
           <select id="snapshotSelect"></select>
         </div>
         <div>
@@ -235,15 +282,77 @@
       </div>
     </div>
 
+    <div id="matchLine" class="match">Ładowanie…</div>
+    <div id="error" class="error" role="alert"></div>
+
+    <div class="section-head">
+      <h2>Przekrój</h2>
+      <span id="snapshotMeta" class="meta">—</span>
+    </div>
+
     <div id="suspect" class="suspect card" role="status" hidden></div>
 
     <div class="stats card" id="stats">Ładowanie…</div>
-    <div id="error" class="error" role="alert"></div>
 
     <div class="card chartBox">
       <div id="chartEmpty" class="empty" hidden>Brak graczy spełniających filtry.</div>
-      <canvas id="professionChart" role="img" aria-label="Rozkład poziomów według profesji. Liczby dla każdej profesji są wypisane nad wykresem."></canvas>
+      <canvas id="professionChart" role="img" aria-label="Rozkład poziomów według profesji w wybranej migawce."></canvas>
     </div>
+
+    <div class="section-head">
+      <h2>Historia</h2>
+      <span id="historyStatus" class="meta">—</span>
+      <div class="history-controls">
+        <div>
+          <label for="thresholdSelect">Próg aktywności</label>
+          <select id="thresholdSelect"></select>
+        </div>
+        <div>
+          <label for="modeSelect">Skala</label>
+          <select id="modeSelect">
+            <option value="liczba">Liczba graczy</option>
+            <option value="udzial">Udział w populacji</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats card" id="summary">Ładowanie…</div>
+
+    <div id="singlePoint" class="note card" role="status" hidden>
+      <span aria-hidden="true">ℹ</span>
+      <span><b>Ten świat ma jedną migawkę.</b> Punkt jest poprawny, ale na trend jest za wcześnie — kolejna runda scrapa da drugi.</span>
+    </div>
+
+    <div id="partialNote" class="note card" role="status" hidden></div>
+
+    <div id="suspectNote" class="note card warn" role="status" hidden>
+      <span aria-hidden="true">⚠</span>
+      <span><b>Któraś migawka może być obcięta.</b> Punkty narysowane pustym kółkiem mają flagę <code>suspect</code> — spadek populacji o ponad 5% wygląda tak samo jak niekompletny scrape.</span>
+    </div>
+
+    <div id="onlineNote" class="note card">
+      <span aria-hidden="true">ℹ</span>
+      <span><b>„Ostatnio online” zależy od godziny scrapa.</b> Rundy schodzą raz o 4 rano, raz o 21, w różne dni tygodnia,
+      więc próg <b>&lt; 24h</b> waha się o ~15% przy populacji stabilnej na 0,6%. Do oceny trendu miarodajniejsze są progi
+      <b>≤ 7 dni</b> i <b>≤ 30 dni</b>; godzina UTC każdej migawki jest w dymku wykresu.</span>
+    </div>
+
+    <div id="thresholdNote" class="note card" role="status" hidden></div>
+
+    <div class="card chartBox short">
+      <canvas id="popChart" role="img" aria-label="Liczba graczy w kolejnych migawkach."></canvas>
+    </div>
+
+    <div id="actChartBox" class="card chartBox short">
+      <canvas id="actChart" role="img" aria-label="Liczba aktywnych graczy w kolejnych migawkach."></canvas>
+    </div>
+
+    <div class="card chartBox">
+      <canvas id="profChart" role="img" aria-label="Liczba graczy każdej profesji w kolejnych migawkach."></canvas>
+    </div>
+
+    <div class="card tableBox" id="changeTable"></div>
   </div>
 
   <script type="module" src="app.js"></script>

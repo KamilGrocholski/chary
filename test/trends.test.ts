@@ -3,16 +3,26 @@ import path from "node:path";
 import { normalizeLegacyRows, splitNormalized, type FilterFile } from "../src/snapshot.ts";
 import { activityBucket as activityBucketServer, buildWorldTrend, summarizeSnapshot } from "../src/trends.ts";
 import { activityBucket as activityBucketBrowser } from "../public/shared.js";
+import { emptyFilters, summarizeFiltered } from "../public/filters.js";
 import {
   ACTIVITY_THRESHOLDS,
   DEFAULT_THRESHOLD,
+  HISTORY_WINDOW,
   activeCounts,
+  buildFilteredTrend,
+  cachedSnapshots,
   changeRows,
+  loadHistory,
+  loadedCount,
   shareSeries,
   summarize,
+  thresholdByKey,
+  toTypedSnapshot,
+  usableThresholds,
   viewFromParams,
   viewToParams,
-} from "../public/trends.js";
+  windowedEntries,
+} from "../public/history.js";
 
 // Wzorcem odniesienia są prawdziwe dane, nie reimplementacja tego samego liczenia:
 // agregat sprawdzamy na próbce prawdziwej migawki w schemacie v1 (ta sama, co
@@ -67,7 +77,9 @@ describe("agregat migawki", () => {
 
   test("scraper i przeglądarka koszykują tak samo", () => {
     // Dwie kopie tej samej funkcji (src/trends.ts i public/shared.js) — rozjazd dałby
-    // wykres trendów niezgodny z dashboardem migawki.
+    // historię niezgodną z przekrojem. Lista to komplet wartości, które scraper potrafi
+    // wyprodukować; wartownika −1 nie ma na niej, bo powstaje dopiero przy konwersji
+    // do tablic typowanych, czyli wyłącznie po stronie przeglądarki.
     for (const days of [null, undefined, 0, 1, 7, 8, 30, 31, 365, 20_655]) {
       expect(activityBucketServer(days)).toBe(activityBucketBrowser(days));
     }
@@ -175,6 +187,60 @@ describe("opublikowany trends.json", () => {
   });
 });
 
+describe("klient przy filtrze domyślnym liczy dokładnie to, co serwer", () => {
+  test("wszystkie 202 migawki, wiersz po wierszu", async () => {
+    // Rdzeń całego widoku: historia pod filtrem powstaje z tej samej funkcji, co
+    // historia bez filtra. Gdyby `summarizeFiltered` odrzucał choć jeden wiersz inaczej
+    // niż `summarizeSnapshot`, wykres skakałby przy pierwszym ruchu filtrem — i to
+    // wyglądałoby jak zmiana w danych, a nie jak błąd.
+    //
+    // Pełny przelot po 64 MB trwa ~0,9 s, więc nie ma powodu sprawdzać próbki.
+    const noFilter = emptyFilters();
+    let checked = 0;
+
+    for (const world of manifest.worlds) {
+      for (const entry of world.files) {
+        const f = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.filters)).text());
+        expect(summarizeFiltered(f, noFilter)).toEqual(summarizeSnapshot(f));
+        // i to samo po konwersji do tablic typowanych, którą robi przeglądarka
+        expect(summarizeFiltered(toTypedSnapshot(f), noFilter)).toEqual(summarizeSnapshot(f));
+        checked += 1;
+      }
+    }
+    expect(checked).toBe(manifest.worlds.reduce((s: number, w: any) => s + w.files.length, 0));
+    expect(checked).toBeGreaterThan(200);
+  });
+});
+
+describe("konwersja do tablic typowanych", () => {
+  const raw = {
+    count: 5,
+    level: [1, 250, 500, 10, 10],
+    profession: [1, 2, 3, 4, 6],
+    honor: [-35, 0, 1_224_565, 100, -1],
+    days: [0, 7, null, 6598, 31],
+    suspect: { reason: "test" },
+  };
+
+  test("null staje się −1, a nie zerem ani wielką liczbą", () => {
+    const typed = toTypedSnapshot(raw);
+    expect([...typed.days]).toEqual([0, 7, -1, 6598, 31]);
+    expect(typed.suspect).toEqual({ reason: "test" });
+  });
+
+  test("żadna kolumna nie traci wartości na typie", () => {
+    const typed = toTypedSnapshot(raw);
+    expect([...typed.level]).toEqual(raw.level);
+    expect([...typed.profession]).toEqual(raw.profession);
+    // honor bywa ujemny i sięga 1,2 mln — Int16 by go urwał
+    expect([...typed.honor]).toEqual(raw.honor);
+  });
+
+  test("brak suspect daje null, a nie undefined", () => {
+    expect(toTypedSnapshot({ ...raw, suspect: undefined }).suspect).toBeNull();
+  });
+});
+
 describe("progi aktywności są skumulowane", () => {
   const aether = trends.worlds.aether;
 
@@ -222,6 +288,227 @@ describe("progi aktywności są skumulowane", () => {
     expect(share.every((s: number) => s >= 0 && s <= 100)).toBe(true);
     // Populacja 0 nie może dać NaN na wykresie.
     expect(shareSeries([0], [0])).toEqual([0]);
+  });
+});
+
+describe("filtr aktywności zabiera progi, które pod nim milkną", () => {
+  // Przy filtrze „online ≤ 7 dni” w zbiorze nie ma już nikogo powyżej siedmiu dni,
+  // więc próg „≤ 7 dni” zrównałby się z liczbą pasujących, a „≤ 30 dni” tak samo.
+  test("zostają tylko progi węższe od filtra", () => {
+    expect(usableThresholds(Infinity).map((t) => t.key)).toEqual(["24h", "7d", "30d"]);
+    expect(usableThresholds(30).map((t) => t.key)).toEqual(["24h", "7d"]);
+    expect(usableThresholds(14).map((t) => t.key)).toEqual(["24h", "7d"]);
+    expect(usableThresholds(7).map((t) => t.key)).toEqual(["24h"]);
+    expect(usableThresholds(3).map((t) => t.key)).toEqual(["24h"]);
+    expect(usableThresholds(0)).toEqual([]);
+  });
+
+  test("wybrany próg spada do najbliższego, który jeszcze coś mówi", () => {
+    expect(thresholdByKey("30d", Infinity)!.key).toBe("30d");
+    expect(thresholdByKey("30d", 7)!.key).toBe("24h");
+    expect(thresholdByKey("7d", 7)!.key).toBe("24h");
+    // filtr węższy niż każdy próg — nie ma czego pokazać i widok musi to znieść
+    expect(thresholdByKey("24h", 0)).toBeNull();
+  });
+
+  test("bez użytecznego progu „aktywni” to po prostu wszyscy pasujący", () => {
+    expect(activeCounts(trends.worlds.aether, "24h", 0)).toEqual(trends.worlds.aether.total);
+  });
+});
+
+describe("historia pod filtrem", () => {
+  const base = {
+    id: ["a", "b", "c"],
+    startedAt: ["2026-06-01T00:00:00.000Z", "2026-06-11T00:00:00.000Z", "2026-06-21T00:00:00.000Z"],
+    total: [100, 110, 120],
+    act: [[10, 11, 12], [20, 22, 24], [30, 33, 36], [39, 43, 47], [1, 1, 1]],
+    byProf: [[50, 55, 60], [10, 11, 12], [10, 11, 12], [10, 11, 12], [10, 11, 12], [10, 11, 12]],
+    suspect: [0, 1, 0],
+  };
+
+  const snapshot = (levels: number[]) =>
+    toTypedSnapshot({
+      count: levels.length,
+      level: levels,
+      profession: levels.map(() => 1),
+      honor: levels.map(() => 0),
+      days: levels.map(() => 0),
+    });
+
+  test("filtr domyślny oddaje agregat bez dotykania migawek", () => {
+    // To jest ta ścieżka, za którą nikt niefiltrujący nie płaci ani bajtem ponad 9 KB.
+    const result = buildFilteredTrend(base, new Map(), emptyFilters());
+    expect(result.trend).toBe(base);
+    expect(result.population).toBe(base.total);
+    expect(result.loaded).toBe(3);
+  });
+
+  test("liczy tylko z wczytanych migawek, reszcie nie podstawia niczego", () => {
+    const store = new Map([
+      ["a", snapshot([10, 300, 300])],
+      ["c", snapshot([300, 300])],
+    ]);
+    const { trend, population, loaded, expected } = buildFilteredTrend(base, store, {
+      ...emptyFilters(),
+      minLevel: 200,
+    });
+
+    expect(trend.id).toEqual(["a", "c"]); // „b” nie ma punktu, a nie punkt zmyślony
+    expect(trend.total).toEqual([2, 2]);
+    expect(trend.startedAt).toEqual([base.startedAt[0], base.startedAt[2]]);
+    expect(trend.suspect).toEqual([0, 0]);
+    expect(loaded).toBe(2);
+    expect(expected).toBe(3);
+    // mianownik zostaje niefiltrowany — inaczej „udział” sumowałby się do 100%
+    expect(population).toEqual([100, 120]);
+  });
+
+  test("dziura w historii robi dłuższy odstęp, a nie fałszywy skok", () => {
+    const store = new Map([
+      ["a", snapshot([300])],
+      ["c", snapshot([300, 300, 300])],
+    ]);
+    const { trend } = buildFilteredTrend(base, store, { ...emptyFilters(), minLevel: 200 });
+    const rows = changeRows(trend);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.delta).toBe(2);
+    expect(rows[0]!.days).toBeCloseTo(20, 6); // a→c, nie a→b
+    expect(rows[0]!.perDay).toBeCloseTo(0.1, 6);
+  });
+
+  test("okno migawek zawęża historię i mówi, ile jej zostało", () => {
+    const store = new Map([["b", snapshot([300])], ["c", snapshot([300])]]);
+    const { trend, expected } = buildFilteredTrend(
+      base,
+      store,
+      { ...emptyFilters(), minLevel: 200 },
+      new Set(["b", "c"]),
+    );
+    expect(trend.id).toEqual(["b", "c"]);
+    expect(expected).toBe(2);
+  });
+
+  test("żadna migawka nie daje pustej historii, nie wysypki", () => {
+    const { trend, loaded } = buildFilteredTrend(base, new Map(), { ...emptyFilters(), minLevel: 200 });
+    expect(trend.id).toEqual([]);
+    expect(loaded).toBe(0);
+    expect(summarize(trend)).toBeNull();
+    expect(changeRows(trend)).toEqual([]);
+  });
+});
+
+describe("okno migawek", () => {
+  const entries = Array.from({ length: 20 }, (_, i) => ({ id: `s${i}` }));
+
+  test("bierze najnowsze, bo to one odpowiadają na „co się dzieje teraz”", () => {
+    const picked = windowedEntries(entries, 5);
+    expect(picked.map((e: { id: string }) => e.id)).toEqual(["s15", "s16", "s17", "s18", "s19"]);
+  });
+
+  test("krótsza historia przechodzi w całości", () => {
+    expect(windowedEntries(entries.slice(0, 3), 5)).toHaveLength(3);
+    expect(windowedEntries(entries.slice(0, 5), 5)).toHaveLength(5);
+  });
+
+  test("domyślne okno jest szersze niż najdłuższa dzisiejsza historia", () => {
+    // Gdy przestanie być, licznik „N z M” ma to pokazać zamiast po cichu uciąć wykres.
+    const longest = Math.max(...(Object.values(trends.worlds) as any[]).map((t) => t.id.length));
+    expect(HISTORY_WINDOW).toBeGreaterThanOrEqual(longest);
+  });
+});
+
+describe("pobieranie historii", () => {
+  const entries = (world: string, n: number) =>
+    Array.from({ length: n }, (_, i) => ({ id: `${world}-${i}`, filters: `worlds/${world}/${i}.f.json` }));
+
+  const fakeSnapshot = { count: 1, level: [10], profession: [1], honor: [0], days: [0] };
+
+  async function withFetch(impl: (url: string) => Promise<any>, run: () => Promise<void>) {
+    const original = globalThis.fetch;
+    globalThis.fetch = impl as any;
+    try {
+      await run();
+    } finally {
+      globalThis.fetch = original;
+    }
+  }
+
+  test("dociąga komplet i melduje postęp po każdej migawce", async () => {
+    const seen: number[] = [];
+    await withFetch(
+      async () => ({ ok: true, status: 200, json: async () => fakeSnapshot }),
+      async () => {
+        const list = entries("w1", 7);
+        const { failed } = await loadHistory("w1", list, {
+          onProgress: (loaded: number) => seen.push(loaded),
+        });
+        expect(failed).toEqual([]);
+        expect(loadedCount(cachedSnapshots("w1"), list)).toBe(7);
+        expect(seen.at(-1)).toBe(7);
+        expect(seen).toHaveLength(7);
+      },
+    );
+  });
+
+  test("drugie wywołanie nic nie pobiera — migawki leżą już w pamięci", async () => {
+    let calls = 0;
+    await withFetch(
+      async () => {
+        calls += 1;
+        return { ok: true, status: 200, json: async () => fakeSnapshot };
+      },
+      async () => {
+        const list = entries("w2", 4);
+        await loadHistory("w2", list, {});
+        expect(calls).toBe(4);
+        await loadHistory("w2", list, {});
+        expect(calls).toBe(4);
+      },
+    );
+  });
+
+  test("jedna zepsuta odpowiedź nie wywala całej historii", async () => {
+    await withFetch(
+      async (url: string) =>
+        url.endsWith("2.f.json")
+          ? { ok: false, status: 500, json: async () => ({}) }
+          : { ok: true, status: 200, json: async () => fakeSnapshot },
+      async () => {
+        const list = entries("w3", 5);
+        const { failed } = await loadHistory("w3", list, {});
+        expect(failed).toEqual(["w3-2"]);
+        expect(loadedCount(cachedSnapshots("w3"), list)).toBe(4);
+      },
+    );
+  });
+
+  test("przełączenie świata porzuca robotę zamiast dosypywać dane do martwego widoku", async () => {
+    await withFetch(
+      async () => ({ ok: true, status: 200, json: async () => fakeSnapshot }),
+      async () => {
+        const list = entries("w4", 8);
+        let stale = false;
+        await loadHistory("w4", list, {
+          concurrency: 1,
+          isStale: () => stale,
+          onProgress: (loaded: number) => {
+            if (loaded >= 2) stale = true;
+          },
+        });
+        expect(loadedCount(cachedSnapshots("w4"), list)).toBeLessThan(8);
+      },
+    );
+  });
+
+  test("pamięć trzyma najwyżej dwa światy — bez tego karta zbiera wszystkie 21", () => {
+    cachedSnapshots("cache-a").set("x", {} as any);
+    cachedSnapshots("cache-b").set("x", {} as any);
+    cachedSnapshots("cache-c").set("x", {} as any);
+    expect(cachedSnapshots("cache-b").size).toBe(1);
+    expect(cachedSnapshots("cache-c").size).toBe(1);
+    // „cache-a” wypadło, więc dostajemy świeżą, pustą mapę
+    expect(cachedSnapshots("cache-a").size).toBe(0);
   });
 });
 
@@ -276,120 +563,41 @@ describe("stan widoku w URL-u", () => {
   });
 
   test("komplet ustawień przechodzi tam i z powrotem", () => {
-    const view = { world: "gordion", threshold: "30d", share: true };
+    const view = { world: "gordion", date: "2026-08-04T10-02-40", threshold: "30d", share: true };
     expect(viewFromParams(new URLSearchParams(viewToParams(view).toString()))).toEqual(view);
   });
 
   test("śmieci w URL-u nie wywalają widoku", () => {
     expect(viewFromParams(new URLSearchParams("prog=xyz&udzial=nie"))).toEqual({
       world: null,
+      date: null,
       threshold: DEFAULT_THRESHOLD,
       share: false,
     });
   });
+
+  test("stan widoku i filtrów nie kolidują kluczami", () => {
+    // Na tym wisi obietnica, że linki do starego trends.html dalej działają:
+    // jedna strona czyta oba zestawy parametrów naraz.
+    const viewKeys = [...viewToParams({ world: "a", date: "b", threshold: "30d", share: true }).keys()];
+    expect(viewKeys.sort()).toEqual(["date", "prog", "udzial", "world"]);
+    for (const key of viewKeys) {
+      expect(["minLevel", "maxLevel", "minHonor", "maxHonor", "maxDays", "prof"]).not.toContain(key);
+    }
+  });
 });
 
 const trendsHtml = await Bun.file(path.join(PUBLIC_DIR, "trends.html")).text();
-const trendsJs = await Bun.file(path.join(PUBLIC_DIR, "trends.js")).text();
-const sharedJs = await Bun.file(path.join(PUBLIC_DIR, "shared.js")).text();
-const appJs = await Bun.file(path.join(PUBLIC_DIR, "app.js")).text();
-const indexHtml = await Bun.file(path.join(PUBLIC_DIR, "index.html")).text();
 
-describe("spójność trends.js z trends.html", () => {
-  test("każdy element pobierany przez el() istnieje w markupie", () => {
-    const ids = [...trendsJs.matchAll(/\bel\("([^"]+)"\)/g)].map((m) => m[1]);
-    expect(ids.length).toBeGreaterThan(5);
-    for (const id of new Set(ids)) {
-      expect(trendsHtml).toContain(`id="${id}"`);
-    }
-  });
-
-  test("strona ładuje moduł i lokalny Chart.js zamiast CDN-u", () => {
-    expect(trendsHtml).toContain('<script type="module" src="trends.js">');
-    expect(trendsHtml).toContain('src="vendor/chart.umd.min.js"');
-
-    const external = [...trendsHtml.matchAll(/<(?:script|link)[^>]*\s(?:src|href)="([^"]+)"/g)]
-      .map((m) => m[1]!)
-      .filter((url) => /^(https?:)?\/\//.test(url));
-    expect(external).toEqual([]);
-  });
-
-  test("widok czyta agregat, a nie surowe migawki", () => {
-    // Cały sens tego widoku: 9 KB zamiast 14,9 MB. Wystarczy jedno `fetch` po
-    // `.f.json`, żeby historia gordiona kosztowała 1,8 MB zamiast 9 KB.
-    const fetched = [...trendsJs.matchAll(/fetch\(\s*["'`]([^"'`]+)/g)].map((m) => m[1]);
-    expect(fetched).toEqual(["trends.json"]);
-  });
-
-  test("obie strony prowadzą do siebie nawzajem", () => {
-    expect(indexHtml).toContain('href="trends.html"');
+describe("stara strona trendów zostaje jako przekierowanie", () => {
+  test("przenosi query string, żeby rozesłane linki dalej działały", () => {
+    expect(trendsHtml).toContain('"index.html" + location.search');
+    expect(trendsHtml).toContain("location.replace(target)");
     expect(trendsHtml).toContain('href="index.html"');
   });
-});
 
-describe("widok składa się w całość", () => {
-  // Warstwa DOM-u przepuszczona przez atrapę w osobnym procesie (test/dom_smoke.ts) —
-  // sprawdza to, czego statyczna kontrola id-ków nie widzi: czy render w ogóle
-  // przechodzi na prawdziwym trends.json i co ląduje w Chart.js.
-  const repo = path.resolve(import.meta.dir, "..");
-  const proc = Bun.spawnSync(["bun", path.join(repo, "test/dom_smoke.ts"), "trends"], { cwd: repo });
-  const out = proc.exitCode === 0 ? JSON.parse(proc.stdout.toString()) : null;
-
-  test("render przechodzi bez wyjątku", () => {
-    expect(proc.stderr.toString()).toBe("");
-    expect(proc.exitCode).toBe(0);
-    expect(out.error).toBe("");
-  });
-
-  test("każdy wykres dostaje punkty ustawione w czasie, nie w kolejności migawek", () => {
-    const fobos = trends.worlds.fobos;
-    for (const [id, expectedSeries] of [["popChart", 1], ["actChart", 1], ["profChart", 6]] as const) {
-      expect(out.charts[id].series).toBe(expectedSeries);
-      expect(out.charts[id].points).toBe(fobos.total.length);
-    }
-    // Oś X w milisekundach epoki — inaczej odstępy 3-17 dni wyglądałyby na równe.
-    expect(out.charts.popChart.firstX).toBe(new Date(fobos.startedAt[0]).getTime());
-  });
-
-  test("podsumowanie i tabela pokazują realne liczby", () => {
-    const fobos = trends.worlds.fobos;
-    // Bez spacji po obu stronach: separator tysięcy z `toLocaleString` to spacja
-    // nierozdzielająca, a atrapa normalizuje białe znaki.
-    const flat = (s: string) => s.replace(/\s/g, "");
-    expect(flat(out.summary)).toContain(flat(fobos.total.at(-1).toLocaleString("pl-PL")));
-    expect(out.summary).toContain("−5,3%"); // fobos wyludnia się najszybciej
-    expect(out.tableRows).toBe(fobos.total.length); // nagłówek + n-1 wierszy zmian
-    expect(out.singlePointHidden).toBe(true);
-    expect(out.suspectHidden).toBe(true);
-  });
-
-  test("liczby są po polsku, bez mieszania przecinka z kropką", () => {
-    // Daty mają kropki z definicji — sprawdzamy ułamki, nie 04.08.2026.
-    const fractions = (s: string) => s.replace(/\d{2}\.\d{2}\.\d{4}/g, "");
-    expect(fractions(out.summary)).not.toMatch(/\d\.\d/);
-    expect(fractions(out.table)).not.toMatch(/\d\.\d/);
-    expect(out.table).toMatch(/\d,\d/);
-  });
-
-  test("przełączenie progu i skali przelicza wykres, a nie tworzy nowego", () => {
-    expect(out.afterToggle.title).toBe("Udział aktywnych < 24h w populacji");
-    expect(out.afterToggle.updates).toBe(1);
-    expect(out.afterToggle.values.every((v: number) => v > 0 && v < 100)).toBe(true);
-  });
-
-  test("świat z jedną migawką pokazuje punkt i notkę zamiast pustego wykresu", () => {
-    expect(out.singleSnapshotWorld.points).toBe(1);
-    expect(out.singleSnapshotWorld.noticeHidden).toBe(false);
-    expect(out.singleSnapshotWorld.table).toBe("");
-  });
-});
-
-describe("wspólny moduł nie może niczego uruchamiać", () => {
-  test("shared.js nie dotyka DOM-u", () => {
-    // app.js startuje dashboard od razu po załadowaniu, więc gdyby trends.js
-    // importował app.js zamiast shared.js, wywaliłby się na obcym markupie.
-    expect(sharedJs).not.toMatch(/\bdocument\b|\bwindow\b/);
-    expect(trendsJs).not.toContain('from "./app.js"');
-    expect(appJs).toContain('from "./shared.js"');
+  test("nie ładuje już wykresów ani modułu widoku", () => {
+    expect(trendsHtml).not.toContain("chart.umd.min.js");
+    expect(trendsHtml).not.toContain("trends.js");
   });
 });

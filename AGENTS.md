@@ -34,21 +34,22 @@ src/
   worlds.ts          lista śledzonych światów — edytowana ręcznie
   server.ts          lokalny serwer statyczny do podglądu
 public/              dokładnie to, co ląduje na GitHub Pages
-  index.html         markup i style dashboardu jednej migawki
-  app.js             logika dashboardu (moduł ES; góra pliku czysta, dół dotyka DOM-u)
-  trends.html        markup i style widoku historii jednego świata
-  trends.js          logika widoku historii — ten sam podział czysta/DOM
-  shared.js          kawałki wspólne obu widoków; nie wolno mu dotykać DOM-u
+  index.html         markup i style całego widoku: przekrój migawki + historia
+  app.js             jedyny moduł dotykający DOM-u — orkiestracja i rysowanie
+  filters.js         filtr i zliczanie: matches, countByLevel, summarizeFiltered, stan w URL-u
+  history.js         historia świata: progi, serie, tablice typowane, pobieranie migawek
+  shared.js          stałe, czas, koszykowanie aktywności — wspólne słownictwo
   vendor/            Chart.js 4.4.7 lokalnie, bez CDN-u
+  trends.html        przekierowanie na index.html z zachowaniem query stringa
   manifest.json      indeks migawek
   trends.json        zwinięta historia wszystkich światów (24 KB, 9 KB po gzipie)
   worlds/<świat>/    <id>.f.json + <id>.n.json
 test/
   parser.test.ts     parser na zrzucie prawdziwej strony rankingu
   snapshot.test.ts   format migawki, migracja, strażnik populacji
-  dashboard.test.ts  logika dashboardu, filtry, czas migawki, spójność z index.html
-  trends.test.ts     agregat wobec .f.json, progi aktywności, spójność z trends.html
-  dom_smoke.ts       atrapa DOM-u dla obu widoków — odpalana z testów w podprocesie
+  dashboard.test.ts  przekrój: filtry, wartownik −1, czas migawki, spójność z index.html, smoke
+  trends.test.ts     historia: agregat serwerowy, trends.json, history.js, klient == serwer
+  dom_smoke.ts       atrapa DOM-u — dwa scenariusze, odpalane z testów w podprocesie
   fixtures/          zrzut strony rankingu + próbka snapshotu w starym schemacie
 docs/                audyty i notatki
 .github/workflows/   deploy.yml (check + publikacja), ci.yml (pull requesty)
@@ -56,7 +57,7 @@ AGENTS.md            ten plik — instrukcje dla agenta
 CLAUDE.md            wskaźnik na AGENTS.md (Claude Code)
 ```
 
-Kod ma ~3,4 tys. linii łącznie z testami. Da się go przeczytać w całości i **warto** to
+Kod ma ~4,4 tys. linii łącznie z testami. Da się go przeczytać w całości i **warto** to
 zrobić przed większą zmianą — to szybsze niż zgadywanie.
 
 ---
@@ -72,7 +73,7 @@ bun run scrape aether  # jeden świat
 bun run scrape aether,tempest 2000   # wybrane światy, własny interwał w ms (min. 250)
 
 bun run serve          # http://localhost:3000 — dashboard lokalnie
-bun test               # 135 testów
+bun test               # 165 testów
 bun run typecheck
 bun run rebuild        # utrzymanie danych: migracja starych schematów + manifest + trendy
 ```
@@ -126,8 +127,9 @@ wyszukiwarka graczy.
 ### `public/trends.json` — historia, nie migawka
 
 Zwinięta historia wszystkich światów, po jednej liczbie na migawkę zamiast setek tysięcy
-wierszy: 24 KB surowo, **9 KB po gzipie na komplet 202 migawek**. Czyta go wyłącznie
-`public/trends.js`; dashboard migawki go nie dotyka.
+wierszy: 24 KB surowo, **9 KB po gzipie na komplet 202 migawek**. To **domyślna** ścieżka
+historii — dopóki filtr jest domyślny, widok rysuje wykresy wyłącznie z tego pliku i nie
+pobiera ani jednej migawki.
 
 ```json
 { "schema": 1, "builtAt": "...", "worlds": { "aether": {
@@ -138,13 +140,43 @@ wierszy: 24 KB surowo, **9 KB po gzipie na komplet 202 migawek**. Czyta go wył�
 
 Kolumnowo, wiersz *i* każdej kolumny to ta sama migawka — ta sama konwencja, co para
 `.f.json`/`.n.json`. **Koszyki `act` są rozłączne**, więc „aktywni ≤7 dni” to suma dwóch
-pierwszych; `ACTIVITY_THRESHOLDS` w `trends.js` robi to sumowanie i jest jedynym miejscem,
+pierwszych; `ACTIVITY_THRESHOLDS` w `history.js` robi to sumowanie i jest jedynym miejscem,
 gdzie wolno mieszać te dwie skale. Przebudowywany w całości przez `bun run rebuild` i na
 końcu każdej rundy scrapa; migawka bez `startedAt` wypada z niego, bo nie ma jej gdzie
 postawić na osi czasu.
 
 Pełne uzasadnienie kształtu i pułapki metryki „ostatnio online”:
 [`docs/2026-08-04-spec-trendy.md`](docs/2026-08-04-spec-trendy.md).
+
+### Historia pod filtrem — druga ścieżka tych samych wykresów
+
+Gdy filtr przestaje być domyślny, agregat przestaje wystarczać: `trends.json` zna tylko sumy
+globalne. Widok dociąga wtedy `.f.json` **tego jednego świata** (0,2-1,9 MB po gzipie),
+konwertuje je do tablic typowanych i liczy historię sam — dokładnie, bez koszykowania.
+
+Sercem jest `summarizeFiltered` z `filters.js`: zwraca `{ total, act[5], byProf[6] }`, czyli
+**dokładnie kształt wiersza `trends.json`**. Dlatego `activeCounts`, `changeRows`, `summarize`
+i całe rysowanie nie odróżniają obu ścieżek i nie mają dla nich osobnego kodu. Przy filtrze
+domyślnym obie muszą dać co do liczby to samo, co `summarizeSnapshot` z `src/trends.ts` —
+sprawdza to test na wszystkich 202 migawkach (~0,9 s).
+
+Pułapki tej ścieżki:
+
+- **`null` w `days` staje się `−1`** — tablice typowane nie umieją `null`-a. `−1 > maxDays`
+  jest **fałszem**, więc sprawdzenie `isNeverOnline` musi iść **przed** progiem, inaczej
+  konta nigdy nieużywane wpadną do każdego progu aktywności. Jedno miejsce: `shared.js`.
+- **Niewczytana migawka nie dostaje punktu.** Żadnej interpolacji, żadnego podstawiania
+  niefiltrowanej liczby z agregatu — dziura robi dłuższy odstęp, a `perDay` dzieli przez
+  realny czas, więc pozostaje uczciwy.
+- **Mianownikiem „udziału” jest populacja niefiltrowana**, nie przefiltrowany zbiór (ten
+  sumowałby się do 100%).
+- **Filtr aktywności zjada progi szersze od siebie** — przy „≤ 3 dni” próg „≤ 7 dni” liczy
+  tych samych graczy, co wykres pasujących. `usableThresholds` je usuwa.
+- Pamięć trzyma najwyżej **dwa światy**, a `HISTORY_WINDOW` (12) ogranicza liczbę migawek.
+  Dziś okno niczego nie ucina — najdłuższa historia ma 11 migawek.
+
+Pomiary, budżet transferu i uzasadnienie scalenia widoków:
+[`docs/2026-08-04-spec-widok-swiata.md`](docs/2026-08-04-spec-widok-swiata.md).
 
 ---
 
@@ -156,8 +188,11 @@ Decyzje, które wyglądają dziwnie, dopóki nie znasz powodu:
 |---|---|
 | Migawka w dwóch plikach | Nicki to ~2/3 objętości, a filtrowaniu są zbędne. Podział ściął `public/` z 620 MB do 118 MB. |
 | `trends.json` liczy tylko to, co rysuje widok | Poprzedni moduł agregatów skasowano za pola bez konsumenta. Ten ma populację, aktywność i profesje — bez rozkładu poziomów (43× większy plik) i bez honoru, których widok historii nie czyta. |
-| Trendy w osobnym pliku, nie w manifeście | Manifest jest pobierany przy każdym wejściu na dashboard migawki, który historii nie potrzebuje. 9 KB dokładane wszystkim to koszt bez pokrycia. |
-| `shared.js` obok `app.js` | `app.js` startuje dashboard od razu po imporcie, więc pożyczenie z niego jednej funkcji wywala trends.html na obcym markupie. |
+| Trendy w osobnym pliku, nie w manifeście | Manifest jest pobierany przy każdym wejściu, a historii bez filtra można nie rysować wcale. 9 KB dokładane wszystkim to koszt bez pokrycia. |
+| Jeden widok zamiast dwóch stron | Przekrój i historia pod tym samym filtrem to jedyne pytanie, na które nie dało się odpowiedzieć wcześniej. Przy okazji znikła duplikacja CSS i drugi stan URL. `trends.html` został przekierowaniem, żeby rozesłane linki działały. |
+| Historia dociągana leniwie, dopiero po ruchu filtrem | Filtr domyślny obsługuje `trends.json` za 9 KB. Kto nie filtruje, nie płaci za 1,9 MB gordiona. |
+| Filtrowanie u klienta zamiast prekompilowanego cube'a | Przelot po 813 tys. wierszy to 2,8-7 ms — koszykowanie kosztowałoby dokładność i nie objęłoby honoru (−35 .. 1,2 mln). |
+| Logika w `filters.js`/`history.js`, nie w `app.js` | `app.js` startuje widok od razu po imporcie, więc modułu z nim zszytego nie da się przetestować poza przeglądarką. Pilnuje tego test. |
 | Chart.js wendorowany | CDN bez SRI to zależność, której nikt nie kontroluje; lokalnie działa też offline. |
 | Retry per strona | Wcześniej cofał cały świat do strony 1 — dla gordiona (797 stron) do 4× po ~13 min. |
 | Wadliwe wiersze pomijane | Jeden dziwny wiersz nie może wywalać całego świata; przerywamy dopiero powyżej 1% na stronę. |
@@ -176,6 +211,7 @@ Pełne uzasadnienia i historia: audyty niżej.
 | [`docs/2026-08-01-audyt-2.md`](docs/2026-08-01-audyt-2.md) | Audyt #2 po naprawach: co się obroniło, co poprawione, **dług na przyszłość i lista pomysłów**. |
 | [`docs/2026-08-01-budzet-rozmiaru.md`](docs/2026-08-01-budzet-rozmiaru.md) | Ile rund scrapa zostało do limitu 1 GB na Pages (~65 ≈ 2 lata) i co zrobić, gdy się skończy. |
 | [`docs/2026-08-04-spec-trendy.md`](docs/2026-08-04-spec-trendy.md) | Spec widoku trendów jednego świata w czasie: co pokazać, `trends.json` (**9,0 KB gzip na całą historię**), pułapki metryki „ostatnio online”. |
+| [`docs/2026-08-04-spec-widok-swiata.md`](docs/2026-08-04-spec-widok-swiata.md) | Spec scalenia `index.html` i `trends.html` w jeden widok per świat, z filtrowaniem **całej historii** u klienta: pomiary (**7 ms na 813 tys. wierszy**), leniwe pobieranie, pułapki i próg okna migawek. |
 | [`README.md`](README.md) | Instrukcja obsługi dla człowieka. |
 
 ---

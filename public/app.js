@@ -1,171 +1,44 @@
-// Logika dashboardu jednej migawki. Górna część jest czysta (bez DOM-u) i testowana
-// w test/dashboard.test.ts; warstwa DOM-owa startuje na końcu pliku.
-// Widok historii wielu migawek mieszka osobno, w trends.js.
-
-import { PROF, PROF_COLORS, activityBucket, capitalize, formatSnapshotDate } from "./shared.js";
-
-// Zakresy koszyków aktywności (w dniach). Koszyk 4 to konta nigdy nieużywane.
-// Koszyki są rozłączne, nie skumulowane — etykiety muszą to oddawać, bo „≤ 7 dni”
-// przy koszyku 1-7 sugerowało, że to wszyscy z ostatniego tygodnia, a to tylko ci,
-// których nie ma w koszyku „< 24h”.
-export const ACTIVITY_BOUNDS = [
-  [0, 0],
-  [1, 7],
-  [8, 30],
-  [31, Infinity],
-];
-
-/**
- * Etykieta koszyka przycięta do aktywnego progu — przy filtrze „14 dni” koszyk
- * 8-30 zawiera realnie 8-14 dni i tak ma być podpisany.
- */
-export function activityLabel(bucket, maxDays = Infinity) {
-  if (bucket === 4) return "nigdy";
-
-  const [from, to] = ACTIVITY_BOUNDS[bucket];
-  const hi = Math.min(to, maxDays);
-  if (from === 0) return "< 24h";
-  if (hi === Infinity) return `> ${from - 1} dni`;
-  if (from === hi) return from === 1 ? "1 dzień" : `${from} dni`;
-  return `${from}-${hi} dni`;
-}
-
-/**
- * Koszyki, które przy danym progu mogą być niepuste. Bez tego widok pokazywał
- * „> 30 dni: 0 · nigdy: 0” — zera z definicji, wyglądające jak zepsute dane.
- */
-export function visibleActivityBuckets(maxDays = Infinity) {
-  if (maxDays === Infinity) return [0, 1, 2, 3, 4];
-  return ACTIVITY_BOUNDS.map(([from], bucket) => (from <= maxDays ? bucket : null)).filter((b) => b !== null);
-}
-
-// ── Dane snapshotu ──────────────────────────────────────────────────────────
+// Widok jednego świata: przekrój wybranej migawki i historia wszystkich, pod jednym
+// filtrem. To jedyny moduł, który dotyka DOM-u — cała logika liczenia siedzi
+// w `filters.js` i `history.js` i jest testowana bez przeglądarki.
 //
-// `<ts>.f.json` trzyma kolumnowo to, czego potrzebuje filtrowanie:
-// level[] / profession[] / honor[] / days[]. Wiersz i ↔ ranga i+1.
-// Nicki siedzą w osobnym `<ts>.n.json` — do filtrów są zbędne, a to 2/3 objętości.
+// Dwie ścieżki danych, celowo nierównoważne:
+//   • filtr domyślny → historia z `trends.json` (9 KB), pobranego i tak
+//   • filtr ustawiony → historia liczona z `.f.json` tego świata (do 1,9 MB),
+//     dociąganych dopiero po pierwszym ruchu filtrem i dopełniających wykres
+//     migawka po migawce
+// Kto nie filtruje, nie płaci za dokładność ani bajtem.
 
-// ── Filtry ──────────────────────────────────────────────────────────────────
+import { PROF, PROF_COLORS, capitalize, formatSnapshotDate, shortDate, utcTime } from "./shared.js";
+import {
+  activityLabel,
+  countByActivity,
+  countByLevel,
+  filtersFromParams,
+  filtersToParams,
+  isDefaultFilters,
+  totalsFromCounts,
+  visibleActivityBuckets,
+} from "./filters.js";
+import {
+  activeCounts,
+  buildFilteredTrend,
+  cachedSnapshots,
+  changeRows,
+  loadHistory,
+  loadedCount,
+  shareSeries,
+  snapshotEntries,
+  summarize,
+  thresholdByKey,
+  toTypedSnapshot,
+  usableThresholds,
+  viewFromParams,
+  viewToParams,
+  windowedEntries,
+} from "./history.js";
 
-export function emptyFilters() {
-  return {
-    minLevel: -Infinity,
-    maxLevel: Infinity,
-    minHonor: -Infinity,
-    maxHonor: Infinity,
-    maxDays: Infinity,
-    professions: new Set([1, 2, 3, 4, 5, 6]),
-  };
-}
-
-function matches(data, i, f) {
-  const level = data.level[i];
-  if (!level || level < f.minLevel || level > f.maxLevel) return false;
-  if (!f.professions.has(data.profession[i])) return false;
-
-  const honor = data.honor[i];
-  if (honor < f.minHonor || honor > f.maxHonor) return false;
-
-  // „nigdy online” wypada przy każdym progu aktywności
-  const days = data.days[i];
-  if (f.maxDays !== Infinity && (days === null || days === undefined || days > f.maxDays)) return false;
-  return true;
-}
-
-// ── Zliczanie ───────────────────────────────────────────────────────────────
-
-/** Mapa poziom → [liczba dla profesji 1..6]. */
-export function countByLevel(data, f) {
-  const counts = new Map();
-  for (let i = 0; i < data.count; i++) {
-    if (!matches(data, i, f)) continue;
-
-    const level = data.level[i];
-    let bucket = counts.get(level);
-    if (!bucket) {
-      bucket = [0, 0, 0, 0, 0, 0];
-      counts.set(level, bucket);
-    }
-    bucket[data.profession[i] - 1] += 1;
-  }
-  return counts;
-}
-
-export function countByActivity(data, f) {
-  const buckets = [0, 0, 0, 0, 0];
-  for (let i = 0; i < data.count; i++) {
-    if (!matches(data, i, f)) continue;
-    buckets[activityBucket(data.days[i])] += 1;
-  }
-  return buckets.map((count, bucket) => [bucket, count]);
-}
-
-export function totalsFromCounts(counts) {
-  const perProfession = [0, 0, 0, 0, 0, 0];
-  let total = 0;
-  for (const row of counts.values()) {
-    for (let p = 0; p < 6; p++) {
-      perProfession[p] += row[p];
-      total += row[p];
-    }
-  }
-  return { total, perProfession };
-}
-
-// ── Stan widoku w URL-u ─────────────────────────────────────────────────────
-//
-// Bez tego przycisk „kopiuj link do tego widoku” wysyłał widok domyślny —
-// ktoś, kto ustawił poziom 250-320 i honor > 100k, dzielił się czymś innym,
-// niż miał na ekranie.
-
-export function filtersToParams(f) {
-  const params = new URLSearchParams();
-  const put = (key, value) => {
-    if (Number.isFinite(value)) params.set(key, String(value));
-  };
-
-  put("minLevel", f.minLevel);
-  put("maxLevel", f.maxLevel);
-  put("minHonor", f.minHonor);
-  put("maxHonor", f.maxHonor);
-  put("maxDays", f.maxDays);
-
-  const profs = [...f.professions].sort((a, b) => a - b);
-  if (profs.length !== 6) params.set("prof", profs.join(","));
-
-  return params;
-}
-
-export function filtersFromParams(params) {
-  const num = (key, fallback) => {
-    const raw = params.get(key);
-    if (raw === null || raw === "") return fallback;
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : fallback;
-  };
-
-  const rawProf = params.get("prof");
-  const parsed = (rawProf ?? "")
-    .split(",")
-    .map(Number)
-    .filter((p) => Number.isInteger(p) && p >= 1 && p <= 6);
-
-  const maxDays = num("maxDays", Infinity);
-  return {
-    minLevel: num("minLevel", -Infinity),
-    maxLevel: num("maxLevel", Infinity),
-    minHonor: num("minHonor", -Infinity),
-    maxHonor: num("maxHonor", Infinity),
-    // Ujemny próg dni nie znaczy nic — traktujemy jak brak filtra zamiast
-    // po cichu pokazywać pustą stronę.
-    maxDays: maxDays < 0 ? Infinity : maxDays,
-    professions: new Set(parsed.length > 0 ? parsed : [1, 2, 3, 4, 5, 6]),
-  };
-}
-
-// ── Warstwa DOM ─────────────────────────────────────────────────────────────
-
-function setupDashboard() {
+function setupView() {
   const el = (id) => {
     const node = document.getElementById(id);
     if (!node) throw new Error(`Brak elementu #${id}`);
@@ -173,10 +46,22 @@ function setupDashboard() {
   };
 
   let manifest = null;
-  let data = null; // zawartość `<ts>.f.json` — komplet potrzebny do filtrowania
-  let chart = null;
-  let loadToken = 0; // odcina odpowiedzi porzuconych, wolniejszych żądań
+  let trends = null;
   let renderTimer = null;
+
+  // Historia jest kupowana świadomie: dopóki nikt nie ruszył filtra, `trends.json`
+  // wystarcza i nie ma powodu ściągać megabajtów.
+  let worldToken = 0; // unieważnia pobieranie po przełączeniu świata
+  let snapshotToken = 0; // to samo dla pojedynczej migawki przekroju
+  let progress = { loaded: 0, expected: 0, failed: 0, running: false };
+
+  const charts = {};
+  // Oś X jest liniowa w milisekundach epoki, więc odstępy 3-17 dni są widoczne jako
+  // różne. Chart.js ma do tego skalę czasu, ale wymaga adaptera dat, którego nie
+  // wendorujemy — podpisy generujemy sami, a podziałki stawiamy dokładnie w migawkach.
+  let tickValues = [];
+  let entriesByTime = new Map();
+  let thresholdKeys = ""; // ostatnio wypełniony zestaw progów, żeby nie kasować wyboru
 
   if (window.Chart) {
     Chart.defaults.color = "#a0a09a";
@@ -201,6 +86,8 @@ function setupDashboard() {
     });
   })();
 
+  // ── Odczyt stanu z formularza ─────────────────────────────────────────────
+
   function numberOr(id, fallback) {
     const value = el(id).value;
     if (value === "") return fallback;
@@ -219,6 +106,15 @@ function setupDashboard() {
       professions: new Set(
         [...el("profCheckboxes").querySelectorAll("input:checked")].map((cb) => Number(cb.value)),
       ),
+    };
+  }
+
+  function readView() {
+    return {
+      world: el("worldSelect").value,
+      date: el("snapshotSelect").value,
+      threshold: el("thresholdSelect").value,
+      share: el("modeSelect").value === "udzial",
     };
   }
 
@@ -246,7 +142,41 @@ function setupDashboard() {
     for (const cb of el("profCheckboxes").querySelectorAll("input")) cb.checked = true;
   }
 
-  function chartOptions() {
+  function writeUrlState() {
+    const params = filtersToParams(readFilters());
+    for (const [key, value] of viewToParams(readView())) params.set(key, value);
+    params.sort();
+    history.replaceState(null, "", `${location.pathname}?${params}`);
+  }
+
+  // ── Dane ──────────────────────────────────────────────────────────────────
+
+  const getWorlds = () => manifest?.worlds || [];
+  const currentWorld = () => el("worldSelect").value;
+  const currentWorldEntries = () => getWorlds().find((w) => w.name === currentWorld())?.files || [];
+  const selectedEntry = () => currentWorldEntries().find((f) => f.id === el("snapshotSelect").value);
+  const baseTrend = () => trends?.worlds[currentWorld()] ?? null;
+  const currentSnapshot = () => cachedSnapshots(currentWorld()).get(el("snapshotSelect").value) ?? null;
+
+  /** Migawki, które w ogóle mogą trafić na oś czasu: datowane i mieszczące się w oknie. */
+  function historyEntries() {
+    const base = baseTrend();
+    if (!base) return [];
+    const dated = new Set(base.id);
+    return windowedEntries(currentWorldEntries().filter((e) => dated.has(e.id)));
+  }
+
+  // ── Formatowanie liczb ────────────────────────────────────────────────────
+
+  const num = (n) => n.toLocaleString("pl-PL");
+  // Ułamki też po polsku — „−5,3%” obok „23 719” zamiast „−5.3%” z dwoma konwencjami naraz.
+  const dec = (n, digits = 1) =>
+    n.toLocaleString("pl-PL", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  const signed = (n, format = num) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${format(Math.abs(n))}`;
+
+  // ── Wykres przekroju: poziomy według profesji ─────────────────────────────
+
+  function levelChartOptions() {
     return {
       responsive: true,
       maintainAspectRatio: false,
@@ -254,7 +184,7 @@ function setupDashboard() {
       plugins: {
         title: { display: true, text: "Level według profesji", color: "#f2f2ef", font: { size: 14, weight: "600" } },
         legend: { display: false },
-        tooltip: { enabled: false, external: renderTooltip },
+        tooltip: { enabled: false, external: renderLevelTooltip },
       },
       scales: {
         y: { beginAtZero: true, stacked: true, ticks: { precision: 0 }, grid: { color: "rgba(255, 255, 255, 0.06)" } },
@@ -263,7 +193,7 @@ function setupDashboard() {
     };
   }
 
-  function renderTooltip({ chart, tooltip }) {
+  function renderLevelTooltip({ chart, tooltip }) {
     let node = document.getElementById("profTooltip");
     if (!node) {
       node = document.createElement("div");
@@ -319,7 +249,7 @@ function setupDashboard() {
     node.style.top = `${y}px`;
   }
 
-  function renderChart(counts) {
+  function renderLevelChart(counts) {
     const labels = [...counts.keys()].sort((a, b) => a - b);
     const datasets = Object.entries(PROF).map(([id, name]) => ({
       label: name,
@@ -332,20 +262,177 @@ function setupDashboard() {
     el("chartEmpty").hidden = labels.length > 0;
     el("professionChart").hidden = labels.length === 0;
 
-    if (!chart) {
-      chart = new Chart(el("professionChart"), { type: "bar", data: { labels, datasets }, options: chartOptions() });
+    if (!charts.professionChart) {
+      charts.professionChart = new Chart(el("professionChart"), {
+        type: "bar",
+        data: { labels, datasets },
+        options: levelChartOptions(),
+      });
       return;
     }
 
     // Podmiana danych zamiast destroy()/new Chart() — filtrowanie 40 tys.
     // wierszy przy każdym znaku w polu było zauważalnie zacinające.
-    chart.data.labels = labels;
-    chart.data.datasets = datasets;
-    chart.update();
+    charts.professionChart.data.labels = labels;
+    charts.professionChart.data.datasets = datasets;
+    charts.professionChart.update();
+  }
+
+  // ── Wykresy historii ──────────────────────────────────────────────────────
+
+  function timeChartOptions(title, { percent = false } = {}) {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: "nearest", axis: "x", intersect: false },
+      plugins: {
+        title: { display: true, text: title, color: "#f2f2ef", font: { size: 14, weight: "600" } },
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              const entry = entriesByTime.get(items[0].parsed.x);
+              if (!entry) return "";
+              // Godzina UTC, bo to ona tłumaczy skoki metryki „ostatnio online”.
+              return `${formatSnapshotDate(entry)} (${utcTime(entry.startedAt)} UTC)`;
+            },
+            label: (item) => `${item.dataset.label}: ${percent ? `${dec(item.parsed.y)}%` : num(item.parsed.y)}`,
+            footer: (items) => (entriesByTime.get(items[0].parsed.x)?.suspect ? "⚠ migawka może być obcięta" : ""),
+          },
+        },
+      },
+      scales: {
+        y: {
+          beginAtZero: percent,
+          ticks: { precision: percent ? 1 : 0, callback: (v) => (percent ? `${dec(v)}%` : num(v)) },
+          grid: { color: "rgba(255, 255, 255, 0.06)" },
+        },
+        x: {
+          type: "linear",
+          afterBuildTicks: (axis) => {
+            axis.ticks = tickValues.map((value) => ({ value }));
+          },
+          ticks: { callback: (v) => shortDate(v), maxRotation: 45, autoSkip: false },
+          grid: { color: "rgba(255, 255, 255, 0.04)" },
+        },
+      },
+    };
+  }
+
+  /** Punkt podejrzanej migawki rysujemy pusty — inaczej obcięty scrape wygląda jak spadek. */
+  function pointStyle(trend, color) {
+    return {
+      pointBackgroundColor: trend.suspect.map((s) => (s ? "transparent" : color)),
+      pointBorderColor: trend.suspect.map((s) => (s ? "#c98500" : color)),
+      pointBorderWidth: trend.suspect.map((s) => (s ? 2 : 1)),
+      pointRadius: trend.suspect.map((s) => (s ? 6 : 3)),
+      pointHoverRadius: 6,
+    };
+  }
+
+  function series(trend, values) {
+    return values.map((y, i) => ({ x: new Date(trend.startedAt[i]).getTime(), y }));
+  }
+
+  function drawChart(id, datasets, options) {
+    if (!charts[id]) {
+      charts[id] = new Chart(el(id), { type: "line", data: { datasets }, options });
+      return;
+    }
+    charts[id].data.datasets = datasets;
+    charts[id].options = options;
+    charts[id].update();
+  }
+
+  function renderHistoryCharts(trend, population, filters, share) {
+    // Przy filtrze domyślnym „udział pasujących w populacji” to z definicji 100% —
+    // wykres populacji zostaje wtedy w liczbach zamiast rysować płaską linię bez treści.
+    const filtered = !isDefaultFilters(filters);
+    const popShare = share && filtered;
+
+    drawChart(
+      "popChart",
+      [
+        {
+          label: filtered ? "Pasujących" : "Populacja",
+          data: series(trend, popShare ? shareSeries(trend.total, population) : trend.total),
+          borderColor: "#3987e5",
+          backgroundColor: "#3987e5",
+          tension: 0.15,
+          ...pointStyle(trend, "#3987e5"),
+        },
+      ],
+      timeChartOptions(
+        popShare
+          ? "Udział pasujących w populacji"
+          : filtered
+            ? "Pasujących filtrowi w czasie"
+            : "Populacja świata w czasie",
+        { percent: popShare },
+      ),
+    );
+
+    const threshold = thresholdByKey(el("thresholdSelect").value, filters.maxDays);
+    if (threshold) {
+      const counts = activeCounts(trend, threshold.key, filters.maxDays);
+      drawChart(
+        "actChart",
+        [
+          {
+            label: `Aktywni ${threshold.label}`,
+            data: series(trend, share ? shareSeries(counts, population) : counts),
+            borderColor: "#199e70",
+            backgroundColor: "#199e70",
+            tension: 0.15,
+            ...pointStyle(trend, "#199e70"),
+          },
+        ],
+        timeChartOptions(
+          share ? `Udział aktywnych ${threshold.label} w populacji` : `Aktywni ${threshold.label} w czasie`,
+          { percent: share },
+        ),
+      );
+    }
+
+    const profOptions = timeChartOptions(share ? "Udział profesji w populacji" : "Profesje w czasie", {
+      percent: share,
+    });
+    // Jedyny wykres z sześcioma seriami, więc jako jedyny potrzebuje legendy.
+    profOptions.plugins.legend = { display: true, position: "bottom", labels: { boxWidth: 12, usePointStyle: true } };
+
+    drawChart(
+      "profChart",
+      Object.entries(PROF)
+        .filter(([id]) => filters.professions.has(Number(id)))
+        .map(([id, name]) => {
+          const values = trend.byProf[id - 1];
+          return {
+            label: name,
+            data: series(trend, share ? shareSeries(values, population) : values),
+            borderColor: PROF_COLORS[id],
+            backgroundColor: PROF_COLORS[id],
+            tension: 0.15,
+            pointRadius: 3,
+            pointHoverRadius: 6,
+          };
+        }),
+      profOptions,
+    );
+  }
+
+  // ── Renderowanie tekstu ───────────────────────────────────────────────────
+
+  function renderMatchLine(matched, population) {
+    const share = population > 0 ? (matched / population) * 100 : 0;
+    el("matchLine").innerHTML =
+      `<span>Pasuje: <b>${num(matched)}</b></span>` +
+      `<span>z ${num(population)} w tej migawce</span>` +
+      `<span>(${dec(share, 1)}%)</span>`;
   }
 
   function renderStats(counts, activity, maxDays) {
-    const { total, perProfession } = totalsFromCounts(counts);
+    const { perProfession } = totalsFromCounts(counts);
 
     const badges = Object.entries(PROF)
       .map(([id, name]) => ({ name, color: PROF_COLORS[id], count: perProfession[id - 1] }))
@@ -360,7 +447,6 @@ function setupDashboard() {
       .join(" · ");
 
     el("stats").innerHTML = `
-      <div style="margin-bottom:6px">Razem: <b style="color:var(--text)">${total}</b></div>
       <div class="stats-line">${badges}</div>
       <div class="stats-line" style="margin-top:8px">${activityLine}</div>
     `;
@@ -382,13 +468,168 @@ function setupDashboard() {
     node.innerHTML = `<span aria-hidden="true">⚠</span><span><b>Ta migawka może być niekompletna.</b> ${suspect.reason}</span>`;
   }
 
+  function renderSummary(trend) {
+    const s = summarize(trend);
+    if (!s) {
+      el("summary").textContent = "—";
+      return;
+    }
+    const color = s.delta < 0 ? "#e66767" : s.delta > 0 ? "#199e70" : "var(--muted)";
+    const span = s.days === null ? "—" : `${Math.round(s.days)} dni`;
+
+    el("summary").innerHTML = `
+      <div style="margin-bottom:6px">Ostatnia migawka: <b style="color:var(--text)">${num(s.total)}</b></div>
+      <div class="stats-line">
+        <span>Zmiana od pierwszej migawki: <b style="color:${color}">${signed(s.delta)}</b>
+          <span style="color:${color}">(${signed(s.percent, dec)}%)</span></span>
+        <span>Migawek: <b style="color:var(--text)">${s.snapshots}</b></span>
+        <span>Okres: <b style="color:var(--text)">${span}</b></span>
+      </div>
+    `;
+  }
+
+  function renderTable(trend) {
+    const rows = changeRows(trend).reverse(); // najnowsze na górze
+    if (rows.length === 0) {
+      el("changeTable").innerHTML = "";
+      return;
+    }
+
+    const body = rows
+      .map(({ entry, total, delta, days, perDay }) => {
+        const color = delta < 0 ? "#e66767" : delta > 0 ? "#199e70" : "var(--muted)";
+        return `<tr>
+          <td>${formatSnapshotDate(entry)}${entry.suspect ? ' <span title="migawka może być obcięta" style="color:#c98500">⚠</span>' : ""}</td>
+          <td class="num">${days === null ? "—" : dec(days)}</td>
+          <td class="num">${num(total)}</td>
+          <td class="num" style="color:${color}">${signed(delta)}</td>
+          <td class="num" style="color:${color}">${perDay === null ? "—" : signed(perDay, dec)}</td>
+        </tr>`;
+      })
+      .join("");
+
+    el("changeTable").innerHTML = `
+      <table>
+        <thead><tr><th>Migawka</th><th class="num">Odstęp (dni)</th><th class="num">Populacja</th><th class="num">Zmiana</th><th class="num">Na dobę</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    `;
+  }
+
+  /**
+   * Progi szersze niż filtr aktywności znikają z wyboru: pod takim filtrem liczyłyby
+   * dokładnie tych samych graczy, co wykres pasujących, więc pokrywałyby się z nim
+   * w jedną linię wyglądającą na potwierdzenie czegoś.
+   */
+  function fillThresholdSelect(maxDays, preferred) {
+    const usable = usableThresholds(maxDays);
+    const keys = usable.map((t) => t.key).join(",");
+    if (keys !== thresholdKeys) {
+      thresholdKeys = keys;
+      el("thresholdSelect").innerHTML = usable.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
+    }
+    const chosen = thresholdByKey(preferred ?? el("thresholdSelect").value, maxDays);
+    if (chosen) el("thresholdSelect").value = chosen.key;
+
+    el("thresholdSelect").disabled = usable.length === 0;
+    el("actChartBox").hidden = usable.length === 0;
+    el("thresholdNote").hidden = usable.length === usableThresholds(Infinity).length;
+    if (!el("thresholdNote").hidden) {
+      const limit = `≤ ${maxDays === 0 ? "< 24h" : `${num(maxDays)} dni`}`;
+      el("thresholdNote").innerHTML =
+        `<span aria-hidden="true">ℹ</span><span><b>Filtr aktywności zawęził progi.</b> ` +
+        (usable.length === 0
+          ? `Każdy próg jest szerszy niż filtr (${limit}), więc wykres aktywnych rysowałby tę samą linię co wykres pasujących — ukryty.`
+          : `Progi szersze niż filtr (${limit}) zniknęły z wyboru: pod nim liczyłyby dokładnie tych samych graczy.`) +
+        `</span>`;
+    }
+    return usable;
+  }
+
+  function renderHistoryStatus(loaded, expected) {
+    const node = el("historyStatus");
+    if (expected === 0) {
+      node.textContent = "brak datowanych migawek";
+      return;
+    }
+    if (loaded >= expected) {
+      const failed = progress.failed > 0 ? ` · ${progress.failed} nie wczytano` : "";
+      node.textContent = `${expected} ${expected === 1 ? "migawka" : "migawek"}${failed}`;
+      return;
+    }
+    node.textContent = `wczytywanie dokładnych danych… ${loaded} z ${expected} migawek`;
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  function renderCrossSection(filters) {
+    const data = currentSnapshot();
+    const base = baseTrend();
+    if (!data) {
+      el("stats").textContent = "Ładowanie…";
+      el("matchLine").textContent = "Ładowanie…";
+      return;
+    }
+
+    const counts = countByLevel(data, filters);
+    const matched = totalsFromCounts(counts).total;
+    const i = base ? base.id.indexOf(el("snapshotSelect").value) : -1;
+
+    renderMatchLine(matched, i > -1 ? base.total[i] : data.count);
+    renderLevelChart(counts);
+    renderStats(counts, countByActivity(data, filters), filters.maxDays);
+  }
+
+  function renderHistory(filters) {
+    const base = baseTrend();
+    if (!base) {
+      el("historyStatus").textContent = "brak historii dla tego świata";
+      return;
+    }
+
+    const allowed = new Set(historyEntries().map((e) => e.id));
+    const { trend, population, loaded, expected } = buildFilteredTrend(
+      base,
+      cachedSnapshots(currentWorld()),
+      filters,
+      allowed,
+    );
+
+    renderHistoryStatus(loaded, expected);
+    el("partialNote").hidden = !progress.running || loaded >= expected;
+    if (!el("partialNote").hidden) {
+      el("partialNote").innerHTML =
+        `<span aria-hidden="true">⏳</span><span><b>Historia dopełnia się w tle.</b> ` +
+        `Narysowane są tylko migawki już wczytane (${loaded} z ${expected}) — brakującym punktom nie podstawiamy niczego zmyślonego.</span>`;
+    }
+
+    const usable = fillThresholdSelect(filters.maxDays);
+    const share = el("modeSelect").value === "udzial";
+
+    // Jeden punkt to poprawny stan, nie błąd — luvia dołączyła w ostatniej rundzie.
+    el("singlePoint").hidden = trend.id.length !== 1 || expected !== 1;
+    el("suspectNote").hidden = !trend.suspect.some((s) => s === 1);
+    el("onlineNote").hidden = usable.length === 0;
+
+    if (trend.id.length === 0) {
+      el("summary").textContent = "—";
+      el("changeTable").innerHTML = "";
+      return;
+    }
+
+    renderSummary(trend);
+    tickValues = trend.startedAt.map((s) => new Date(s).getTime());
+    entriesByTime = new Map(snapshotEntries(trend).map((e) => [new Date(e.startedAt).getTime(), e]));
+    renderHistoryCharts(trend, population, filters, share);
+    renderTable(trend);
+  }
+
   function render() {
-    if (!data) return;
+    if (!manifest || !trends) return;
     writeUrlState();
     const filters = readFilters();
-    const counts = countByLevel(data, filters);
-    renderChart(counts);
-    renderStats(counts, countByActivity(data, filters), filters.maxDays);
+    renderCrossSection(filters);
+    renderHistory(filters);
   }
 
   function scheduleRender() {
@@ -396,23 +637,41 @@ function setupDashboard() {
     renderTimer = setTimeout(render, 150);
   }
 
+  /** Zmiana filtra to moment, w którym agregat przestaje wystarczać. */
+  function onFilterChange() {
+    scheduleRender();
+    void ensureHistory();
+  }
+
+  // ── Pobieranie ────────────────────────────────────────────────────────────
+
   async function loadSnapshot(entry) {
     if (!entry) return;
-    const token = ++loadToken;
+    const token = ++snapshotToken;
+    const world = currentWorld();
+    const store = cachedSnapshots(world);
+
+    el("sourceInfo").textContent = entry.filters;
+    el("snapshotMeta").textContent = formatSnapshotDate(entry);
+
+    if (store.has(entry.id)) {
+      showSuspect(store.get(entry.id).suspect);
+      render();
+      return;
+    }
 
     el("error").textContent = "";
     el("stats").textContent = "Ładowanie…";
     showSuspect(null);
-    el("sourceInfo").textContent = entry.filters;
 
     try {
       const res = await fetch(entry.filters);
       if (!res.ok) throw new Error(`HTTP ${res.status} dla ${entry.filters}`);
       const json = await res.json();
       // Odpowiedź na porzucone żądanie — użytkownik zdążył przełączyć świat/datę.
-      if (token !== loadToken) return;
+      if (token !== snapshotToken) return;
 
-      data = json;
+      store.set(entry.id, toTypedSnapshot(json));
       showSuspect(json.suspect);
       render();
     } catch (e) {
@@ -421,9 +680,41 @@ function setupDashboard() {
     }
   }
 
-  const getWorlds = () => manifest?.worlds || [];
-  const currentWorldEntries = () => getWorlds().find((w) => w.name === el("worldSelect").value)?.files || [];
-  const selectedEntry = () => currentWorldEntries().find((f) => f.id === el("snapshotSelect").value);
+  /**
+   * Dociąga historię tego świata, jeśli filtr przestał być domyślny. Wywoływane przy
+   * każdej zmianie filtra, ale robi coś tylko raz na świat — reszta to sprawdzenie mapy.
+   */
+  async function ensureHistory() {
+    if (isDefaultFilters(readFilters())) return;
+    if (!manifest || !trends) return;
+
+    const world = currentWorld();
+    const entries = historyEntries();
+    const store = cachedSnapshots(world);
+    if (entries.length === 0 || loadedCount(store, entries) === entries.length) return;
+
+    const token = worldToken;
+    progress = { loaded: loadedCount(store, entries), expected: entries.length, failed: 0, running: true };
+    render();
+
+    const { failed } = await loadHistory(world, entries, {
+      isStale: () => token !== worldToken,
+      onProgress: (loaded, expected, failedCount) => {
+        if (token !== worldToken) return;
+        progress = { loaded, expected, failed: failedCount, running: true };
+        scheduleRender();
+      },
+    });
+
+    if (token !== worldToken) return;
+    progress = { loaded: loadedCount(store, entries), expected: entries.length, failed: failed.length, running: false };
+    if (failed.length > 0) {
+      el("error").textContent = `Nie udało się pobrać ${failed.length} migawek — historia jest niepełna.`;
+    }
+    render();
+  }
+
+  // ── Selecty ───────────────────────────────────────────────────────────────
 
   function fillWorldSelect(selected) {
     el("worldSelect").innerHTML = getWorlds()
@@ -440,37 +731,42 @@ function setupDashboard() {
     if (selected && files.some((f) => f.id === selected)) el("snapshotSelect").value = selected;
   }
 
-  function writeUrlState() {
-    const params = filtersToParams(readFilters());
-    params.set("world", el("worldSelect").value);
-    params.set("date", el("snapshotSelect").value);
-    params.sort();
-    history.replaceState(null, "", `${location.pathname}?${params}`);
-  }
-
   async function selectAndLoad() {
     writeUrlState();
     await loadSnapshot(selectedEntry());
+    await ensureHistory();
   }
 
   async function init() {
     try {
-      const res = await fetch("manifest.json");
-      if (!res.ok) throw new Error(`HTTP ${res.status} dla manifest.json`);
-      manifest = await res.json();
+      const [manifestRes, trendsRes] = await Promise.all([fetch("manifest.json"), fetch("trends.json")]);
+      if (!manifestRes.ok) throw new Error(`HTTP ${manifestRes.status} dla manifest.json`);
+      if (!trendsRes.ok) throw new Error(`HTTP ${trendsRes.status} dla trends.json`);
+      manifest = await manifestRes.json();
+      trends = await trendsRes.json();
 
       const params = new URLSearchParams(location.search);
-      fillWorldSelect(params.get("world"));
-      fillSnapshotSelect(params.get("date"));
+      const view = viewFromParams(params);
+      fillWorldSelect(view.world);
+      fillSnapshotSelect(view.date);
       applyFilters(filtersFromParams(params));
+      fillThresholdSelect(readFilters().maxDays, view.threshold);
+      el("modeSelect").value = view.share ? "udzial" : "liczba";
+
+      // Link z filtrami ma działać od razu — historia startuje bez czekania na ruch myszą.
       await selectAndLoad();
     } catch (e) {
       el("error").textContent = String(e?.message || e);
       el("stats").textContent = "—";
+      el("matchLine").textContent = "—";
     }
   }
 
+  // ── Zdarzenia ─────────────────────────────────────────────────────────────
+
   el("worldSelect").addEventListener("change", async () => {
+    worldToken += 1; // porzuca historię poprzedniego świata
+    progress = { loaded: 0, expected: 0, failed: 0, running: false };
     fillSnapshotSelect();
     await selectAndLoad();
   });
@@ -479,13 +775,17 @@ function setupDashboard() {
   el("onlinePreset").addEventListener("change", () => {
     const value = el("onlinePreset").value;
     el("onlineValue").value = value === "all" ? "" : value;
-    scheduleRender();
+    onFilterChange();
   });
 
   for (const id of ["minLevel", "maxLevel", "minHonor", "maxHonor", "onlineValue"]) {
-    el(id).addEventListener("input", scheduleRender);
+    el(id).addEventListener("input", onFilterChange);
   }
-  el("profCheckboxes").addEventListener("change", scheduleRender);
+  el("profCheckboxes").addEventListener("change", onFilterChange);
+
+  for (const id of ["thresholdSelect", "modeSelect"]) {
+    el(id).addEventListener("change", scheduleRender);
+  }
 
   el("resetBtn").addEventListener("click", () => {
     resetFilters();
@@ -509,8 +809,8 @@ function setupDashboard() {
 // trafił tu wcześniej, czekamy na DOM zamiast wywalać się na brakującym #id.
 if (typeof document !== "undefined") {
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", setupDashboard);
+    document.addEventListener("DOMContentLoaded", setupView);
   } else {
-    setupDashboard();
+    setupView();
   }
 }

@@ -1,20 +1,19 @@
 // Atrapa DOM-u dla warstwy widokowej. Uruchamiana w osobnym procesie przez
-// trends.test.ts i dashboard.test.ts — `globalThis.document` ustawione tutaj
-// sprawiłoby, że import app.js w innym pliku testowym wystartowałby dashboard
-// na obcym markupie.
+// dashboard.test.ts — `globalThis.document` ustawione tutaj sprawiłoby, że import
+// app.js w innym pliku testowym wystartowałby widok na obcym markupie.
 //
 // Statyczne testy sprawdzają tylko, czy każde `el("...")` ma swój węzeł w HTML-u.
 // Ten przepuszcza prawdziwe dane z public/ przez prawdziwy render, więc łapie to,
 // czego tamte nie widzą: wyjątek w renderze, pustą serię, wykres bez punktów.
 //
-//   bun test/dom_smoke.ts trends
-//   bun test/dom_smoke.ts app
+//   bun test/dom_smoke.ts default    — filtr domyślny: historia z trends.json
+//   bun test/dom_smoke.ts filtered   — filtr ustawiony: historia z surowych .f.json
 //
 // Atrapa musi udawać przeglądarkę w dwóch miejscach, w których kod na nią liczy:
 // `<select>` po ustawieniu innerHTML sam wybiera pierwszą opcję, a
 // `querySelectorAll` schodzi w głąb drzewa (checkboxy siedzą w `<label>`).
 
-const page = process.argv[2] === "app" ? "app" : "trends";
+const scenario = process.argv[2] === "filtered" ? "filtered" : "default";
 
 function makeNode(id = "", tag = "") {
   const node: any = {
@@ -23,6 +22,7 @@ function makeNode(id = "", tag = "") {
     value: "",
     textContent: "",
     hidden: false,
+    disabled: false,
     checked: true,
     style: {},
     children: [] as any[],
@@ -54,7 +54,7 @@ function makeNode(id = "", tag = "") {
   return node;
 }
 
-const markup = await Bun.file(`public/${page === "app" ? "index" : "trends"}.html`).text();
+const markup = await Bun.file("public/index.html").text();
 const nodes: Record<string, any> = {};
 for (const [, id] of markup.matchAll(/id="([^"]+)"/g)) nodes[id!] = makeNode(id!);
 
@@ -74,8 +74,10 @@ class FakeChart {
   }
 }
 
-// Dashboard migawki dostaje filtry w URL-u, żeby liczby dało się porównać z `.f.json`.
-const search = page === "app" ? "?world=aether&minLevel=200&maxLevel=250&prof=1,4" : "?world=fobos";
+// Scenariusz „filtered” dostaje filtry w URL-u, żeby liczby dało się porównać z `.f.json`
+// i żeby historia ruszyła bez czekania na ruch myszą — tak samo jak rozesłany link.
+const search =
+  scenario === "filtered" ? "?world=aether&minLevel=200&maxLevel=250&prof=1,4" : "?world=fobos";
 
 Object.assign(globalThis, {
   document: {
@@ -88,7 +90,7 @@ Object.assign(globalThis, {
   },
   window: { Chart: FakeChart, innerWidth: 1400, innerHeight: 900 },
   Chart: FakeChart,
-  location: { search, pathname: `/${page}.html`, href: "" },
+  location: { search, pathname: "/index.html", href: "" },
   history: { replaceState() {} },
   fetch: async (url: string) => ({
     ok: true,
@@ -97,65 +99,104 @@ Object.assign(globalThis, {
   }),
 });
 
+const trends = JSON.parse(await Bun.file("public/trends.json").text());
+const world = scenario === "filtered" ? "aether" : "fobos";
+const expectedPoints = trends.worlds[world].total.length;
+
+async function waitFor(check: () => boolean, timeoutMs = 20_000) {
+  const started = Date.now();
+  while (!check() && Date.now() - started < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
 // Import uruchamia setup widoku, bo `document` już istnieje.
-await import(`${process.cwd()}/public/${page === "app" ? "app" : "trends"}.js`);
+await import(`${process.cwd()}/public/app.js`);
+
+// Filtrowana historia dociąga dziesięć plików `.f.json`, więc czekamy na komplet punktów,
+// a nie na stały czas — inaczej test mierzyłby prędkość dysku.
+await waitFor(() => (charts.popChart?.data.datasets[0]?.data.length ?? 0) >= expectedPoints);
 await new Promise((resolve) => setTimeout(resolve, 300));
 
 const text = (id: string) => nodes[id]!.innerHTML.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-const result: Record<string, unknown> = { error: nodes.error!.textContent };
+const chartShape = (id: string) => ({
+  series: charts[id]?.data.datasets.length ?? 0,
+  points: charts[id]?.data.datasets[0]?.data.length ?? 0,
+  title: charts[id]?.options.plugins.title.text ?? null,
+  label: charts[id]?.data.datasets[0]?.label ?? null,
+  firstX: charts[id]?.data.datasets[0]?.data[0]?.x ?? null,
+  lastY: charts[id]?.data.datasets[0]?.data.at(-1)?.y ?? null,
+});
 
-if (page === "app") {
-  const chart = charts.professionChart;
-  Object.assign(result, {
-    stats: text("stats"),
-    professionCheckboxes: nodes.profCheckboxes!.querySelectorAll("input").length,
-    series: chart?.data.datasets.length ?? 0,
-    levels: chart?.data.labels.length ?? 0,
-    // Suma po wszystkich seriach = liczba graczy spełniających filtry z URL-a.
-    matched:
-      chart?.data.datasets.reduce(
-        (sum: number, ds: { data: number[] }) => sum + ds.data.reduce((a, b) => a + b, 0),
-        0,
-      ) ?? 0,
-    source: nodes.sourceInfo!.textContent,
-    suspectHidden: nodes.suspect!.hidden,
-  });
-} else {
-  const chartShape = (id: string) => ({
-    series: charts[id]?.data.datasets.length ?? 0,
-    points: charts[id]?.data.datasets[0]?.data.length ?? 0,
-    title: charts[id]?.options.plugins.title.text ?? null,
-    firstX: charts[id]?.data.datasets[0]?.data[0]?.x ?? null,
-  });
-  const fireChange = () => nodes.worldSelect!.handlers[0]!();
+const result: Record<string, unknown> = {
+  error: nodes.error!.textContent,
+  matchLine: text("matchLine"),
+  stats: text("stats"),
+  summary: text("summary"),
+  historyStatus: nodes.historyStatus!.textContent,
+  professionCheckboxes: nodes.profCheckboxes!.querySelectorAll("input").length,
+  source: nodes.sourceInfo!.textContent,
+  snapshotMeta: nodes.snapshotMeta!.textContent,
+  suspectHidden: nodes.suspect!.hidden,
+  suspectNoteHidden: nodes.suspectNote!.hidden,
+  singlePointHidden: nodes.singlePoint!.hidden,
+  partialNoteHidden: nodes.partialNote!.hidden,
+  thresholdNoteHidden: nodes.thresholdNote!.hidden,
+  actChartHidden: nodes.actChartBox!.hidden,
+  levels: charts.professionChart?.data.labels.length ?? 0,
+  // Suma po wszystkich seriach histogramu = liczba graczy spełniających filtry z URL-a.
+  matched:
+    charts.professionChart?.data.datasets.reduce(
+      (sum: number, ds: { data: number[] }) => sum + ds.data.reduce((a, b) => a + b, 0),
+      0,
+    ) ?? 0,
+  charts: {
+    popChart: chartShape("popChart"),
+    actChart: chartShape("actChart"),
+    profChart: chartShape("profChart"),
+  },
+  tableRows: (nodes.changeTable!.innerHTML.match(/<tr>/g) ?? []).length,
+  table: text("changeTable"),
+};
 
-  Object.assign(result, {
-    summary: text("summary"),
-    charts: { popChart: chartShape("popChart"), actChart: chartShape("actChart"), profChart: chartShape("profChart") },
-    tableRows: (nodes.changeTable!.innerHTML.match(/<tr>/g) ?? []).length,
-    table: text("changeTable"),
-    singlePointHidden: nodes.singlePoint!.hidden,
-    suspectHidden: nodes.suspectNote!.hidden,
-  });
-
+if (scenario === "default") {
   // Przełączenie na udział i najkrótszy próg — drugi przebieg renderu, po chart.update().
   nodes.modeSelect!.value = "udzial";
   nodes.thresholdSelect!.value = "24h";
-  fireChange();
+  nodes.modeSelect!.handlers[0]!();
+  await new Promise((resolve) => setTimeout(resolve, 400));
+
   result.afterToggle = {
     title: charts.actChart.options.plugins.title.text,
     updates: charts.actChart.updates,
     values: charts.actChart.data.datasets[0].data.map((p: { y: number }) => p.y),
+    // Populacja przy filtrze domyślnym zostaje w liczbach: udział populacji
+    // w populacji to 100% i płaska linia bez treści.
+    popTitle: charts.popChart.options.plugins.title.text,
   };
 
   // Świat z jedną migawką — poprawny stan, nie błąd.
   nodes.worldSelect!.value = "luvia";
   nodes.modeSelect!.value = "liczba";
-  fireChange();
+  await nodes.worldSelect!.handlers[0]!();
+  await new Promise((resolve) => setTimeout(resolve, 400));
+
   result.singleSnapshotWorld = {
     points: charts.popChart.data.datasets[0].data.length,
     noticeHidden: nodes.singlePoint!.hidden,
     table: nodes.changeTable!.innerHTML,
+  };
+} else {
+  // Filtr aktywności węższy niż progi — wykres aktywnych nie ma czego pokazać.
+  nodes.onlineValue!.value = "3";
+  nodes.onlineValue!.handlers[0]!();
+  await new Promise((resolve) => setTimeout(resolve, 500));
+
+  result.afterActivityFilter = {
+    thresholdOptions: (nodes.thresholdSelect!.innerHTML.match(/<option/g) ?? []).length,
+    noteHidden: nodes.thresholdNote!.hidden,
+    note: text("thresholdNote"),
+    actHidden: nodes.actChartBox!.hidden,
   };
 }
 

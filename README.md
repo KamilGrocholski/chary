@@ -21,8 +21,11 @@ margonem.pl/ladder  ──scrape──►  public/worlds/<świat>/<ts>.f.json   
                           ▼                               ▼
                   public/manifest.json            public/trends.json
                           │                               │
-                          ▼                               ▼
-                  Migawka (index.html)            Trendy (trends.html)
+                          └───────────────┬───────────────┘
+                                          ▼
+                              Widok świata (index.html)
+                          przekrój migawki + historia w czasie,
+                                pod tym samym filtrem
 ```
 
 - **Scraper** (`src/world_scraper.ts`) — przechodzi po stronach rankingu każdego świata i zapisuje snapshot.
@@ -30,22 +33,27 @@ margonem.pl/ladder  ──scrape──►  public/worlds/<świat>/<ts>.f.json   
 - **Podział snapshotu** (`src/snapshot.ts`) — zapis do dwóch plików o tej samej kolejności wierszy.
 - **Manifest** (`public/manifest.json`) — indeks snapshotów per świat, z linkiem do obu plików.
 - **Trendy** (`src/trends.ts` → `public/trends.json`) — zwinięta historia każdego świata, po jednej liczbie na migawkę.
-- **Migawka** (`public/index.html` + `public/app.js`) — wybór świata i daty, filtry (poziom, honor, profesja, ostatnia aktywność), wykres rozkładu poziomów wg profesji.
-- **Trendy** (`public/trends.html` + `public/trends.js`) — jak zmieniała się populacja, aktywność i rozkład profesji jednego świata przez wszystkie migawki.
+- **Widok świata** (`public/index.html` + `public/app.js`) — wybór świata, jeden panel filtrów (poziom, honor, profesja, ostatnia aktywność), a pod nim dwie sekcje: **przekrój** wybranej migawki (rozkład poziomów wg profesji) i **historia** wszystkich migawek (populacja, aktywność, profesje, tabela zmian). Filtr rządzi obiema.
+- **Logika** (`public/filters.js`, `public/history.js`, `public/shared.js`) — filtrowanie, zliczanie i budowa serii, bez DOM-u, testowane bez przeglądarki.
 
 Cały `public/` jest statyczny — nie ma serwera aplikacyjnego, więc idealnie nadaje się pod Pages.
 
-### Skąd dashboard bierze dane
+### Skąd widok bierze dane
 
-Wyłącznie z `.f.json`, zawsze — więc **wszystkie filtry są dokładne**, także honor i „ostatnio online" (dowolny próg dni, nie tylko presety). Plik trzyma cztery tablice liczb, po jednej na kolumnę, więc jest mały: 97 KB po gzipie dla aethera, 180 KB dla największego `gordiona`. Pages serwuje JSON skompresowany, więc to realny transfer.
+**Przekrój** — zawsze z jednego `.f.json`, więc wszystkie filtry są dokładne, także honor i „ostatnio online" (dowolny próg dni, nie tylko presety). Plik trzyma cztery tablice liczb, po jednej na kolumnę, więc jest mały: 97 KB po gzipie dla aethera, 180 KB dla największego `gordiona`.
+
+**Historia** ma dwie ścieżki i to jest sedno tego widoku:
+
+| kiedy | skąd | ile |
+|---|---|---|
+| filtr domyślny | `public/trends.json` | **9 KB gzip na całą historię wszystkich światów** |
+| filtr ustawiony | `.f.json` tego jednego świata | 0,2-1,9 MB gzip, dociągane w tle po pierwszym ruchu filtrem |
+
+Kto nie filtruje, nie płaci za dokładność ani bajtem. Kto filtruje, dostaje odpowiedź policzoną z surowych wierszy — przelot po całej historii gordiona (813 tys. wierszy) trwa **2,8-7 ms**, więc żaden prekompilowany agregat nie byłby tego wart. Punkty pojawiają się na wykresie w miarę pobierania; migawka jeszcze niewczytana **nie dostaje punktu**, zamiast dostać zmyślony.
+
+`trends.json` trzyma po jednej liczbie na migawkę: populację, pięć rozłącznych koszyków aktywności i rozbicie na profesje. Przebudowuje się sam po każdej rundzie scrapa i przy `bun run rebuild`.
 
 Nicki i `charId` leżą osobno w `.n.json` i nie są pobierane wcale — filtrowaniu są niepotrzebne, a to ~połowa objętości snapshotu. Pobierze je dopiero przyszła wyszukiwarka graczy i widok progresji.
-
-### Skąd widok trendów bierze dane
-
-Wyłącznie z `public/trends.json` — **9 KB po gzipie na całą historię wszystkich światów**. Te same wykresy zbudowane z surowych `.f.json` kosztowałyby 14,9 MB i 5,6 mln wierszy do sparsowania, więc przełączanie świata byłoby sekundami zamiast natychmiast.
-
-Plik trzyma po jednej liczbie na migawkę: populację, pięć rozłącznych koszyków aktywności i rozbicie na profesje. Przebudowuje się sam po każdej rundzie scrapa i przy `bun run rebuild`.
 
 > **Uwaga na metrykę „ostatnio online".** Scrape leci ręcznie, raz o 4 rano, raz o 21, w różne dni tygodnia — a jedna runda trwa ~2 h. Przy populacji zmieniającej się o 0,6% próg „< 24h" waha się o ~15%. Do oceny trendu miarodajniejsze są progi „≤ 7 dni" i „≤ 30 dni"; widok pokazuje wszystkie trzy i podaje godzinę UTC każdej migawki. Szczegóły: [`docs/2026-08-04-spec-trendy.md`](docs/2026-08-04-spec-trendy.md).
 
@@ -136,12 +144,12 @@ Chart.js jest wendorowany w `public/vendor/chart.umd.min.js` (wersja **4.4.7**),
 curl -sL https://cdn.jsdelivr.net/npm/chart.js@<wersja>/dist/chart.umd.min.js -o public/vendor/chart.umd.min.js
 ```
 
-Po podmianie zaktualizuj numer wersji tutaj oraz w komentarzach w `public/index.html` i `public/trends.html`.
+Po podmianie zaktualizuj numer wersji tutaj oraz w komentarzu w `public/index.html`.
 
 ## Testy
 
 ```bash
-bun test        # parser (na prawdziwej stronie rankingu w test/fixtures) + logika obu widoków
+bun test        # parser (na prawdziwej stronie rankingu w test/fixtures) + cała logika widoku
 bun run typecheck
 ```
 
@@ -181,16 +189,17 @@ src/
 test/
   parser.test.ts     # testy parsera na zrzucie prawdziwej strony
   snapshot.test.ts   # format snapshotu i migracja ze starych schematów
-  dashboard.test.ts  # logika dashboardu, porównana z danymi sprzed migracji
-  trends.test.ts     # agregat porównany z .f.json, z których powstał
-  dom_smoke.ts       # atrapa DOM-u obu widoków (odpalana z testów w podprocesie)
+  dashboard.test.ts  # przekrój: filtry porównane z danymi sprzed migracji
+  trends.test.ts     # historia: agregat wobec .f.json, klient liczy to samo co serwer
+  dom_smoke.ts       # atrapa DOM-u, dwa scenariusze (odpalane z testów w podprocesie)
 public/              # to, co ląduje na GitHub Pages
-  index.html         # widok migawki (markup + style)
-  app.js             # logika widoku migawki
-  trends.html        # widok historii świata (markup + style)
-  trends.js          # logika widoku historii
-  shared.js          # kawałki wspólne obu widoków (bez DOM-u)
+  index.html         # cały widok świata (markup + style)
+  app.js             # jedyny moduł dotykający DOM-u
+  filters.js         # filtr, zliczanie, stan filtrów w URL-u (bez DOM-u)
+  history.js         # historia świata: progi, serie, pobieranie migawek (bez DOM-u)
+  shared.js          # stałe, czas, koszykowanie aktywności (bez DOM-u)
   vendor/            # Chart.js 4.4.7 (lokalnie, bez CDN-u)
+  trends.html        # przekierowanie na index.html (stare linki)
   manifest.json      # indeks snapshotów
   trends.json        # zwinięta historia wszystkich światów
   worlds/            # snapshoty per świat: <ts>.f.json + <ts>.n.json
