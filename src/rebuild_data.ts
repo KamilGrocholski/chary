@@ -9,10 +9,12 @@ import {
   splitNormalized,
   timestampFromFileName,
 } from "./snapshot.ts";
+import { rebuildTrends } from "./trends.ts";
 
 // Utrzymanie danych w public/:
 //   - migracja snapshotów z jednego pliku do pary `.f.json` / `.n.json`,
-//   - przebudowa manifestu.
+//   - przebudowa manifestu,
+//   - przebudowa trendów (`public/trends.json`).
 // Bezpieczne do wielokrotnego uruchamiania.
 
 const args = process.argv.slice(2);
@@ -66,6 +68,7 @@ for (const world of worldDirs) {
 }
 
 const manifest = await rebuildManifest();
+const { trends, skipped } = await rebuildTrends();
 
 if (migrated > 0) {
   process.stdout.write(`\nZmigrowano ${migrated} snapshotów: ${mb(before)} → ${mb(after)}\n`);
@@ -73,3 +76,10 @@ if (migrated > 0) {
   process.stdout.write(`\nNic do migracji — wszystkie snapshoty są już rozdzielone.\n`);
 }
 process.stdout.write(`Manifest: ${manifest.worlds.length} światów\n`);
+
+const points = Object.values(trends.worlds).reduce((sum, w) => sum + w.id.length, 0);
+process.stdout.write(`Trendy: ${Object.keys(trends.worlds).length} światów, ${points} migawek\n`);
+if (skipped > 0) {
+  // Migawka bez `startedAt` nie ma gdzie stanąć na osi czasu — ale musi być widać, że wypadła.
+  process.stdout.write(`  ⚠ pominięto ${skipped} migawek bez startedAt\n`);
+}

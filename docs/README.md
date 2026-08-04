@@ -11,6 +11,7 @@ Zaczynasz pracę nad projektem? Najpierw [`../AGENTS.md`](../AGENTS.md), nie ten
 | [`2026-08-01-audyt.md`](2026-08-01-audyt.md) | Audyt #1: czy dane są prawdziwe (są — zweryfikowane wobec żywego rankingu), co było zepsute, co usunięte, czego brakuje. |
 | [`2026-08-01-audyt-2.md`](2026-08-01-audyt-2.md) | Audyt #2 po naprawach: co się obroniło, co poprawione, **dług na przyszłość i lista pomysłów**. |
 | [`2026-08-01-budzet-rozmiaru.md`](2026-08-01-budzet-rozmiaru.md) | Ile rund scrapa zostało do limitu 1 GB na Pages (~65 ≈ 2 lata) i co zrobić, gdy się skończy. |
+| [`2026-08-04-spec-trendy.md`](2026-08-04-spec-trendy.md) | Spec widoku trendów jednego świata w czasie: co pokazać, `trends.json` (**9,0 KB gzip na całą historię**), pułapki metryki „ostatnio online”. |
 
 Nazwy plików: `RRRR-MM-DD-<temat>.md`. Nową notatkę dopisz do tabeli wyżej **oraz** do sekcji
 „Co czytać dalej” w [`../AGENTS.md`](../AGENTS.md) — inaczej nikt jej nie znajdzie.

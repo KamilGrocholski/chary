@@ -16,8 +16,8 @@ statycznych plików JSON i pozwala je przeglądać oraz filtrować bez żadnego 
 - **Repo:** `git@github.com:KamilGrocholski/chary.git` — uwaga, repozytorium nazywa się
   `chary`, mimo że pakiet i projekt to `margostat`. To nie pomyłka.
 - **Źródło danych:** `https://www.margonem.pl/ladder/<świat>/players?page=N`
-- **Stan:** 181 migawek z 20 światów (`src/worlds.ts` śledzi 21 — `luvia` dojdzie przy
-  najbliższym scrapie), ~548 tys. graczy w rundzie, `public/` 119 MB.
+- **Stan:** 202 migawki z 21 światów, 11 rund od 2026-04-17, ~586 tys. graczy w rundzie,
+  `public/` 137 MB.
 
 ---
 
@@ -29,19 +29,26 @@ src/
   parser.ts          parsowanie HTML-a rankingu — czyste funkcje, zero I/O
   snapshot.ts        format migawki: podział .f/.n, migracja starych, strażnik populacji
   manifest.ts        budowa public/manifest.json
-  rebuild_data.ts    CLI utrzymania danych (migracja + manifest)
+  trends.ts          agregat historii świata → public/trends.json
+  rebuild_data.ts    CLI utrzymania danych (migracja + manifest + trendy)
   worlds.ts          lista śledzonych światów — edytowana ręcznie
   server.ts          lokalny serwer statyczny do podglądu
 public/              dokładnie to, co ląduje na GitHub Pages
-  index.html         markup i style dashboardu
+  index.html         markup i style dashboardu jednej migawki
   app.js             logika dashboardu (moduł ES; góra pliku czysta, dół dotyka DOM-u)
+  trends.html        markup i style widoku historii jednego świata
+  trends.js          logika widoku historii — ten sam podział czysta/DOM
+  shared.js          kawałki wspólne obu widoków; nie wolno mu dotykać DOM-u
   vendor/            Chart.js 4.4.7 lokalnie, bez CDN-u
   manifest.json      indeks migawek
+  trends.json        zwinięta historia wszystkich światów (24 KB, 9 KB po gzipie)
   worlds/<świat>/    <id>.f.json + <id>.n.json
 test/
   parser.test.ts     parser na zrzucie prawdziwej strony rankingu
   snapshot.test.ts   format migawki, migracja, strażnik populacji
   dashboard.test.ts  logika dashboardu, filtry, czas migawki, spójność z index.html
+  trends.test.ts     agregat wobec .f.json, progi aktywności, spójność z trends.html
+  dom_smoke.ts       atrapa DOM-u dla obu widoków — odpalana z testów w podprocesie
   fixtures/          zrzut strony rankingu + próbka snapshotu w starym schemacie
 docs/                audyty i notatki
 .github/workflows/   deploy.yml (check + publikacja), ci.yml (pull requesty)
@@ -49,7 +56,7 @@ AGENTS.md            ten plik — instrukcje dla agenta
 CLAUDE.md            wskaźnik na AGENTS.md (Claude Code)
 ```
 
-Kod ma ~2,4 tys. linii łącznie z testami. Da się go przeczytać w całości i **warto** to
+Kod ma ~3,4 tys. linii łącznie z testami. Da się go przeczytać w całości i **warto** to
 zrobić przed większą zmianą — to szybsze niż zgadywanie.
 
 ---
@@ -65,9 +72,9 @@ bun run scrape aether  # jeden świat
 bun run scrape aether,tempest 2000   # wybrane światy, własny interwał w ms (min. 250)
 
 bun run serve          # http://localhost:3000 — dashboard lokalnie
-bun test               # 98 testów
+bun test               # 135 testów
 bun run typecheck
-bun run rebuild        # utrzymanie danych: migracja starych schematów + manifest
+bun run rebuild        # utrzymanie danych: migracja starych schematów + manifest + trendy
 ```
 
 Deploy dzieje się sam po pushu na `main`, ale dopiero gdy przejdą typecheck i testy.
@@ -116,6 +123,29 @@ Filtry poziomu, profesji, honoru i aktywności liczą się **dokładnie**, zawsz
 pliku `.f.json` (20-180 KB po gzipie). Nicki nie są pobierane wcale, dopóki nie powstanie
 wyszukiwarka graczy.
 
+### `public/trends.json` — historia, nie migawka
+
+Zwinięta historia wszystkich światów, po jednej liczbie na migawkę zamiast setek tysięcy
+wierszy: 24 KB surowo, **9 KB po gzipie na komplet 202 migawek**. Czyta go wyłącznie
+`public/trends.js`; dashboard migawki go nie dotyka.
+
+```json
+{ "schema": 1, "builtAt": "...", "worlds": { "aether": {
+  "id": [...], "startedAt": [...], "total": [39849, ...],
+  "act": [[<24h], [1-7 dni], [8-30 dni], [>30 dni], [nigdy]],
+  "byProf": [[wojownik], ..., [łowca]], "suspect": [0, ...] } } }
+```
+
+Kolumnowo, wiersz *i* każdej kolumny to ta sama migawka — ta sama konwencja, co para
+`.f.json`/`.n.json`. **Koszyki `act` są rozłączne**, więc „aktywni ≤7 dni” to suma dwóch
+pierwszych; `ACTIVITY_THRESHOLDS` w `trends.js` robi to sumowanie i jest jedynym miejscem,
+gdzie wolno mieszać te dwie skale. Przebudowywany w całości przez `bun run rebuild` i na
+końcu każdej rundy scrapa; migawka bez `startedAt` wypada z niego, bo nie ma jej gdzie
+postawić na osi czasu.
+
+Pełne uzasadnienie kształtu i pułapki metryki „ostatnio online”:
+[`docs/2026-08-04-spec-trendy.md`](docs/2026-08-04-spec-trendy.md).
+
 ---
 
 ## Dlaczego tak, a nie inaczej
@@ -125,7 +155,9 @@ Decyzje, które wyglądają dziwnie, dopóki nie znasz powodu:
 | Decyzja | Powód |
 |---|---|
 | Migawka w dwóch plikach | Nicki to ~2/3 objętości, a filtrowaniu są zbędne. Podział ściął `public/` z 620 MB do 118 MB. |
-| Brak agregatów | Były pisane na zapas i nikt ich nie czytał — skasowane. Gdy powstanie widok wielu migawek, agregat to kilkanaście linii nad `.f.json`. |
+| `trends.json` liczy tylko to, co rysuje widok | Poprzedni moduł agregatów skasowano za pola bez konsumenta. Ten ma populację, aktywność i profesje — bez rozkładu poziomów (43× większy plik) i bez honoru, których widok historii nie czyta. |
+| Trendy w osobnym pliku, nie w manifeście | Manifest jest pobierany przy każdym wejściu na dashboard migawki, który historii nie potrzebuje. 9 KB dokładane wszystkim to koszt bez pokrycia. |
+| `shared.js` obok `app.js` | `app.js` startuje dashboard od razu po imporcie, więc pożyczenie z niego jednej funkcji wywala trends.html na obcym markupie. |
 | Chart.js wendorowany | CDN bez SRI to zależność, której nikt nie kontroluje; lokalnie działa też offline. |
 | Retry per strona | Wcześniej cofał cały świat do strony 1 — dla gordiona (797 stron) do 4× po ~13 min. |
 | Wadliwe wiersze pomijane | Jeden dziwny wiersz nie może wywalać całego świata; przerywamy dopiero powyżej 1% na stronę. |
@@ -143,6 +175,7 @@ Pełne uzasadnienia i historia: audyty niżej.
 | [`docs/2026-08-01-audyt.md`](docs/2026-08-01-audyt.md) | Audyt #1: czy dane są prawdziwe (są — zweryfikowane wobec żywego rankingu), co było zepsute, co usunięte, czego brakuje. |
 | [`docs/2026-08-01-audyt-2.md`](docs/2026-08-01-audyt-2.md) | Audyt #2 po naprawach: co się obroniło, co poprawione, **dług na przyszłość i lista pomysłów**. |
 | [`docs/2026-08-01-budzet-rozmiaru.md`](docs/2026-08-01-budzet-rozmiaru.md) | Ile rund scrapa zostało do limitu 1 GB na Pages (~65 ≈ 2 lata) i co zrobić, gdy się skończy. |
+| [`docs/2026-08-04-spec-trendy.md`](docs/2026-08-04-spec-trendy.md) | Spec widoku trendów jednego świata w czasie: co pokazać, `trends.json` (**9,0 KB gzip na całą historię**), pułapki metryki „ostatnio online”. |
 | [`README.md`](README.md) | Instrukcja obsługi dla człowieka. |
 
 ---
@@ -170,9 +203,14 @@ Pełne uzasadnienia i historia: audyty niżej.
 
 ## Czego tu nie ma (świadomie)
 
-- **Wyszukiwarki gracza i progresji w czasie** — mimo że dane leżą gotowe: `.n.json`
-  towarzyszy każdej migawce i nikt go dziś nie czyta. Pierwszy pomysł z listy w audycie #2.
-- **Automatycznego scrapa (cron)** — odpalany ręcznie, stąd nierówne odstępy 6-13 dni.
+- **Wyszukiwarki gracza i progresji pojedynczej postaci** — mimo że dane leżą gotowe:
+  `.n.json` towarzyszy każdej migawce i nikt go dziś nie czyta. Uwaga: tę analizę przecina
+  „szew `charId`” z audytu #2 — trendy populacji nie, bo liczą ludzi, nie śledzą osób.
+- **Sum globalnych i zestawiania światów ze sobą** — `trends.json` ma na to komplet danych,
+  ale suma wywraca się na zmiennym zestawie światów (`luvia` istnieje tylko w ostatniej
+  rundzie i ma 41,3% online), a zestawienie wymaga normalizacji, bo gordion spłaszcza
+  brutala. Świadomie odłożone — patrz spec trendów.
+- **Automatycznego scrapa (cron)** — odpalany ręcznie, stąd nierówne odstępy 3-17 dni.
 - **37 światów legacy/prywatnych** — ranking wystawia ich łącznie ~57, śledzimy 21.
-- **Sprawdzania typów w `public/app.js`** — `checkJs` daje 25 błędów typowania DOM-u,
+- **Sprawdzania typów w `public/*.js`** — `checkJs` daje dziesiątki błędów typowania DOM-u,
   nie realnych bugów; wymaga adnotacji JSDoc. Powód zapisany w `tsconfig.json`.

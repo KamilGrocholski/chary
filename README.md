@@ -17,15 +17,21 @@ Scraper cyklicznie pobiera rankingi graczy ze wszystkich śledzonych światów, 
 margonem.pl/ladder  ──scrape──►  public/worlds/<świat>/<ts>.f.json   (poziom/profesja/honor/dni)
                                  public/worlds/<świat>/<ts>.n.json   (nicki + charId)
                                           │
-                                          ▼
-                                  public/manifest.json  ──►  dashboard (GitHub Pages)
+                          ┌───────────────┴───────────────┐
+                          ▼                               ▼
+                  public/manifest.json            public/trends.json
+                          │                               │
+                          ▼                               ▼
+                  Migawka (index.html)            Trendy (trends.html)
 ```
 
 - **Scraper** (`src/world_scraper.ts`) — przechodzi po stronach rankingu każdego świata i zapisuje snapshot.
 - **Parser** (`src/parser.ts`) — czysta logika parsowania HTML-a rankingu, pokryta testami na prawdziwej stronie.
 - **Podział snapshotu** (`src/snapshot.ts`) — zapis do dwóch plików o tej samej kolejności wierszy.
 - **Manifest** (`public/manifest.json`) — indeks snapshotów per świat, z linkiem do obu plików.
-- **Dashboard** (`public/index.html` + `public/app.js`) — wybór świata i daty, filtry (poziom, honor, profesja, ostatnia aktywność), wykres rozkładu poziomów wg profesji.
+- **Trendy** (`src/trends.ts` → `public/trends.json`) — zwinięta historia każdego świata, po jednej liczbie na migawkę.
+- **Migawka** (`public/index.html` + `public/app.js`) — wybór świata i daty, filtry (poziom, honor, profesja, ostatnia aktywność), wykres rozkładu poziomów wg profesji.
+- **Trendy** (`public/trends.html` + `public/trends.js`) — jak zmieniała się populacja, aktywność i rozkład profesji jednego świata przez wszystkie migawki.
 
 Cały `public/` jest statyczny — nie ma serwera aplikacyjnego, więc idealnie nadaje się pod Pages.
 
@@ -34,6 +40,14 @@ Cały `public/` jest statyczny — nie ma serwera aplikacyjnego, więc idealnie 
 Wyłącznie z `.f.json`, zawsze — więc **wszystkie filtry są dokładne**, także honor i „ostatnio online" (dowolny próg dni, nie tylko presety). Plik trzyma cztery tablice liczb, po jednej na kolumnę, więc jest mały: 97 KB po gzipie dla aethera, 180 KB dla największego `gordiona`. Pages serwuje JSON skompresowany, więc to realny transfer.
 
 Nicki i `charId` leżą osobno w `.n.json` i nie są pobierane wcale — filtrowaniu są niepotrzebne, a to ~połowa objętości snapshotu. Pobierze je dopiero przyszła wyszukiwarka graczy i widok progresji.
+
+### Skąd widok trendów bierze dane
+
+Wyłącznie z `public/trends.json` — **9 KB po gzipie na całą historię wszystkich światów**. Te same wykresy zbudowane z surowych `.f.json` kosztowałyby 14,9 MB i 5,6 mln wierszy do sparsowania, więc przełączanie świata byłoby sekundami zamiast natychmiast.
+
+Plik trzyma po jednej liczbie na migawkę: populację, pięć rozłącznych koszyków aktywności i rozbicie na profesje. Przebudowuje się sam po każdej rundzie scrapa i przy `bun run rebuild`.
+
+> **Uwaga na metrykę „ostatnio online".** Scrape leci ręcznie, raz o 4 rano, raz o 21, w różne dni tygodnia — a jedna runda trwa ~2 h. Przy populacji zmieniającej się o 0,6% próg „< 24h" waha się o ~15%. Do oceny trendu miarodajniejsze są progi „≤ 7 dni" i „≤ 30 dni"; widok pokazuje wszystkie trzy i podaje godzinę UTC każdej migawki. Szczegóły: [`docs/2026-08-04-spec-trendy.md`](docs/2026-08-04-spec-trendy.md).
 
 ## Wymagania
 
@@ -108,7 +122,7 @@ Starsze snapshoty (jeden plik na migawkę, z tekstem „Mniej niż 24h temu” i
 ## Utrzymanie danych
 
 ```bash
-bun run rebuild                # migruje stare, jednoplikowe snapshoty do pary .f/.n i przebudowuje manifest
+bun run rebuild                # migruje stare snapshoty do pary .f/.n, przebudowuje manifest i trends.json
 bun run rebuild --keep-legacy  # zostawia oryginalne pliki po migracji
 ```
 
@@ -122,12 +136,12 @@ Chart.js jest wendorowany w `public/vendor/chart.umd.min.js` (wersja **4.4.7**),
 curl -sL https://cdn.jsdelivr.net/npm/chart.js@<wersja>/dist/chart.umd.min.js -o public/vendor/chart.umd.min.js
 ```
 
-Po podmianie zaktualizuj numer wersji tutaj i w komentarzu w `public/index.html`.
+Po podmianie zaktualizuj numer wersji tutaj oraz w komentarzach w `public/index.html` i `public/trends.html`.
 
 ## Testy
 
 ```bash
-bun test        # parser (na prawdziwej stronie rankingu w test/fixtures) + logika dashboardu
+bun test        # parser (na prawdziwej stronie rankingu w test/fixtures) + logika obu widoków
 bun run typecheck
 ```
 
@@ -160,18 +174,25 @@ src/
   parser.ts          # parsowanie HTML-a rankingu (czyste funkcje)
   snapshot.ts        # format snapshotu: podział na .f/.n i migracja starych
   manifest.ts        # przebudowa public/manifest.json
-  rebuild_data.ts    # utrzymanie: migracja + agregaty + manifest
+  trends.ts          # agregat historii świata → public/trends.json
+  rebuild_data.ts    # utrzymanie: migracja + manifest + trendy
   worlds.ts          # lista śledzonych światów
   server.ts          # lokalny statyczny serwer do podglądu
 test/
   parser.test.ts     # testy parsera na zrzucie prawdziwej strony
   snapshot.test.ts   # format snapshotu i migracja ze starych schematów
   dashboard.test.ts  # logika dashboardu, porównana z danymi sprzed migracji
+  trends.test.ts     # agregat porównany z .f.json, z których powstał
+  dom_smoke.ts       # atrapa DOM-u obu widoków (odpalana z testów w podprocesie)
 public/              # to, co ląduje na GitHub Pages
-  index.html         # dashboard (markup + style)
-  app.js             # logika dashboardu
+  index.html         # widok migawki (markup + style)
+  app.js             # logika widoku migawki
+  trends.html        # widok historii świata (markup + style)
+  trends.js          # logika widoku historii
+  shared.js          # kawałki wspólne obu widoków (bez DOM-u)
   vendor/            # Chart.js 4.4.7 (lokalnie, bez CDN-u)
   manifest.json      # indeks snapshotów
+  trends.json        # zwinięta historia wszystkich światów
   worlds/            # snapshoty per świat: <ts>.f.json + <ts>.n.json
 docs/                # audyty i notatki
 .github/workflows/

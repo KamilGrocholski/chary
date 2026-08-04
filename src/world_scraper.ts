@@ -13,6 +13,7 @@ import {
   type PopulationDrop,
 } from "./snapshot.ts";
 import { WORLDS_DIR, rebuildManifest } from "./manifest.ts";
+import { rebuildTrends } from "./trends.ts";
 
 // ── Typy błędów ───────────────────────────────────────────────────────────────
 
@@ -325,6 +326,13 @@ for (const world of worlds) {
 }
 
 await rebuildManifest();
+
+// Trendy przebudowujemy w całości — inaczej `public/trends.json` opisywałby stan
+// sprzed rundy, a widok historii pokazywałby wszystko poza tym, co przed chwilą zeszło.
+const { skipped } = await rebuildTrends();
+if (skipped > 0) {
+  await log("WARN", `Trendy: pominięto ${skipped} migawek bez startedAt`, { skipped });
+}
 
 if (suspects.length > 0) {
   // Migawki są zapisane — to ostrzeżenie do sprawdzenia, nie porażka runu.

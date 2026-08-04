@@ -2,18 +2,16 @@ import { describe, expect, test } from "bun:test";
 import path from "node:path";
 import { normalizeLegacyRows, splitNormalized } from "../src/snapshot.ts";
 import {
-  activityBucket,
   activityLabel,
   countByActivity,
   countByLevel,
-  daysBetween,
   emptyFilters,
   filtersFromParams,
   filtersToParams,
-  formatSnapshotDate,
   totalsFromCounts,
   visibleActivityBuckets,
 } from "../public/app.js";
+import { activityBucket, daysBetween, formatSnapshotDate } from "../public/shared.js";
 
 // Wzorcem odniesienia jest próbka prawdziwego snapshotu w starym schemacie v1
 // (test/fixtures/legacy-snapshot-aether.json — co 12. wiersz oryginału, więc pokrywa
@@ -353,6 +351,45 @@ describe("etykiety rozkładu aktywności", () => {
 
   test("1 dzień odmienia się poprawnie", () => {
     expect(activityLabel(1, 1)).toBe("1 dzień");
+  });
+});
+
+describe("dashboard składa się w całość", () => {
+  // Warstwa DOM-u przepuszczona przez atrapę w osobnym procesie (test/dom_smoke.ts).
+  // Filtry przychodzą z URL-a, więc wynik da się porównać wprost z `.f.json` —
+  // to jedyny test, który przechodzi całą drogę manifest → fetch → filtry → wykres.
+  const repo = path.resolve(import.meta.dir, "..");
+  const proc = Bun.spawnSync(["bun", path.join(repo, "test/dom_smoke.ts"), "app"], { cwd: repo });
+  const out = proc.exitCode === 0 ? JSON.parse(proc.stdout.toString()) : null;
+
+  test("render przechodzi bez wyjątku", () => {
+    expect(proc.stderr.toString()).toBe("");
+    expect(proc.exitCode).toBe(0);
+    expect(out.error).toBe("");
+    expect(out.professionCheckboxes).toBe(6);
+    expect(out.series).toBe(6);
+  });
+
+  test("filtry z URL-a dają na wykresie to, co siedzi w migawce", async () => {
+    const latest = manifest.worlds.find((w: { name: string }) => w.name === "aether").files.at(-1);
+    expect(out.source).toBe(latest.filters);
+
+    const f = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, latest.filters)).text());
+    let expected = 0;
+    for (let i = 0; i < f.count; i++) {
+      const level = f.level[i];
+      const prof = f.profession[i];
+      if (level >= 200 && level <= 250 && (prof === 1 || prof === 4)) expected += 1;
+    }
+
+    expect(out.matched).toBe(expected);
+    expect(expected).toBeGreaterThan(0);
+    expect(out.stats).toContain(`Razem: ${expected}`);
+    expect(out.levels).toBeGreaterThan(0);
+  });
+
+  test("pasek podejrzanej migawki jest schowany, dopóki flagi nie ma", () => {
+    expect(out.suspectHidden).toBe(true);
   });
 });
 

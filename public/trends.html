@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Margostat — trendy</title>
+  <meta name="description" content="Jak zmieniała się populacja, aktywność i rozkład profesji na świecie Margonem — wszystkie migawki w czasie." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2316161a'/><rect x='6' y='17' width='4' height='9' fill='%233987e5'/><rect x='12' y='12' width='4' height='14' fill='%23199e70'/><rect x='18' y='7' width='4' height='19' fill='%23c98500'/><rect x='24' y='14' width='4' height='12' fill='%23d55181'/></svg>" />
+  <!-- Chart.js 4.4.7, lokalnie zamiast z CDN-u. Aktualizacja:
+       curl -sL https://cdn.jsdelivr.net/npm/chart.js@<wersja>/dist/chart.umd.min.js -o public/vendor/chart.umd.min.js -->
+  <script src="vendor/chart.umd.min.js"></script>
+  <style>
+    :root {
+      /* Motyw margometera: ciepły, ciemny */
+      --bg: #101013;
+      --panel: #16161a;
+      --surface-2: #1e1e22;
+      --text: #f2f2ef;
+      --muted: #a0a09a;
+      --accent: #3987e5;
+      --border: #35353b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 24px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+    }
+    button {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+    }
+    button:hover { filter: brightness(1.1); }
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .nav {
+      display: flex;
+      gap: 14px;
+      margin-left: auto;
+      font-size: 13px;
+    }
+    .nav a { color: var(--muted); text-decoration: none; }
+    .nav a:hover { color: var(--text); }
+    .nav a[aria-current="page"] { color: var(--accent); font-weight: 700; }
+
+    .toolbar { margin-bottom: 20px; }
+    .toolbar-row {
+      display: grid;
+      grid-template-columns: 200px 160px 160px 1fr;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .stats {
+      margin: 0 0 20px;
+      color: var(--muted);
+    }
+    .stats-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 16px;
+    }
+    .chartBox { height: 320px; margin-bottom: 20px; }
+    canvas { width: 100% !important; height: 100% !important; }
+    .note {
+      margin-bottom: 20px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--muted);
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .note b { color: var(--text); }
+    .note.warn { border-color: #c98500; }
+    .note.warn b { color: #c98500; }
+    .error {
+      color: #e66767;
+      white-space: pre-wrap;
+      margin-bottom: 12px;
+    }
+    .error:empty { margin: 0; }
+
+    .tableBox { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    th { color: var(--muted); font-weight: 600; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tbody tr:last-child td { border-bottom: none; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 720px) {
+      .wrap { padding: 14px; }
+      .toolbar-row { grid-template-columns: 1fr; }
+      .chartBox { height: 260px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header style="display:flex;align-items:baseline;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+      <h1 style="margin:0;font-size:22px;letter-spacing:0.02em;font-weight:700">margostat</h1>
+      <span style="color:var(--muted);font-size:13px">historia jednego świata</span>
+      <nav class="nav">
+        <a href="index.html">Migawka</a>
+        <a href="trends.html" aria-current="page">Trendy</a>
+      </nav>
+    </header>
+
+    <div class="card toolbar">
+      <div class="toolbar-row">
+        <div>
+          <label for="worldSelect">Świat</label>
+          <select id="worldSelect"></select>
+        </div>
+        <div>
+          <label for="thresholdSelect">Próg aktywności</label>
+          <select id="thresholdSelect"></select>
+        </div>
+        <div>
+          <label for="modeSelect">Skala</label>
+          <select id="modeSelect">
+            <option value="liczba">Liczba graczy</option>
+            <option value="udzial">Udział w populacji</option>
+          </select>
+        </div>
+        <div style="display:flex;justify-content:flex-end">
+          <button id="copyBtn" title="Kopiuj link do tego widoku" style="width:auto;padding:8px 12px;font-size:13px;background:#1e1e22;color:var(--accent);border:1px solid var(--border)">⎘</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats card" id="summary">Ładowanie…</div>
+    <div id="error" class="error" role="alert"></div>
+
+    <div id="singlePoint" class="note card" role="status" hidden>
+      <span aria-hidden="true">ℹ</span>
+      <span><b>Ten świat ma jedną migawkę.</b> Punkt jest poprawny, ale na trend jest za wcześnie — kolejna runda scrapa da drugi.</span>
+    </div>
+
+    <div id="suspectNote" class="note card warn" role="status" hidden>
+      <span aria-hidden="true">⚠</span>
+      <span><b>Któraś migawka może być obcięta.</b> Punkty narysowane pustym kółkiem mają flagę <code>suspect</code> — spadek populacji o ponad 5% wygląda tak samo jak niekompletny scrape.</span>
+    </div>
+
+    <div class="note card">
+      <span aria-hidden="true">ℹ</span>
+      <span><b>„Ostatnio online” zależy od godziny scrapa.</b> Rundy schodzą raz o 4 rano, raz o 21, w różne dni tygodnia,
+      więc próg <b>&lt; 24h</b> waha się o ~15% przy populacji stabilnej na 0,6%. Do oceny trendu miarodajniejsze są progi
+      <b>≤ 7 dni</b> i <b>≤ 30 dni</b>; godzina UTC każdej migawki jest w dymku wykresu.</span>
+    </div>
+
+    <div class="card chartBox">
+      <canvas id="popChart" role="img" aria-label="Populacja świata w kolejnych migawkach."></canvas>
+    </div>
+
+    <div class="card chartBox">
+      <canvas id="actChart" role="img" aria-label="Liczba aktywnych graczy w kolejnych migawkach."></canvas>
+    </div>
+
+    <div class="card chartBox" style="height:380px">
+      <canvas id="profChart" role="img" aria-label="Liczba graczy każdej profesji w kolejnych migawkach."></canvas>
+    </div>
+
+    <div class="card tableBox" id="changeTable"></div>
+  </div>
+
+  <script type="module" src="trends.js"></script>
+</body>
+</html>

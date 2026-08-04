@@ -68,6 +68,15 @@
       background: none;
       color: var(--accent);
     }
+    .nav {
+      display: flex;
+      gap: 14px;
+      margin-left: auto;
+      font-size: 13px;
+    }
+    .nav a { color: var(--muted); text-decoration: none; }
+    .nav a:hover { color: var(--text); }
+    .nav a[aria-current="page"] { color: var(--accent); font-weight: 700; }
 
     .toolbar { margin-bottom: 20px; }
     .toolbar-row1 {
@@ -159,6 +168,10 @@
     <header style="display:flex;align-items:baseline;gap:10px;margin-bottom:20px;flex-wrap:wrap">
       <h1 style="margin:0;font-size:22px;letter-spacing:0.02em;font-weight:700">margostat</h1>
       <span style="color:var(--muted);font-size:13px">statystyki graczy Margonem</span>
+      <nav class="nav">
+        <a href="index.html" aria-current="page">Migawka</a>
+        <a href="trends.html">Trendy</a>
+      </nav>
     </header>
 
     <div class="card toolbar">
