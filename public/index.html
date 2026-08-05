@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Margostat</title>
   <meta name="description" content="Statystyki graczy Margonem — rozkład poziomów i profesji w rankingach światów oraz historia populacji, aktywności i profesji w czasie." />
+  <meta name="theme-color" content="#101013" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2316161a'/><rect x='6' y='17' width='4' height='9' fill='%233987e5'/><rect x='12' y='12' width='4' height='14' fill='%23199e70'/><rect x='18' y='7' width='4' height='19' fill='%23c98500'/><rect x='24' y='14' width='4' height='12' fill='%23d55181'/></svg>" />
   <!-- Chart.js 4.4.7, lokalnie zamiast z CDN-u. Aktualizacja:
        curl -sL https://cdn.jsdelivr.net/npm/chart.js@<wersja>/dist/chart.umd.min.js -o public/vendor/chart.umd.min.js -->
-  <script src="vendor/chart.umd.min.js"></script>
+  <script defer src="vendor/chart.umd.min.js"></script>
   <style>
     :root {
       /* Motyw margometera: ciepły, ciemny */
@@ -18,7 +19,18 @@
       --text: #f2f2ef;
       --muted: #a0a09a;
       --accent: #3987e5;
+      /* Rozdzielacze wewnątrz karty — dekoracja, więc bez progu kontrastu. */
       --border: #35353b;
+      /* Granice kontrolek i kart. WCAG 2.2 SC 1.4.11 wymaga 3:1: #35353b dawało
+         1,48:1 wobec karty i 1,09:1 wobec wypełnienia pola, czyli pole formularza
+         nie odróżniało się od tła niczym. #6a6a73 daje 3,37:1 i 3,10:1. */
+      --border-strong: #6a6a73;
+      --warn: #c98500;
+      --danger: #e66767;
+      --ok: #199e70;
+      /* Bez tego natywne listy rozwijane, strzałki pól liczbowych i paski
+         przewijania rysują się jasną skórką systemu na ciemnym interfejsie. */
+      color-scheme: dark;
     }
     * { box-sizing: border-box; }
     body {
@@ -30,35 +42,68 @@
     .wrap { max-width: 1400px; margin: 0 auto; padding: 24px; }
     .card {
       background: var(--panel);
-      border: 1px solid var(--border);
+      border: 1px solid var(--border-strong);
       border-radius: 14px;
       padding: 16px;
     }
-    label {
+    label, .field-title {
       display: block;
       font-size: 12px;
       color: var(--muted);
       margin-bottom: 6px;
     }
+    /* Kontrolki nie dziedziczą fontu z `body` same z siebie: bez tego przeglądarka
+       rysowała wszystkie pola i listy krojem systemowym w 13,33 px, czyli innym
+       niż reszta strony i poniżej 14 px. */
+    input, select, button {
+      font-family: inherit;
+      font-size: 14px;
+    }
     input, select {
       width: 100%;
       padding: 10px 12px;
       border-radius: 10px;
-      border: 1px solid var(--border);
+      border: 1px solid var(--border-strong);
       background: var(--surface-2);
       color: var(--text);
     }
+    /* Wariant „biały na akcencie” miał 3,64:1, czyli poniżej AA — i nie miał ani
+       jednego użytkownika, bo wszystkie przyciski są `.ghost-btn` albo `.reset-btn`.
+       Domyślny przycisk wygląda więc jak `.ghost-btn`, żeby następny dodany nie
+       wracał po cichu do wariantu, który nie przechodzi kontrastu. */
     button {
       width: 100%;
       padding: 10px 12px;
       border-radius: 10px;
-      border: none;
       cursor: pointer;
-      background: var(--accent);
-      color: #fff;
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      color: var(--accent);
       font-weight: 700;
     }
     button:hover { filter: brightness(1.1); }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.92em;
+      padding: 1px 5px;
+      border-radius: 5px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+    }
+    /* Skip-link: cała treść wisi za paskiem filtrów, więc bez niego czytnik ekranu
+       i klawiatura przechodzą przez komplet kontrolek, zanim dojdą do danych. */
+    .skip {
+      position: fixed;
+      left: -9999px;
+      top: 8px;
+      z-index: 1002;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      color: var(--accent);
+    }
+    .skip:focus { left: 8px; }
     :focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
@@ -111,7 +156,10 @@
       left: 0;
       right: 0;
       z-index: 1001;
-      max-height: calc(100vh - 90px);
+      /* `dvh`, nie `vh`: na telefonie pasek adresu zjada część okna, a `100vh`
+         go ignoruje, więc szuflada wychodziła poniżej realnego ekranu.
+         Odejmujemy wysokość paska (56 px) plus zapas na cień. */
+      max-height: calc(100dvh - 90px);
       overflow-y: auto;
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
       margin: 0;
@@ -141,42 +189,54 @@
       font-size: 13px;
       background: var(--surface-2);
       color: var(--accent);
-      border: 1px solid var(--border);
+      border: 1px solid var(--border-strong);
     }
 
-    /* Chipy dostają całą resztę linii i są przycinane, zamiast zawijać pasek.
-       Komplet aktywnych filtrów i tak stoi w liczniku przy „Filtry (N)”. */
+    /* Chipy dostają całą resztę linii i nie zawijają paska.
+       `overflow: hidden` sprawiało jednak, że przy 800 px zostawało im zmierzone
+       **0 px** — trzy chipy o łącznej szerokości 421 px były wtedy niewidoczne
+       w całości, razem ze swoimi krzyżykami. Przewijanie zamiast przycinania
+       zostawia je osiągalne: kółkiem, dotykiem i tabulatorem (przeglądarka sama
+       przewija do elementu, który dostał focus). Pasek suwaka byłby wyższy niż
+       chip, więc go chowamy — nie odbierając samego przewijania. */
     .chips {
       display: flex;
       flex-wrap: nowrap;
       gap: 6px;
       flex: 1 1 auto;
       min-width: 0;
-      overflow: hidden;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
+    .chips::-webkit-scrollbar { display: none; }
     .chip {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      padding: 3px 4px 3px 10px;
-      border: 1px solid var(--border);
+      padding: 0 0 0 10px;
+      border: 1px solid var(--border-strong);
       border-radius: 999px;
       background: var(--surface-2);
       color: var(--text);
       font-size: 12px;
       white-space: nowrap;
     }
+    /* Krzyżyk miał zmierzone 21×15 px, czyli poniżej minimum 24×24 z WCAG 2.2
+       SC 2.5.8. Powiększenie idzie w samego guzika, nie w wysokość paska. */
     .chip button {
       width: auto;
+      min-width: 24px;
+      height: 24px;
       padding: 0 4px;
       border: none;
+      border-radius: 999px;
       background: none;
       color: var(--muted);
       font-size: 15px;
       line-height: 1;
       font-weight: 700;
     }
-    .chip button:hover { color: #e66767; filter: none; }
+    .chip button:hover { color: var(--danger); filter: none; }
 
     .toolbar { margin-bottom: 20px; }
     .toolbar-row1 {
@@ -272,7 +332,7 @@
     .chartBox.short { height: 320px; }
     canvas { width: 100% !important; height: 100% !important; }
     .error {
-      color: #e66767;
+      color: var(--danger);
       white-space: pre-wrap;
       margin-bottom: 12px;
     }
@@ -287,19 +347,19 @@
       align-items: flex-start;
     }
     .note b { color: var(--text); }
-    .note.warn { border-color: #c98500; }
-    .note.warn b { color: #c98500; }
+    .note.warn { border-color: var(--warn); }
+    .note.warn b { color: var(--warn); }
     .suspect {
       margin-bottom: 20px;
-      border-color: #c98500;
-      color: #f2f2ef;
+      border-color: var(--warn);
+      color: var(--text);
       display: flex;
       gap: 10px;
       align-items: flex-start;
       font-size: 13px;
       line-height: 1.5;
     }
-    .suspect b { color: #c98500; }
+    .suspect b { color: var(--warn); }
     .source {
       padding: 10px 0;
       color: var(--muted);
@@ -307,11 +367,14 @@
     }
     .empty {
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 14px;
       height: 100%;
       color: var(--muted);
     }
+    .empty button { width: auto; }
 
     .tableBox { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -320,6 +383,16 @@
     td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     tbody tr:last-child td { border-bottom: none; }
     [hidden] { display: none !important; }
+
+    /* Poniżej ~1100 px pasek nie mieści naraz świata, licznika, chipów, kotwic
+       i dwóch przycisków — a shrinkowanie odbierało miejsce wyłącznie chipom,
+       aż do zera. Kotwice i doprecyzowanie „w tej migawce” ustępują pierwsze:
+       obie rzeczy są wygodą, a chipy niosą stan filtra i jedyny sposób usunięcia
+       pojedynczego z nich. */
+    @media (max-width: 1100px) {
+      .filterbar-nav { display: none; }
+      .wide-only { display: none; }
+    }
 
     @media (max-width: 720px) {
       .wrap { padding: 14px; }
@@ -351,7 +424,10 @@
       .filterbar-actions { order: 2; flex: 0 0 auto; }
       .filterbar .match { order: 3; font-size: 12px; flex: 1 1 100%; flex-wrap: nowrap; }
       .filterbar-nav, .chips { display: none; }
-      #filterFields { top: calc(100% + 6px); }
+      /* Pasek ma tu 88 px, nie 56 — obie liczby liczone od jego wysokości muszą
+         to uwzględnić, inaczej kotwica ląduje pod paskiem, a szuflada poniżej ekranu. */
+      .section-head { scroll-margin-top: 108px; }
+      #filterFields { max-height: calc(100dvh - 122px); }
       /* „w tej migawce” to doprecyzowanie, bez którego liczba nadal się broni */
       .wide-only { display: none; }
     }
@@ -359,6 +435,11 @@
 </head>
 <body>
   <div class="wrap">
+    <a class="skip" href="#tresc">Przejdź do treści</a>
+    <noscript>
+      <p class="error">Ten widok liczy wszystko w przeglądarce, więc bez JavaScriptu nie pokaże
+      żadnych danych. Dane źródłowe leżą jako pliki JSON w katalogu <code>worlds/</code>.</p>
+    </noscript>
     <header style="display:flex;align-items:baseline;gap:10px;margin-bottom:20px;flex-wrap:wrap">
       <h1 style="margin:0;font-size:22px;letter-spacing:0.02em;font-weight:700">margostat</h1>
       <span style="color:var(--muted);font-size:13px">statystyki graczy Margonem</span>
@@ -374,7 +455,6 @@
       </nav>
       <div class="filterbar-actions">
         <button id="filtersToggle" class="ghost-btn" aria-expanded="false" aria-controls="filterFields">Filtry</button>
-        <button id="copyBtn" class="ghost-btn" title="Kopiuj link do tego widoku" aria-label="Kopiuj link do tego widoku">⎘</button>
       </div>
 
       <div class="card toolbar" id="filterFields" hidden>
@@ -384,7 +464,9 @@
           <select id="snapshotSelect"></select>
         </div>
         <div>
-          <label>Plik</label>
+          <!-- To nie jest etykieta kontrolki, tylko podpis nad tekstem — `<label>`
+               bez `for` niczego nie etykietuje i myli czytnik ekranu. -->
+          <span class="field-title">Plik</span>
           <div id="sourceInfo" class="source">—</div>
         </div>
       </div>
@@ -422,8 +504,12 @@
           </div>
         </div>
         <div class="col-full">
-          <label>Profesja</label>
-          <div class="prof-checkboxes" id="profCheckboxes"></div>
+          <!-- Sześć checkboxów to jedna grupa: bez `role="group"` czytnik ekranu
+               ogłasza je jako sześć niezależnych pól, bez słowa „Profesja”.
+               Kontener musi zostać pusty — `buildProfCheckboxes` dokłada do niego
+               bez czyszczenia, więc statyczne pola dałyby dwanaście zamiast sześciu. -->
+          <span class="field-title" id="profLabel">Profesja</span>
+          <div class="prof-checkboxes" id="profCheckboxes" role="group" aria-labelledby="profLabel"></div>
         </div>
         <div>
           <button id="resetBtn" class="reset-btn">Resetuj filtry</button>
@@ -432,6 +518,7 @@
       </div>
     </div>
 
+    <main id="tresc">
     <div id="error" class="error" role="alert"></div>
 
     <div class="section-head" id="przekroj">
@@ -444,7 +531,13 @@
     <div class="stats card" id="stats">Ładowanie…</div>
 
     <div class="card chartBox">
-      <div id="chartEmpty" class="empty" hidden>Brak graczy spełniających filtry.</div>
+      <!-- Pusty stan musi mieć wyjście: „Resetuj filtry” siedzi w zamkniętej
+           szufladzie, więc bez tego jedyną drogą powrotu było zgadnięcie, że
+           trzeba otworzyć „Filtry”. -->
+      <div id="chartEmpty" class="empty" hidden>
+        <span>Brak graczy spełniających filtry.</span>
+        <button id="emptyResetBtn" class="reset-btn" type="button">Resetuj filtry</button>
+      </div>
       <canvas id="professionChart" role="img" aria-label="Rozkład poziomów według profesji w wybranej migawce."></canvas>
     </div>
 
@@ -501,7 +594,12 @@
       <canvas id="profChart" role="img" aria-label="Liczba graczy każdej profesji w kolejnych migawkach."></canvas>
     </div>
 
-    <div class="card tableBox" id="changeTable"></div>
+    <!-- Kontener przewija się w poziomie (zmierzone: 526 px treści w 333 px przy
+         375 px szerokości), więc bez `tabindex` prawe kolumny są nieosiągalne
+         z klawiatury — WCAG 2.1.1. -->
+    <div class="card tableBox" id="changeTable" tabindex="0" role="region"
+         aria-label="Zmiany populacji między migawkami"></div>
+    </main>
   </div>
 
   <script type="module" src="app.js"></script>

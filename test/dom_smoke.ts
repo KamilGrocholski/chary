@@ -115,8 +115,18 @@ Object.assign(globalThis, {
   },
   window: { Chart: FakeChart, innerWidth: 1400, innerHeight: 900 },
   Chart: FakeChart,
-  location: { search, pathname: "/index.html", href: "" },
-  history: { replaceState() {} },
+  // `hash` musi tu być, bo `writeUrlState` doszywa kotwicę do adresu. Atrapa bez
+  // tego pola dawałaby „undefined” po obu stronach porównania — czyli zielony test
+  // dla kodu, który w przeglądarce dopisuje do URL-a napis „undefined”.
+  location: { search, pathname: "/index.html", href: "", hash: "" },
+  history: {
+    replaceState(_state: unknown, _title: string, url: string) {
+      (globalThis as { location: { search: string } }).location.search = new URL(
+        url,
+        "http://localhost",
+      ).search;
+    },
+  },
   fetch: async (url: string) => {
     fetchCounts.set(url, (fetchCounts.get(url) ?? 0) + 1);
     // Migawki dostają sztuczne opóźnienie. Z dysku wracają w mikrosekundach, a cały
@@ -221,7 +231,7 @@ if (scenario === "default") {
   };
 } else {
   const chipLabels = () =>
-    [...nodes.filterChips!.innerHTML.matchAll(/<span class="chip">([^<]*)</g)].map((m) => m[1]);
+    [...nodes.filterChips!.innerHTML.matchAll(/<span class="chip"[^>]*>([^<]*)</g)].map((m) => m[1]);
 
   // Szuflada startuje zamknięta i nikt jej nie przełącza po dojściu danych — inaczej
   // strona przeskakiwałaby o wysokość panelu w trakcie ładowania.

@@ -15,6 +15,7 @@ Zaczynasz pracę nad projektem? Najpierw [`../AGENTS.md`](../AGENTS.md), nie ten
 | [`2026-08-04-spec-widok-swiata.md`](2026-08-04-spec-widok-swiata.md) | Spec scalenia obu widoków w jeden per świat i filtrowania **całej historii** po stronie klienta (**7 ms na 813 tys. wierszy, zero bajtów do limitu Pages**). |
 | [`2026-08-04-audyt-3.md`](2026-08-04-audyt-3.md) | Audyt #3 po scaleniu widoków: **osiem błędów, których nie łapało 165 testów**, atrapa DOM-u łagodniejsza od przeglądarki, dług i lista pomysłów. |
 | [`2026-08-04-spec-pasek-filtrow.md`](2026-08-04-spec-pasek-filtrow.md) | Spec przypiętego paska filtrów: strona ma **2806 px**, a na telefonie panel zjada **87% pierwszego ekranu**. Warianty, badania (NN/g, Baymard) i przykłady z innych serwisów. |
+| [`2026-08-05-audyt-ui-ux.md`](2026-08-05-audyt-ui-ux.md) | Audyt #4, pierwszy o interfejsie: granice kontrolek miały **1,48:1** przy progu 3:1, chipy znikały do **0 px** w paśmie 721-1100 px, focus ginął przy Escape i przy krzyżyku na chipie. Plus trzy hipotezy obalone pomiarem. |
 
 Nazwy plików: `RRRR-MM-DD-<temat>.md`. Nową notatkę dopisz do tabeli wyżej **oraz** do sekcji
 „Co czytać dalej” w [`../AGENTS.md`](../AGENTS.md) — inaczej nikt jej nie znajdzie.

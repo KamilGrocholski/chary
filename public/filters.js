@@ -199,9 +199,9 @@ export function summarizeFiltered(data, f) {
 
 // ── Stan filtrów w URL-u ────────────────────────────────────────────────────
 //
-// Bez tego przycisk „kopiuj link do tego widoku” wysyłał widok domyślny —
-// ktoś, kto ustawił poziom 250-320 i honor > 100k, dzielił się czymś innym,
-// niż miał na ekranie.
+// Bez tego adres w pasku przeglądarki opisywał widok domyślny — ktoś, kto ustawił
+// poziom 250-320 i honor > 100k, po skopiowaniu adresu albo po przeładowaniu strony
+// dostawał co innego, niż miał na ekranie.
 
 export function filtersToParams(f) {
   const params = new URLSearchParams();

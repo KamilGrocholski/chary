@@ -147,7 +147,16 @@ function setupView() {
     const params = filtersToParams(readFilters());
     for (const [key, value] of viewToParams(readView())) params.set(key, value);
     params.sort();
-    history.replaceState(null, "", `${location.pathname}?${params}`);
+    // Kotwica zostaje: bez niej pierwsza zmiana filtra po kliknięciu „Historia”
+    // kasowała `#historia` z adresu, więc przeładowanie wracało na górę strony.
+    const hash = location.hash || "";
+    const query = params.toString();
+    const url = `${location.pathname}${query ? `?${query}` : ""}${hash}`;
+    // `render()` leci przy każdym znaku i przy każdym pobranym pliku historii.
+    // Safari przerywa po ~100 wywołaniach `replaceState` na 30 s, a wyjątek
+    // wywaliłby render w połowie — więc piszemy tylko wtedy, gdy adres się zmienił.
+    if (url === `${location.pathname}${location.search || ""}${hash}`) return;
+    history.replaceState(null, "", url);
   }
 
   // ── Dane ──────────────────────────────────────────────────────────────────
@@ -174,6 +183,22 @@ function setupView() {
   const dec = (n, digits = 1) =>
     n.toLocaleString("pl-PL", { minimumFractionDigits: digits, maximumFractionDigits: digits });
   const signed = (n, format = num) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${format(Math.abs(n))}`;
+
+  /**
+   * Wyjątek na komunikat dla człowieka. Wcześniej w pasek błędu szedł surowy tekst
+   * wyjątku — „Failed to fetch” albo „HTTP 500 dla worlds/gordion/2026-…f.json” —
+   * czyli komunikat po angielsku, ze ścieżką pliku i bez podpowiedzi, co zrobić.
+   * Ścieżka nie znika z widoku: stoi w polu „Plik” w szufladzie filtrów.
+   */
+  function describeFailure(error, what) {
+    const message = String(error?.message ?? error);
+    const http = message.match(/^HTTP (\d{3})/);
+    if (http) return `Nie udało się pobrać ${what}: serwer odpowiedział kodem ${http[1]}.`;
+    if (/JSON|Unexpected token/i.test(message)) {
+      return `Nie udało się odczytać ${what}: plik nie jest poprawnym JSON-em.`;
+    }
+    return `Nie udało się pobrać ${what} — wygląda na brak połączenia. Odśwież stronę i spróbuj ponownie.`;
+  }
 
   // ── Wykres przekroju: poziomy według profesji ─────────────────────────────
 
@@ -221,11 +246,12 @@ function setupView() {
       .filter((e) => e.val > 0)
       .sort((a, b) => b.val - a.val)
       .map((e) => {
-        const pct = total ? ((e.val / total) * 100).toFixed(1) : "0.0";
+        // Ten sam zapis, co w pasku i w tabeli: „12,3%” i „1 234”, nie „12.3%” i „1234”.
+        const pct = total ? dec((e.val / total) * 100, 1) : dec(0, 1);
         return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
           <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${e.color};flex-shrink:0"></span>
           <span style="flex:1">${e.label}</span>
-          <span style="color:#a0a09a;margin-left:8px">${e.val}</span>
+          <span style="color:#a0a09a;margin-left:8px">${num(e.val)}</span>
           <span style="color:#3987e5;min-width:48px;text-align:right">${pct}%</span>
         </div>`;
       })
@@ -234,7 +260,7 @@ function setupView() {
     node.innerHTML = `
       <div style="font-weight:700;margin-bottom:6px;color:#3987e5">Level ${level}</div>
       ${rows}
-      <div style="border-top:1px solid #35353b;margin-top:6px;padding-top:6px;color:#a0a09a">Razem: <b style="color:#f2f2ef">${total}</b></div>
+      <div style="border-top:1px solid #35353b;margin-top:6px;padding-top:6px;color:#a0a09a">Razem: <b style="color:#f2f2ef">${num(total)}</b></div>
     `;
 
     const pos = chart.canvas.getBoundingClientRect();
@@ -455,18 +481,40 @@ function setupView() {
    */
   function renderChips(filters) {
     const chips = describeFilters(filters);
-    el("filterChips").innerHTML = chips
+    const box = el("filterChips");
+    // Chipy są przebudowywane przy każdym renderze, więc naciśnięcie krzyżyka
+    // niszczyło element, który miał focus — ten wracał na `<body>` i nie dało się
+    // usunąć dwóch filtrów pod rząd z klawiatury. Zapamiętujemy więc, gdzie był.
+    const active = typeof document !== "undefined" ? document.activeElement : null;
+    const hadFocus = active && box.contains?.(active) ? (active.dataset?.clear ?? "") : null;
+
+    box.innerHTML = chips
       .map(
         ({ key, label }) =>
-          `<span class="chip">${label}<button type="button" data-clear="${key}" aria-label="Usuń filtr: ${label}">×</button></span>`,
+          `<span class="chip" title="${label}">${label}<button type="button" data-clear="${key}" aria-label="Usuń filtr: ${label}">×</button></span>`,
       )
       .join("");
     el("filtersToggle").textContent = chips.length > 0 ? `Filtry (${chips.length})` : "Filtry";
+
+    if (hadFocus === null) return;
+    const buttons = [...box.querySelectorAll("button")];
+    // Ten sam chip, jeśli przeżył; inaczej pierwszy pozostały; a gdy zniknął ostatni —
+    // przycisk, spod którego chipy wyrastają.
+    const next = buttons.find((b) => b.dataset?.clear === hadFocus) ?? buttons[0] ?? el("filtersToggle");
+    next.focus?.();
   }
 
   function setFieldsOpen(open) {
-    el("filterFields").hidden = !open;
+    // Zamknięcie chowa szufladę przez `display: none`. Gdyby focus był w środku,
+    // przeglądarka zrzuciłaby go na `<body>` i następny Tab startowałby od początku
+    // dokumentu — więc oddajemy go przyciskowi, który szufladę otwiera.
+    const fields = el("filterFields");
+    const active = typeof document !== "undefined" ? document.activeElement : null;
+    const focusWasInside = !open && active && fields.contains?.(active);
+
+    fields.hidden = !open;
     el("filtersToggle").setAttribute("aria-expanded", String(open));
+    if (focusWasInside) el("filtersToggle").focus?.();
   }
 
   function renderMatchLine(matched, population) {
@@ -477,19 +525,38 @@ function setupView() {
       `<span>(${dec(share, 1)}%)</span>`;
   }
 
-  function renderStats(counts, activity, maxDays) {
+  function renderStats(counts, activity, maxDays, professions) {
     const { perProfession } = totalsFromCounts(counts);
 
+    // Zero trafień to nie jest rozkład złożony z samych zer: sześć profesji i pięć
+    // koszyków aktywności wypisanych jako „0” czyta się jak zepsute dane, a nie jak
+    // odpowiedź „nikt nie pasuje”. To ta sama zasada, co `visibleActivityBuckets`.
+    if (perProfession.every((n) => n === 0)) {
+      el("stats").innerHTML =
+        `<div class="stats-line">Żaden gracz w tej migawce nie spełnia filtrów — rozkładu nie ma z czego złożyć.</div>`;
+      return;
+    }
+
+    // Profesja odznaczona w filtrze nie ma czego wnosić — „Mag: 0” obok wyniku
+    // filtra „tylko Wojownik i Tropiciel” wygląda jak brak danych, a nie jak
+    // wykluczenie. `profChart` rysuje tylko wybrane serie; tu było inaczej.
     const badges = Object.entries(PROF)
+      .filter(([id]) => professions.has(Number(id)))
       .map(([id, name]) => ({ name, color: PROF_COLORS[id], count: perProfession[id - 1] }))
       .sort((a, b) => b.count - a.count)
-      .map(({ name, color, count }) => `<span style="color:${color};white-space:nowrap">${name}: <b>${count}</b></span>`)
+      .map(
+        ({ name, color, count }) =>
+          `<span style="color:${color};white-space:nowrap">${name}: <b>${num(count)}</b></span>`,
+      )
       .join(" · ");
 
     const visible = new Set(visibleActivityBuckets(maxDays));
     const activityLine = activity
       .filter(([bucket]) => visible.has(bucket))
-      .map(([bucket, count]) => `<span>${activityLabel(bucket, maxDays)}: <b style="color:var(--text)">${count}</b></span>`)
+      .map(
+        ([bucket, count]) =>
+          `<span>${activityLabel(bucket, maxDays)}: <b style="color:var(--text)">${num(count)}</b></span>`,
+      )
       .join(" · ");
 
     el("stats").innerHTML = `
@@ -653,7 +720,7 @@ function setupView() {
 
     renderMatchLine(matched, i > -1 ? base.total[i] : data.count);
     renderLevelChart(counts);
-    renderStats(counts, countByActivity(data, filters), filters.maxDays);
+    renderStats(counts, countByActivity(data, filters), filters.maxDays, filters.professions);
   }
 
   function renderHistory(filters) {
@@ -731,6 +798,18 @@ function setupView() {
     }, 150);
   }
 
+  /**
+   * Bez zwłoki — dla kontrolek, które zmieniają się skokowo. Debounce istnieje po to,
+   * żeby pisanie w polu liczbowym nie startowało renderu na każdy znak; wybór opcji
+   * z listy i kliknięcie przycisku to jedno zdarzenie, więc czekanie 150 ms jest tam
+   * wyłącznie opóźnieniem odczuwalnym przez użytkownika.
+   */
+  function renderNow() {
+    clearTimeout(renderTimer);
+    render();
+    void ensureHistory();
+  }
+
   // ── Pobieranie ────────────────────────────────────────────────────────────
 
   async function loadSnapshot(entry) {
@@ -769,8 +848,11 @@ function setupView() {
       // Ten sam strażnik co przy sukcesie: odrzucenie porzuconego żądania nie może
       // skasować poprawnie wyrenderowanego przekroju innej migawki.
       if (token !== snapshotToken) return;
-      el("error").textContent = String(e?.message || e);
+      el("error").textContent = describeFailure(e, "migawki przekroju");
       el("stats").textContent = "—";
+      // Bez tego pasek zostawał na liczbach poprzedniej migawki albo na „Ładowanie…”,
+      // czyli obok czerwonego błędu stał wynik, którego nie ma czym poprzeć.
+      el("matchLine").textContent = "—";
     }
   }
 
@@ -859,9 +941,12 @@ function setupView() {
       // Link z filtrami ma działać od razu — historia startuje bez czekania na ruch myszą.
       await selectAndLoad();
     } catch (e) {
-      el("error").textContent = String(e?.message || e);
+      el("error").textContent = describeFailure(e, "indeksu migawek");
       el("stats").textContent = "—";
       el("matchLine").textContent = "—";
+      // `#summary` zostawało na „Ładowanie…” na zawsze — obok komunikatu o błędzie
+      // stał więc napis obiecujący dane, które nigdy nie dojdą.
+      el("summary").textContent = "—";
     }
   }
 
@@ -883,7 +968,7 @@ function setupView() {
   el("onlinePreset").addEventListener("change", () => {
     const value = el("onlinePreset").value;
     el("onlineValue").value = value === "all" ? "" : value;
-    scheduleRender();
+    renderNow();
   });
 
   for (const id of ["minLevel", "maxLevel", "minHonor", "maxHonor", "onlineValue"]) {
@@ -892,23 +977,18 @@ function setupView() {
   el("profCheckboxes").addEventListener("change", scheduleRender);
 
   for (const id of ["thresholdSelect", "modeSelect"]) {
-    el(id).addEventListener("change", scheduleRender);
+    el(id).addEventListener("change", renderNow);
   }
 
-  el("resetBtn").addEventListener("click", () => {
+  // Literały, nie pętla po tablicy: test „każdy element pobierany ma swój węzeł
+  // w markupie” szuka wywołań z identyfikatorem wpisanym wprost, więc identyfikator
+  // schowany w zmiennej przestaje być przez cokolwiek pilnowany.
+  const resetAndRender = () => {
     resetFilters();
-    scheduleRender();
-  });
-
-  el("copyBtn").addEventListener("click", async () => {
-    writeUrlState();
-    await navigator.clipboard.writeText(location.href);
-    const btn = el("copyBtn");
-    btn.textContent = "✓";
-    setTimeout(() => {
-      btn.textContent = "⎘";
-    }, 1500);
-  });
+    renderNow();
+  };
+  el("resetBtn").addEventListener("click", resetAndRender);
+  el("emptyResetBtn").addEventListener("click", resetAndRender);
 
   // Listenery paska rejestrujemy NA KOŃCU. `test/dom_smoke.ts` wywołuje pierwszy
   // zarejestrowany listener węzła (`handlers[0]`), więc wepchnięcie czegokolwiek przed

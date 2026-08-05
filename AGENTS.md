@@ -202,6 +202,8 @@ Decyzje, które wyglądają dziwnie, dopóki nie znasz powodu:
 | Jeden widok zamiast dwóch stron | Przekrój i historia pod tym samym filtrem to jedyne pytanie, na które nie dało się odpowiedzieć wcześniej. Przy okazji znikła duplikacja CSS i drugi stan URL. `trends.html` został przekierowaniem, żeby rozesłane linki działały. |
 | Wybór świata i licznik trafień w przyklejonym pasku | Od filtra do pierwszego wykresu historii było 961 px — więcej niż ekran, więc kontrolka i to, czym steruje, nigdy nie były widoczne naraz. Pasek trzyma **jedyny egzemplarz** obu, więc nie ma czego synchronizować. |
 | Pola filtrów jako szuflada `position: absolute` w pasku | Otwiera się tam, gdzie użytkownik patrzy — panel na górze dokumentu był po przewinięciu niewidoczny, więc przycisk „Filtry” nic nie dawał. Nie zajmuje miejsca w układzie, więc otwieranie i zamykanie **nie przesuwa strony**, a stan początkowy siedzi w markupie (`hidden`), nie w JS-ie po `fetch`ach. |
+| Dwie zmienne na obramowania: `--border` i `--border-strong` | Granice kontrolek i kart potrzebują 3:1 (WCAG 2.2 SC 1.4.11), rozdzielacze w tabeli nie. Jedna wspólna wartość dawała 1,48:1 i pole formularza nie odróżniało się od karty niczym. |
+| Chipy przewijane, nie przycinane | `overflow: hidden` przy 800 px zostawiało im zmierzone **0 px** — trzy chipy niewidoczne w całości, razem z krzyżykami. Przewijanie zostawia je osiągalne także tabulatorem. |
 | Historia dociągana leniwie, dopiero po ruchu filtrem | Filtr domyślny obsługuje `trends.json` za 9 KB. Kto nie filtruje, nie płaci za 1,9 MB gordiona. |
 | Filtrowanie u klienta zamiast prekompilowanego cube'a | Przelot po 813 tys. wierszy to 2,8-7 ms — koszykowanie kosztowałoby dokładność i nie objęłoby honoru (−35 .. 1,2 mln). |
 | Logika w `filters.js`/`history.js`, nie w `app.js` | `app.js` startuje widok od razu po imporcie, więc modułu z nim zszytego nie da się przetestować poza przeglądarką. Pilnuje tego test. |
@@ -226,6 +228,7 @@ Pełne uzasadnienia i historia: audyty niżej.
 | [`docs/2026-08-04-spec-widok-swiata.md`](docs/2026-08-04-spec-widok-swiata.md) | Spec scalenia `index.html` i `trends.html` w jeden widok per świat, z filtrowaniem **całej historii** u klienta: pomiary (**7 ms na 813 tys. wierszy**), leniwe pobieranie, pułapki i próg okna migawek. |
 | [`docs/2026-08-04-audyt-3.md`](docs/2026-08-04-audyt-3.md) | Audyt #3: **osiem błędów, których nie łapało 165 testów**, atrapa DOM-u łagodniejsza od przeglądarki, `Retry-After: 0`, nieatomowy zapis, walidacja CLI — plus dług i pomysły. |
 | [`docs/2026-08-04-spec-pasek-filtrow.md`](docs/2026-08-04-spec-pasek-filtrow.md) | Spec przypiętego paska filtrów: geometria strony (**2806 px**, filtr 961 px od pierwszego wykresu historii, **87% ekranu na telefonie**), warianty, badania i pułapki `position: sticky` w tym markupie. |
+| [`docs/2026-08-05-audyt-ui-ux.md`](docs/2026-08-05-audyt-ui-ux.md) | Audyt #4, pierwszy o **interfejsie**: kontrasty granic (było **1,48:1** przy progu 3:1), chipy ściskane do **0 px** między 721 a 1100 px, focus ginący przy Escape i przy krzyżyku, geometria zmierzona w przeglądarce. Metoda pomiaru, dług i trzy hipotezy obalone. |
 | [`README.md`](README.md) | Instrukcja obsługi dla człowieka. |
 
 ---
