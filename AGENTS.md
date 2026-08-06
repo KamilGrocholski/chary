@@ -41,7 +41,7 @@ public/              dokładnie to, co ląduje na GitHub Pages
   filters.js         filtr i zliczanie: matches, countByLevel, summarizeFiltered, stan w URL-u
   history.js         historia świata: progi, serie, tablice typowane, pobieranie migawek
   shared.js          stałe, czas, koszykowanie aktywności — wspólne słownictwo
-  vendor/            Chart.js 4.4.7 lokalnie, bez CDN-u
+  vendor/            Chart.js 4.4.7 lokalnie, bez CDN-u + LICENSE.chartjs
   trends.html        przekierowanie na index.html z zachowaniem query stringa
   manifest.json      indeks migawek
   trends.json        zwinięta historia wszystkich światów (24 KB, 9 KB po gzipie)
@@ -57,6 +57,9 @@ docs/                audyty i notatki
 .github/workflows/   deploy.yml (check + publikacja), ci.yml (pull requesty)
 AGENTS.md            ten plik — instrukcje dla agenta
 CLAUDE.md            wskaźnik na AGENTS.md (Claude Code)
+LICENSE              MIT — obejmuje TYLKO kod, nie dane
+DATA-NOTICE.md       dane rankingu: czyje, czego nie licencjonujemy, RODO, usuwanie
+THIRD-PARTY-NOTICES.md  Chart.js, cheerio, drzewo zależności (wszystko permisywne)
 ```
 
 Kod ma ~4,4 tys. linii łącznie z testami. Da się go przeczytać w całości i **warto** to
@@ -212,6 +215,9 @@ Decyzje, które wyglądają dziwnie, dopóki nie znasz powodu:
 | Wadliwe wiersze pomijane | Jeden dziwny wiersz nie może wywalać całego świata; przerywamy dopiero powyżej 1% na stronę. |
 | Strażnik zapisuje, nie odrzuca | Utrata całego runu boli bardziej niż migawka z ostrzeżeniem. |
 | `noUnusedLocals` włączone | Martwy kod przeżył tu już dwie przebudowy. |
+| Licencja rozdzielona: MIT na kod, osobna nota na dane | Licencji udziela się do tego, do czego ma się prawa. Baza rankingu jest Margonem, a nicki to dane osobowe — objęcie `public/worlds/` MIT-em byłoby oświadczeniem praw, których nie mamy, i zaproszeniem innych do tego, czego zakazuje `VII.2.k)`. |
+| Pełny tekst licencji Chart.js obok pliku, mimo banera w minifikacie | MIT wymaga noty w każdej kopii, a banery giną przy dalszej minifikacji. |
+| `LICENSE` to czysty MIT bez ani jednego dopisku o danych | GitHub rozpoznaje licencję przez podobieństwo do wzorca (próg ~98%) — dopisek o zakresie zmieniłby wykrytą licencję na „Other". Zakres jest w `DATA-NOTICE.md` i `README.md`. |
 
 Pełne uzasadnienia i historia: audyty niżej.
 
@@ -229,6 +235,8 @@ Pełne uzasadnienia i historia: audyty niżej.
 | [`docs/2026-08-04-audyt-3.md`](docs/2026-08-04-audyt-3.md) | Audyt #3: **osiem błędów, których nie łapało 165 testów**, atrapa DOM-u łagodniejsza od przeglądarki, `Retry-After: 0`, nieatomowy zapis, walidacja CLI — plus dług i pomysły. |
 | [`docs/2026-08-04-spec-pasek-filtrow.md`](docs/2026-08-04-spec-pasek-filtrow.md) | Spec przypiętego paska filtrów: geometria strony (**2806 px**, filtr 961 px od pierwszego wykresu historii, **87% ekranu na telefonie**), warianty, badania i pułapki `position: sticky` w tym markupie. |
 | [`docs/2026-08-05-audyt-ui-ux.md`](docs/2026-08-05-audyt-ui-ux.md) | Audyt #4, pierwszy o **interfejsie**: kontrasty granic (było **1,48:1** przy progu 3:1), chipy ściskane do **0 px** między 721 a 1100 px, focus ginący przy Escape i przy krzyżyku, geometria zmierzona w przeglądarce. Metoda pomiaru, dług i trzy hipotezy obalone. |
+| [`DATA-NOTICE.md`](DATA-NOTICE.md) | **Czyje są dane i czego nie licencjonujemy.** Granica kod/dane, klauzule regulaminu Margonem (`XIX.2`, `XIX.4`, `VII.2.m)`, `VII.2.k)`), prawo sui generis do bazy, dane osobowe w `.n.json`, procedura usunięcia, zachowanie scrapera. |
+| [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) | Chart.js (rozpowszechniany — wymaga noty) vs zależności buildu; całe drzewo permisywne, bez copyleftu. |
 | [`README.md`](README.md) | Instrukcja obsługi dla człowieka. |
 
 ---
@@ -242,7 +250,9 @@ Pełne uzasadnienia i historia: audyty niżej.
 3. **Nie pisz kodu na zapas.** Ten projekt skasował już stałą i cały moduł, które istniały
    „na przyszłość”. Jeśli coś nie ma dziś konsumenta, opisz pomysł w `docs/` i nie commituj kodu.
 4. **Szanuj serwis.** 1 req/s to domyślny interwał; przy 400 ms ranking odpowiada `429`.
-   `robots.txt` nie zabrania `/ladder`, ale to nie jest zaproszenie do dobijania.
+   `robots.txt` nie zabrania `/ladder` (a `sitemap.xml` Margonem sam te ścieżki wypisuje),
+   ale to nie jest zaproszenie do dobijania. Nie podszywaj UA pod przeglądarkę —
+   `Mozilla/5.0 (margostat scraper)` mówi wprost, kto puka.
 5. **Dane w `public/worlds/` są nieodtwarzalne.** Ranking nie ma historii — czego nie
    zescrapowaliśmy wtedy, tego nie da się dziś odzyskać. Migracje formatu rób bezstratnie
    i weryfikuj wiersz po wierszu wobec oryginałów z gita.
@@ -251,6 +261,13 @@ Pełne uzasadnienia i historia: audyty niżej.
    układ — test, który sprawdza reimplementację samego siebie, niczego nie pilnuje.
 7. **Notatki i audyty trafiają do `docs/`**, wg schematu `RRRR-MM-DD-<temat>.md`, i są
    dopisywane do tabeli w [`docs/README.md`](docs/README.md) oraz do „Co czytać dalej” wyżej.
+8. **Kod jest nasz, dane nie.** MIT z `LICENSE` obejmuje wyłącznie kod. Baza rankingu
+   należy do wydawcy Margonem (regulamin `XIX.2`/`VII.2.m)` + prawo sui generis do bazy
+   danych), a `.n.json` zawiera nicki, czyli dane osobowe. Nigdy nie obejmuj `public/worlds/`
+   ani `test/fixtures/` licencją open source, nie dopisuj im `CC-BY`/`ODbL` i nie zapraszaj
+   w README do komercyjnego użytku — to byłoby oświadczanie praw, których nie mamy.
+   Wszystko rozliczone w [`DATA-NOTICE.md`](DATA-NOTICE.md); zmieniasz zakres publikowanych
+   pól — zaktualizuj tam tabelę danych osobowych.
 
 ---
 

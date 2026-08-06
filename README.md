@@ -209,8 +209,32 @@ docs/                # audyty i notatki
   ci.yml             # typecheck + testy
 AGENTS.md            # punkt wejścia dla agenta AI
 CLAUDE.md            # wskaźnik na AGENTS.md
+LICENSE              # MIT — tylko kod
+DATA-NOTICE.md       # dane rankingu: czyje są, czego nie licencjonuję, RODO
+THIRD-PARTY-NOTICES.md  # Chart.js, cheerio i drzewo zależności
 ```
 
 ## Stack
 
 Bun · TypeScript · Cheerio (parsowanie HTML) · Chart.js (wykresy) · GitHub Pages (hosting)
+
+## Licencja
+
+**Kod jest na [MIT](LICENSE). Dane nie są i nie mogą być** — licencji udziela się do
+tego, do czego ma się prawa, a baza rankingu należy do wydawcy Margonem.
+
+| Co | Na jakich zasadach |
+|---|---|
+| `src/`, `test/*.ts`, `public/*.html`, `public/*.js`, `docs/` | MIT — [`LICENSE`](LICENSE) |
+| `public/worlds/`, `manifest.json`, `trends.json`, `test/fixtures/` | **nie open source** — [`DATA-NOTICE.md`](DATA-NOTICE.md) |
+| `public/vendor/` (Chart.js 4.4.7) | MIT — [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) |
+
+Forkując, dostajesz kod. **Prawo do redystrybucji danych nie przechodzi razem
+z forkiem** — dane rankingu podlegają regulaminowi Margonem (`XIX.2` ogranicza
+korzystanie do celów osobistych, `VII.2.k)` zakazuje użytku komercyjnego) oraz
+prawu sui generis do bazy danych. Scraper trzyma się `robots.txt`, 1 req/s
+i identyfikującego się User-Agenta; ścieżki `/ladder` są wypisane w `sitemap.xml`
+Margonem. Pełne rozliczenie — czym to jest, a czym nie jest, wraz z danymi
+osobowymi i **procedurą usunięcia nicku na żądanie** — w [`DATA-NOTICE.md`](DATA-NOTICE.md).
+
+Projekt nie jest powiązany z wydawcą Margonem ani przez niego autoryzowany.

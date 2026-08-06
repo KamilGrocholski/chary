@@ -2,6 +2,12 @@
   "name": "margostat",
   "module": "src/world_scraper.ts",
   "type": "module",
+  "license": "MIT",
+  "author": "Kamil Grocholski",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KamilGrocholski/chary.git"
+  },
   "scripts": {
     "scrape": "bun src/world_scraper.ts",
     "scrape:check": "bun src/world_scraper.ts --dry-run",
