@@ -175,27 +175,28 @@ describe("opublikowany trends.json", () => {
     }
   });
 
-  // @UWAGA wyłączony test, na ten moment nie jest potrzebny, przebadać go w przyszłości
-  //test("duży skok populacji albo nie istnieje, albo jest oflagowany", () => {
-  //  // Sanity check na realnych danych: gdyby agregat liczył co innego niż migawka,
-  //  // sąsiednie punkty rozjechałyby się dużo mocniej niż realny odpływ graczy.
-  //  //
-  //  // Ale spadek > 5% to dokładnie to, co `checkPopulationDrop` (ten sam próg 0,05)
-  //  // ma wykrywać i **zapisywać** z flagą `suspect`. Test zabraniający takiej migawce
-  //  // istnieć robił czerwony build z pierwszego realnie obciętego scrapa — czyli karał
-  //  // za zachowanie, które projekt uznał za poprawne. Warunek jest więc odwrócony:
-  //  // wolno jej być, pod warunkiem że jest oflagowana.
-  //  for (const [world, trend] of Object.entries(trends.worlds) as [string, any][]) {
-  //    for (let i = 1; i < trend.total.length; i++) {
-  //      const delta = (trend.total[i] - trend.total[i - 1]) / trend.total[i - 1];
-  //      if (delta <= -0.05) {
-  //        expect(`${world}[${i}] suspect=${trend.suspect[i]}`).toBe(`${world}[${i}] suspect=1`);
-  //      } else {
-  //        expect(delta).toBeLessThan(0.05);
-  //      }
-  //    }
-  //  }
-  //});
+  test("duży spadek populacji albo nie istnieje, albo jest oflagowany", () => {
+    // Sanity check na realnych danych: gdyby agregat liczył co innego niż migawka,
+    // sąsiednie punkty rozjechałyby się dużo mocniej niż realny odpływ graczy.
+    //
+    // Spadek > 5% to dokładnie to, co `checkPopulationDrop` (ten sam próg 0,05) ma
+    // wykrywać i **zapisywać** z flagą `suspect`. Test zabraniający takiej migawce
+    // istnieć robił czerwony build z pierwszego realnie obciętego scrapa — czyli karał
+    // za zachowanie, które projekt uznał za poprawne. Warunek jest więc odwrócony:
+    // wolno jej być, pod warunkiem że jest oflagowana.
+    //
+    // Tylko spadki — `checkPopulationDrop` nigdy nie flaguje wzrostów, więc świat,
+    // który realnie zyskuje graczy (np. `luvia` +11% między dwiema migawkami), nie
+    // ma tu żadnego invariantu do sprawdzenia.
+    for (const [world, trend] of Object.entries(trends.worlds) as [string, any][]) {
+      for (let i = 1; i < trend.total.length; i++) {
+        const delta = (trend.total[i] - trend.total[i - 1]) / trend.total[i - 1];
+        if (delta <= -0.05) {
+          expect(`${world}[${i}] suspect=${trend.suspect[i]}`).toBe(`${world}[${i}] suspect=1`);
+        }
+      }
+    }
+  });
 });
 
 describe("klient przy filtrze domyślnym liczy dokładnie to, co serwer", () => {

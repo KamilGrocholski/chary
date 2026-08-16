@@ -512,214 +512,218 @@ const smoke = (scenario: string) => {
   };
 };
 
-// @UWAGA test wyłączony
-//describe("widok składa się w całość — filtr domyślny", () => {
-//  const { proc, out } = smoke("default");
-//
-//  test("render przechodzi bez wyjątku", () => {
-//    expect(proc.stderr.toString()).toBe("");
-//    expect(proc.exitCode).toBe(0);
-//    expect(out.error).toBe("");
-//    expect(out.professionCheckboxes).toBe(6);
-//  });
-//
-//  test("przekrój pokazuje całą migawkę, bo filtr niczego nie odrzuca", () => {
-//    expect(out.matched).toBeGreaterThan(0);
-//    expect(out.levels).toBeGreaterThan(0);
-//    expect(out.matchLine).toMatch(/\(100,0%\)/);
-//    expect(out.suspectHidden).toBe(true);
-//  });
-//
-//  test("historia idzie z agregatu i nie dociąga migawek", () => {
-//    // Ścieżka, za którą nikt niefiltrujący nie płaci: 9 KB zamiast 1,9 MB.
-//    expect(out.charts.popChart.title).toBe("Populacja świata w czasie");
-//    expect(out.charts.popChart.label).toBe("Populacja");
-//    expect(out.partialNoteHidden).toBe(true);
-//    expect(out.historyStatus).toMatch(/^\d+ migawek$/);
-//  });
-//
-//  test("każdy wykres dostaje punkty ustawione w czasie, nie w kolejności migawek", () => {
-//    for (const [id, expectedSeries] of [["popChart", 1], ["actChart", 1], ["profChart", 6]] as const) {
-//      expect(out.charts[id].series).toBe(expectedSeries);
-//      expect(out.charts[id].points).toBe(out.charts.popChart.points);
-//    }
-//    // Oś X w milisekundach epoki — inaczej odstępy 3-17 dni wyglądałyby na równe.
-//    expect(out.charts.popChart.firstX).toBeGreaterThan(0);
-//  });
-//
-//  test("podsumowanie i tabela pokazują realne liczby", () => {
-//    // Zmiana liczona z opublikowanego agregatu, nie zaszyta literałem: „−5,3%” było
-//    // policzone z dzisiejszych danych fobosa i pierwszy `bun run scrape` robił z tego
-//    // czerwone CI na commicie z danymi.
-//    const fobos = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.fobos;
-//    const percent = ((fobos.total.at(-1) - fobos.total[0]) / fobos.total[0]) * 100;
-//    const sign = percent > 0 ? "+" : percent < 0 ? "−" : "";
-//    const formatted = Math.abs(percent).toLocaleString("pl-PL", {
-//      minimumFractionDigits: 1,
-//      maximumFractionDigits: 1,
-//    });
-//
-//    expect(out.summary).toContain(`${sign}${formatted}%`);
-//    expect(percent).toBeLessThan(0); // fobos wyludnia się najszybciej ze wszystkich
-//    expect(out.tableRows).toBe(out.charts.popChart.points); // nagłówek + n-1 wierszy zmian
-//    expect(out.singlePointHidden).toBe(true);
-//    expect(out.suspectNoteHidden).toBe(true);
-//  });
-//
-//  test("liczby są po polsku, bez mieszania przecinka z kropką", () => {
-//    // Daty mają kropki z definicji — sprawdzamy ułamki, nie 04.08.2026.
-//    const fractions = (s: string) => s.replace(/\d{2}\.\d{2}\.\d{4}/g, "");
-//    expect(fractions(out.summary)).not.toMatch(/\d\.\d/);
-//    expect(fractions(out.table)).not.toMatch(/\d\.\d/);
-//    expect(out.table).toMatch(/\d,\d/);
-//  });
-//
-//  test("przełączenie progu i skali przelicza wykres, a nie tworzy nowego", () => {
-//    expect(out.afterToggle.title).toBe("Udział aktywnych < 24h w populacji");
-//    expect(out.afterToggle.updates).toBe(1);
-//    expect(out.afterToggle.values.every((v: number) => v > 0 && v < 100)).toBe(true);
-//  });
-//
-//  test("udział populacji w populacji to nie jest metryka", () => {
-//    // Bez filtra „udział” dla wykresu populacji dałby płaską linię 100% — wykres
-//    // zostaje wtedy w liczbach zamiast udawać, że coś pokazuje.
-//    expect(out.afterToggle.popTitle).toBe("Populacja świata w czasie");
-//  });
-//
-//  test("świat z jedną migawką pokazuje punkt i notkę zamiast pustego wykresu", () => {
-//    expect(out.singleSnapshotWorld.points).toBe(1);
-//    expect(out.singleSnapshotWorld.noticeHidden).toBe(false);
-//    expect(out.singleSnapshotWorld.table).toBe("");
-//  });
-//});
+describe("widok składa się w całość — filtr domyślny", () => {
+  const { proc, out } = smoke("default");
 
-// @UWAGA test wyłączony
-//describe("widok składa się w całość — filtr ustawiony", () => {
-//  const { proc, out } = smoke("filtered");
-//
-//  test("render przechodzi bez wyjątku", () => {
-//    expect(proc.stderr.toString()).toBe("");
-//    expect(proc.exitCode).toBe(0);
-//    expect(out.error).toBe("");
-//  });
-//
-//  test("filtry z URL-a dają na histogramie to, co siedzi w migawce", async () => {
-//    const latest = manifest.worlds.find((w: { name: string }) => w.name === "aether").files.at(-1);
-//    expect(out.source).toBe(latest.filters);
-//
-//    const f = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, latest.filters)).text());
-//    let expected = 0;
-//    for (let i = 0; i < f.count; i++) {
-//      const level = f.level[i];
-//      const prof = f.profession[i];
-//      if (level >= 200 && level <= 250 && (prof === 1 || prof === 4)) expected += 1;
-//    }
-//
-//    expect(out.matched).toBe(expected);
-//    expect(expected).toBeGreaterThan(0);
-//    expect(out.matchLine).toContain(`Pasuje: ${expected.toLocaleString("pl-PL")}`);
-//  });
-//
-//  test("link z filtrami dociąga historię bez czekania na ruch myszą", () => {
-//    expect(out.charts.popChart.title).toBe("Pasujących filtrowi w czasie");
-//    expect(out.charts.popChart.points).toBeGreaterThan(1);
-//    expect(out.partialNoteHidden).toBe(true); // komplet zdążył dojść
-//    expect(out.historyStatus).toMatch(/^\d+ migawek$/);
-//  });
-//
-//  test("ostatni punkt historii to ta sama liczba, co przekrój tej samej migawki", () => {
-//    // Dwie niezależne drogi do jednej liczby: histogram sumowany po seriach
-//    // i agregat policzony przez summarizeFiltered. Rozjazd znaczyłby, że któraś
-//    // z nich filtruje inaczej.
-//    expect(out.charts.popChart.lastY).toBe(out.matched);
-//  });
-//
-//  test("wykres profesji pokazuje tylko profesje z filtra", () => {
-//    expect(out.charts.profChart.series).toBe(2);
-//  });
-//
-//  test("pasek streszcza filtr, który przewinął się poza ekran", () => {
-//    // Od filtra do pierwszego wykresu historii jest 961 px — więcej niż ekran. Pasek
-//    // jest jedynym miejscem, w którym widać naraz, co jest ustawione i na co działa.
-//    expect(out.bar.chips).toEqual(["Poziom 200-250", "Wojownik, Tropiciel"]);
-//    expect(out.bar.toggle).toBe("Filtry (2)");
-//  });
-//
-//  test("szuflada startuje zamknięta i nic jej nie przełącza po dojściu danych", () => {
-//    // Panel przełączany z JS-a dopiero po `fetch`ach przesuwał stronę o własną wysokość
-//    // w trakcie ładowania — a przy przeładowaniu przywrócona pozycja scrolla lądowała
-//    // gdzie indziej. Stan początkowy jest teraz wyłącznie w markupie.
-//    expect(out.bar.fieldsHidden).toBe(true);
-//    expect(out.afterOpen.fieldsHidden).toBe(false);
-//    expect(out.afterOpen.expanded).toBe("true");
-//    expect(out.afterClose.fieldsHidden).toBe(true);
-//    expect(out.afterClose.expanded).toBe("false");
-//    // otwieranie i zamykanie nie rusza filtrów
-//    expect(out.afterOpen.chips).toEqual(out.bar.chips);
-//  });
-//
-//  test("krzyżyk na chipie kasuje całą grupę pól, nie jedno", () => {
-//    // „Poziom 200-250” to jeden byt dla czytającego, a dwa `<input>` dla kodu.
-//    expect(out.afterChipClear.minLevel).toBe("");
-//    expect(out.afterChipClear.maxLevel).toBe("");
-//    expect(out.afterChipClear.chips).toEqual(["Wojownik, Tropiciel"]);
-//    expect(out.afterChipClear.toggle).toBe("Filtry (1)");
-//  });
-//
-//  test("każda migawka jest pobierana dokładnie raz, mimo serii zdarzeń filtra", () => {
-//    // Historia gordiona to 1,9 MB. Wywoływanie pobierania wprost z handlera `input`
-//    // startowało własny przelot na każdy wciśnięty klawisz, bo lista brakujących
-//    // migawek jest liczona w momencie startu — a to zamienia „kupujesz 1,9 MB
-//    // świadomie” w kilkukrotność tej liczby bez wiedzy użytkownika.
-//    expect(out.fetches.duplicated).toEqual([]);
-//    expect(out.fetches.maxPerFile).toBe(1);
-//    expect(out.fetches.files).toBeGreaterThan(15); // aether + brutal, dwa światy
-//  });
-//
-//  test("przełączenie świata gasi wykresy poprzedniego, zamiast trzymać je na ekranie", () => {
-//    // Pierwszy render nowego świata przychodzi dopiero po pobraniu migawki. Bez
-//    // synchronicznego wyczyszczenia pod nowym nagłówkiem stały przez kilkaset
-//    // milisekund serie poprzedniego świata — łącznie z dymkami z tamtymi datami.
-//    expect(out.afterWorldSwitch).toEqual({ popSeries: 0, profSeries: 0, tableRows: 0 });
-//  });
-//
-//  test("niepełna historia mówi o sobie, i przestaje, gdy przestaje być niepełna", () => {
-//    // Migawka, która nie doszła, nie ma punktu — i widok ma to powiedzieć w sekcji
-//    // HISTORIA, a nie w pasku błędu 1500 px wyżej, dotyczącym migawki przekroju.
-//    expect(out.partialHistory.status).toBe("10 z 11 migawek · 1 nie wczytano");
-//    expect(out.partialHistory.noteHidden).toBe(false);
-//    expect(out.partialHistory.note).toContain("Historia jest niepełna");
-//    expect(out.partialHistory.error).toBe("");
-//
-//    // Po powrocie do filtra domyślnego historia idzie z kompletnego agregatu.
-//    // Licznik porażek z poprzedniego filtra nie ma prawa jej dalej opisywać.
-//    expect(out.afterReset).toEqual({ status: "11 migawek", noteHidden: true, points: 11 });
-//  });
-//
-//  test("wybrany próg przeżywa przebudowę listy opcji", () => {
-//    // Podmiana `innerHTML` na `<select>` zeruje wartość, więc odczytanie jej PO
-//    // podmianie cofa użytkownika na pierwszą opcję. Efekt: ktoś, kto wybrał
-//    // „≤ 30 dni”, ląduje na „< 24h” — serii wahającej się o 14,7% przy populacji
-//    // stabilnej na 0,6% — i dostaje to jeszcze utrwalone w skopiowanym linku.
-//    expect(out.thresholdSurvival.picked).toEqual({ value: "30d", options: 3 });
-//
-//    // przy „≤ 14 dni” próg 30d jest nieosiągalny, ale schodzimy na najszerszy
-//    // sensowny (7d), nie na najwęższy z listy
-//    expect(out.thresholdSurvival.narrowed).toEqual({ value: "7d", options: 2 });
-//
-//    // lista wraca do trzech opcji — wybór ma zostać, a nie skoczyć na pierwszą
-//    expect(out.thresholdSurvival.widened).toEqual({ value: "7d", options: 3 });
-//  });
-//
-//  test("filtr aktywności zabiera progi, które pod nim nic już nie mówią", () => {
-//    // Przy „≤ 3 dni” próg „≤ 7 dni” liczyłby dokładnie tych samych graczy, co wykres
-//    // pasujących — trzy linie jedna na drugiej wyglądają jak potwierdzenie czegoś.
-//    expect(out.afterActivityFilter.thresholdOptions).toBe(1);
-//    expect(out.afterActivityFilter.noteHidden).toBe(false);
-//    expect(out.afterActivityFilter.note).toContain("≤ 3 dni");
-//    expect(out.afterActivityFilter.actHidden).toBe(false);
-//  });
-//});
+  test("render przechodzi bez wyjątku", () => {
+    expect(proc.stderr.toString()).toBe("");
+    expect(proc.exitCode).toBe(0);
+    expect(out.error).toBe("");
+    expect(out.professionCheckboxes).toBe(6);
+  });
+
+  test("przekrój pokazuje całą migawkę, bo filtr niczego nie odrzuca", () => {
+    expect(out.matched).toBeGreaterThan(0);
+    expect(out.levels).toBeGreaterThan(0);
+    expect(out.matchLine).toMatch(/\(100,0%\)/);
+    expect(out.suspectHidden).toBe(true);
+  });
+
+  test("historia idzie z agregatu i nie dociąga migawek", () => {
+    // Ścieżka, za którą nikt niefiltrujący nie płaci: 9 KB zamiast 1,9 MB.
+    expect(out.charts.popChart.title).toBe("Populacja świata w czasie");
+    expect(out.charts.popChart.label).toBe("Populacja");
+    expect(out.partialNoteHidden).toBe(true);
+    expect(out.historyStatus).toMatch(/^\d+ migawek$/);
+  });
+
+  test("każdy wykres dostaje punkty ustawione w czasie, nie w kolejności migawek", () => {
+    for (const [id, expectedSeries] of [["popChart", 1], ["actChart", 1], ["profChart", 6]] as const) {
+      expect(out.charts[id].series).toBe(expectedSeries);
+      expect(out.charts[id].points).toBe(out.charts.popChart.points);
+    }
+    // Oś X w milisekundach epoki — inaczej odstępy 3-17 dni wyglądałyby na równe.
+    expect(out.charts.popChart.firstX).toBeGreaterThan(0);
+  });
+
+  test("podsumowanie i tabela pokazują realne liczby", () => {
+    // Zmiana liczona z opublikowanego agregatu, nie zaszyta literałem: „−5,3%” było
+    // policzone z dzisiejszych danych fobosa i pierwszy `bun run scrape` robił z tego
+    // czerwone CI na commicie z danymi.
+    const fobos = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.fobos;
+    const percent = ((fobos.total.at(-1) - fobos.total[0]) / fobos.total[0]) * 100;
+    const sign = percent > 0 ? "+" : percent < 0 ? "−" : "";
+    const formatted = Math.abs(percent).toLocaleString("pl-PL", {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+
+    expect(out.summary).toContain(`${sign}${formatted}%`);
+    expect(percent).toBeLessThan(0); // fobos wyludnia się najszybciej ze wszystkich
+    expect(out.tableRows).toBe(out.charts.popChart.points); // nagłówek + n-1 wierszy zmian
+    expect(out.singlePointHidden).toBe(true);
+    expect(out.suspectNoteHidden).toBe(true);
+  });
+
+  test("liczby są po polsku, bez mieszania przecinka z kropką", () => {
+    // Daty mają kropki z definicji — sprawdzamy ułamki, nie 04.08.2026.
+    const fractions = (s: string) => s.replace(/\d{2}\.\d{2}\.\d{4}/g, "");
+    expect(fractions(out.summary)).not.toMatch(/\d\.\d/);
+    expect(fractions(out.table)).not.toMatch(/\d\.\d/);
+    expect(out.table).toMatch(/\d,\d/);
+  });
+
+  test("przełączenie progu i skali przelicza wykres, a nie tworzy nowego", () => {
+    expect(out.afterToggle.title).toBe("Udział aktywnych < 24h w populacji");
+    expect(out.afterToggle.updates).toBe(1);
+    expect(out.afterToggle.values.every((v: number) => v > 0 && v < 100)).toBe(true);
+  });
+
+  test("udział populacji w populacji to nie jest metryka", () => {
+    // Bez filtra „udział” dla wykresu populacji dałby płaską linię 100% — wykres
+    // zostaje wtedy w liczbach zamiast udawać, że coś pokazuje.
+    expect(out.afterToggle.popTitle).toBe("Populacja świata w czasie");
+  });
+
+  test("świat z jedną migawką pokazuje punkt i notkę zamiast pustego wykresu", () => {
+    expect(out.singleSnapshotWorld.points).toBe(1);
+    expect(out.singleSnapshotWorld.noticeHidden).toBe(false);
+    expect(out.singleSnapshotWorld.table).toBe("");
+  });
+});
+
+describe("widok składa się w całość — filtr ustawiony", () => {
+  const { proc, out } = smoke("filtered");
+
+  test("render przechodzi bez wyjątku", () => {
+    expect(proc.stderr.toString()).toBe("");
+    expect(proc.exitCode).toBe(0);
+    expect(out.error).toBe("");
+  });
+
+  test("filtry z URL-a dają na histogramie to, co siedzi w migawce", async () => {
+    const latest = manifest.worlds.find((w: { name: string }) => w.name === "aether").files.at(-1);
+    expect(out.source).toBe(latest.filters);
+
+    const f = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, latest.filters)).text());
+    let expected = 0;
+    for (let i = 0; i < f.count; i++) {
+      const level = f.level[i];
+      const prof = f.profession[i];
+      if (level >= 200 && level <= 250 && (prof === 1 || prof === 4)) expected += 1;
+    }
+
+    expect(out.matched).toBe(expected);
+    expect(expected).toBeGreaterThan(0);
+    expect(out.matchLine).toContain(`Pasuje: ${expected.toLocaleString("pl-PL")}`);
+  });
+
+  test("link z filtrami dociąga historię bez czekania na ruch myszą", () => {
+    expect(out.charts.popChart.title).toBe("Pasujących filtrowi w czasie");
+    expect(out.charts.popChart.points).toBeGreaterThan(1);
+    expect(out.partialNoteHidden).toBe(true); // komplet zdążył dojść
+    expect(out.historyStatus).toMatch(/^\d+ migawek$/);
+  });
+
+  test("ostatni punkt historii to ta sama liczba, co przekrój tej samej migawki", () => {
+    // Dwie niezależne drogi do jednej liczby: histogram sumowany po seriach
+    // i agregat policzony przez summarizeFiltered. Rozjazd znaczyłby, że któraś
+    // z nich filtruje inaczej.
+    expect(out.charts.popChart.lastY).toBe(out.matched);
+  });
+
+  test("wykres profesji pokazuje tylko profesje z filtra", () => {
+    expect(out.charts.profChart.series).toBe(2);
+  });
+
+  test("pasek streszcza filtr, który przewinął się poza ekran", () => {
+    // Od filtra do pierwszego wykresu historii jest 961 px — więcej niż ekran. Pasek
+    // jest jedynym miejscem, w którym widać naraz, co jest ustawione i na co działa.
+    expect(out.bar.chips).toEqual(["Poziom 200-250", "Wojownik, Tropiciel"]);
+    expect(out.bar.toggle).toBe("Filtry (2)");
+  });
+
+  test("szuflada startuje zamknięta i nic jej nie przełącza po dojściu danych", () => {
+    // Panel przełączany z JS-a dopiero po `fetch`ach przesuwał stronę o własną wysokość
+    // w trakcie ładowania — a przy przeładowaniu przywrócona pozycja scrolla lądowała
+    // gdzie indziej. Stan początkowy jest teraz wyłącznie w markupie.
+    expect(out.bar.fieldsHidden).toBe(true);
+    expect(out.afterOpen.fieldsHidden).toBe(false);
+    expect(out.afterOpen.expanded).toBe("true");
+    expect(out.afterClose.fieldsHidden).toBe(true);
+    expect(out.afterClose.expanded).toBe("false");
+    // otwieranie i zamykanie nie rusza filtrów
+    expect(out.afterOpen.chips).toEqual(out.bar.chips);
+  });
+
+  test("krzyżyk na chipie kasuje całą grupę pól, nie jedno", () => {
+    // „Poziom 200-250” to jeden byt dla czytającego, a dwa `<input>` dla kodu.
+    expect(out.afterChipClear.minLevel).toBe("");
+    expect(out.afterChipClear.maxLevel).toBe("");
+    expect(out.afterChipClear.chips).toEqual(["Wojownik, Tropiciel"]);
+    expect(out.afterChipClear.toggle).toBe("Filtry (1)");
+  });
+
+  test("każda migawka jest pobierana dokładnie raz, mimo serii zdarzeń filtra", () => {
+    // Historia gordiona to 1,9 MB. Wywoływanie pobierania wprost z handlera `input`
+    // startowało własny przelot na każdy wciśnięty klawisz, bo lista brakujących
+    // migawek jest liczona w momencie startu — a to zamienia „kupujesz 1,9 MB
+    // świadomie” w kilkukrotność tej liczby bez wiedzy użytkownika.
+    expect(out.fetches.duplicated).toEqual([]);
+    expect(out.fetches.maxPerFile).toBe(1);
+    expect(out.fetches.files).toBeGreaterThan(15); // aether + brutal, dwa światy
+  });
+
+  test("przełączenie świata gasi wykresy poprzedniego, zamiast trzymać je na ekranie", () => {
+    // Pierwszy render nowego świata przychodzi dopiero po pobraniu migawki. Bez
+    // synchronicznego wyczyszczenia pod nowym nagłówkiem stały przez kilkaset
+    // milisekund serie poprzedniego świata — łącznie z dymkami z tamtymi datami.
+    expect(out.afterWorldSwitch).toEqual({ popSeries: 0, profSeries: 0, tableRows: 0 });
+  });
+
+  test("niepełna historia mówi o sobie, i przestaje, gdy przestaje być niepełna", () => {
+    // Liczba migawek świata "brutal" rośnie z każdym scrapem — liczona z trends.json,
+    // nie zaszyta literałem, inaczej kolejny `bun run scrape` daje czerwone CI.
+    // dom_smoke.ts psuje pobranie dokładnie jednej migawki tego świata.
+    const total = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.brutal
+      .total.length;
+
+    // Migawka, która nie doszła, nie ma punktu — i widok ma to powiedzieć w sekcji
+    // HISTORIA, a nie w pasku błędu 1500 px wyżej, dotyczącym migawki przekroju.
+    expect(out.partialHistory.status).toBe(`${total - 1} z ${total} migawek · 1 nie wczytano`);
+    expect(out.partialHistory.noteHidden).toBe(false);
+    expect(out.partialHistory.note).toContain("Historia jest niepełna");
+    expect(out.partialHistory.error).toBe("");
+
+    // Po powrocie do filtra domyślnego historia idzie z kompletnego agregatu.
+    // Licznik porażek z poprzedniego filtra nie ma prawa jej dalej opisywać.
+    expect(out.afterReset).toEqual({ status: `${total} migawek`, noteHidden: true, points: total });
+  });
+
+  test("wybrany próg przeżywa przebudowę listy opcji", () => {
+    // Podmiana `innerHTML` na `<select>` zeruje wartość, więc odczytanie jej PO
+    // podmianie cofa użytkownika na pierwszą opcję. Efekt: ktoś, kto wybrał
+    // „≤ 30 dni”, ląduje na „< 24h” — serii wahającej się o 14,7% przy populacji
+    // stabilnej na 0,6% — i dostaje to jeszcze utrwalone w skopiowanym linku.
+    expect(out.thresholdSurvival.picked).toEqual({ value: "30d", options: 3 });
+
+    // przy „≤ 14 dni” próg 30d jest nieosiągalny, ale schodzimy na najszerszy
+    // sensowny (7d), nie na najwęższy z listy
+    expect(out.thresholdSurvival.narrowed).toEqual({ value: "7d", options: 2 });
+
+    // lista wraca do trzech opcji — wybór ma zostać, a nie skoczyć na pierwszą
+    expect(out.thresholdSurvival.widened).toEqual({ value: "7d", options: 3 });
+  });
+
+  test("filtr aktywności zabiera progi, które pod nim nic już nie mówią", () => {
+    // Przy „≤ 3 dni” próg „≤ 7 dni” liczyłby dokładnie tych samych graczy, co wykres
+    // pasujących — trzy linie jedna na drugiej wyglądają jak potwierdzenie czegoś.
+    expect(out.afterActivityFilter.thresholdOptions).toBe(1);
+    expect(out.afterActivityFilter.noteHidden).toBe(false);
+    expect(out.afterActivityFilter.note).toContain("≤ 3 dni");
+    expect(out.afterActivityFilter.actHidden).toBe(false);
+  });
+});
 
 describe("ostrzeżenie o podejrzanej migawce", () => {
   test("widok czyta flagę ze snapshotu i ma gdzie ją pokazać", () => {

@@ -83,6 +83,29 @@ const fetchCounts = new Map<string, number>();
 // nie była wykonywana ani razu, bo atrapa zawsze zwracała `ok: true`.
 const failUrls = new Set<string>();
 
+// Świat z dokładnie jedną migawką dopisany do manifestu i trendów przez atrapę,
+// nie wzięty z prawdziwych danych — na żywych danych taki świat istnieje tylko do
+// czasu drugiego scrapa (np. `luvia` miała 1 migawkę, dziś ma 2), więc test
+// przywiązany do konkretnej nazwy świata psuje się przy każdym `bun run scrape`.
+const SMOKE_WORLD = "smoke-single";
+const SMOKE_ENTRY = {
+  id: "smoke-only",
+  startedAt: "2026-08-16T12:00:00.000Z",
+  filters: `worlds/${SMOKE_WORLD}/smoke-only.f.json`,
+  names: `worlds/${SMOKE_WORLD}/smoke-only.n.json`,
+};
+const SMOKE_FILTERS = {
+  schema: 3,
+  kind: "filter",
+  world: SMOKE_WORLD,
+  count: 3,
+  startedAt: SMOKE_ENTRY.startedAt,
+  level: [10, 20, 30],
+  profession: [1, 2, 1],
+  honor: [5, 10, -3],
+  days: [0, 5, null],
+};
+
 const charts: Record<string, any> = {};
 class FakeChart {
   data: any;
@@ -134,6 +157,26 @@ Object.assign(globalThis, {
     // test przechodzi także z zepsutym kodem i niczego nie pilnuje.
     if (url.endsWith(".f.json")) await new Promise((resolve) => setTimeout(resolve, 100));
     if (failUrls.has(url)) return { ok: false, status: 503, json: async () => ({}) };
+    if (url === SMOKE_ENTRY.filters) {
+      return { ok: true, status: 200, json: async () => SMOKE_FILTERS };
+    }
+    if (url === "manifest.json") {
+      const manifest = JSON.parse(await Bun.file(`public/${url}`).text());
+      manifest.worlds.push({ name: SMOKE_WORLD, files: [SMOKE_ENTRY] });
+      return { ok: true, status: 200, json: async () => manifest };
+    }
+    if (url === "trends.json") {
+      const trends = JSON.parse(await Bun.file(`public/${url}`).text());
+      trends.worlds[SMOKE_WORLD] = {
+        id: [SMOKE_ENTRY.id],
+        startedAt: [SMOKE_ENTRY.startedAt],
+        total: [3],
+        act: [[1], [1], [0], [0], [1]],
+        byProf: [[2], [1], [0], [0], [0], [0]],
+        suspect: [0],
+      };
+      return { ok: true, status: 200, json: async () => trends };
+    }
     return {
       ok: true,
       status: 200,
@@ -218,8 +261,9 @@ if (scenario === "default") {
     popTitle: charts.popChart.options.plugins.title.text,
   };
 
-  // Świat z jedną migawką — poprawny stan, nie błąd.
-  nodes.worldSelect!.value = "luvia";
+  // Świat z jedną migawką — poprawny stan, nie błąd. Dopisany przez atrapę
+  // (SMOKE_WORLD), nie wzięty z żywych danych — patrz komentarz przy jego definicji.
+  nodes.worldSelect!.value = SMOKE_WORLD;
   nodes.modeSelect!.value = "liczba";
   await nodes.worldSelect!.handlers[0]!();
   await new Promise((resolve) => setTimeout(resolve, 400));
