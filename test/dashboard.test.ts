@@ -561,6 +561,7 @@ describe("widok składa się w całość — filtr domyślny", () => {
     expect(out.summary).toContain(`${sign}${formatted}%`);
     expect(percent).toBeLessThan(0); // fobos wyludnia się najszybciej ze wszystkich
     expect(out.tableRows).toBe(out.charts.popChart.points); // nagłówek + n-1 wierszy zmian
+    expect(out.tableHidden).toBe(false); // ukrywana jest tylko wtedy, gdy nie ma wierszy
     expect(out.singlePointHidden).toBe(true);
     expect(out.suspectNoteHidden).toBe(true);
   });
@@ -589,6 +590,10 @@ describe("widok składa się w całość — filtr domyślny", () => {
     expect(out.singleSnapshotWorld.points).toBe(1);
     expect(out.singleSnapshotWorld.noticeHidden).toBe(false);
     expect(out.singleSnapshotWorld.table).toBe("");
+    // Sama pusta treść nie wystarcza: `.card` ma ramkę i padding, a `tabindex="0"`
+    // z `role="region"` zostawiały puste pudełko łapiące tabulator i ogłaszane jako
+    // region bez zawartości. Notka `#singlePoint` niesie już ten komunikat.
+    expect(out.singleSnapshotWorld.tableHidden).toBe(true);
   });
 });
 

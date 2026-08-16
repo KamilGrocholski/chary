@@ -243,6 +243,7 @@ const result: Record<string, unknown> = {
   },
   tableRows: (nodes.changeTable!.innerHTML.match(/<tr>/g) ?? []).length,
   table: text("changeTable"),
+  tableHidden: nodes.changeTable!.hidden,
 };
 
 if (scenario === "default") {
@@ -272,6 +273,7 @@ if (scenario === "default") {
     points: charts.popChart.data.datasets[0].data.length,
     noticeHidden: nodes.singlePoint!.hidden,
     table: nodes.changeTable!.innerHTML,
+    tableHidden: nodes.changeTable!.hidden,
   };
 } else {
   const chipLabels = () =>

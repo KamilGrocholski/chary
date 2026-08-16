@@ -603,6 +603,12 @@ function setupView() {
 
   function renderTable(trend) {
     const rows = changeRows(trend).reverse(); // najnowsze na górze
+    // Świat z jedną migawką nie ma czego z czym porównać. Samo wyczyszczenie treści
+    // zostawiało `.card` z ramką i paddingiem — puste pudełko, które nadal łapało
+    // tabulator (`tabindex="0"`) i nadal było ogłaszane jako region „Zmiany populacji
+    // między migawkami”, tyle że bez zawartości. Notka `#singlePoint` wyżej mówi już,
+    // dlaczego tabeli nie ma, więc karta ma zniknąć w całości.
+    el("changeTable").hidden = rows.length === 0;
     if (rows.length === 0) {
       el("changeTable").innerHTML = "";
       return;
@@ -696,6 +702,10 @@ function setupView() {
       charts[id].data.datasets = [];
       charts[id].update();
     }
+    // Ukrywana z tego samego powodu, co przy jednej migawce: pusta karta z ramką
+    // to widoczne puste pudełko i martwy przystanek tabulatora. `renderTable`
+    // odsłoni ją z powrotem, gdy będzie miała co pokazać.
+    el("changeTable").hidden = true;
     el("changeTable").innerHTML = "";
   }
 
