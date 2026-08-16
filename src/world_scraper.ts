@@ -96,7 +96,7 @@ const WORLD_NAME = /^[a-z0-9-]+$/;
 // Uwaga: stary format `/ladder/players,<świat>?page=N` robi 301 na
 // `/ladder/<Świat>/players` GUBIĄC parametr `page` — pobierałby w kółko stronę 1.
 function buildUrl(world: string, page: number) {
-  return `${BASE}/ladder/${world}/players?page=${page}`;
+  return `${BASE}/ladder/${world}?page=${page}`;
 }
 
 function formatStamp(d: Date) {
