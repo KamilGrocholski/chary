@@ -27,7 +27,7 @@ export const ACTIVITY_THRESHOLDS = [
 ];
 
 // Domyślnie ≤ 7 dni: „< 24h” waha się o 14,7% przy populacji stabilnej na 0,6%,
-// bo zależy od godziny i dnia tygodnia scrapa. Patrz docs/2026-08-04-spec-trendy.md.
+// bo zależy od godziny i dnia tygodnia scrapa. Patrz docs/2026-08-04-spec-trends.md.
 export const DEFAULT_THRESHOLD = "7d";
 
 /**

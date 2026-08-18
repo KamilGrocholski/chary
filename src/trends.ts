@@ -11,7 +11,7 @@ import { writeAtomic } from "./atomic.ts";
 // Kształt jest podyktowany tym, co rysuje `public/trends.js`, i niczym więcej: bez
 // rozkładu poziomów (43× większy plik) i bez koszyków honoru, których ten widok nie
 // czyta. Poprzednik, `src/aggregate.ts`, został skasowany właśnie za produkowanie pól
-// bez konsumenta — patrz docs/2026-08-04-spec-trendy.md.
+// bez konsumenta — patrz docs/2026-08-04-spec-trends.md.
 
 export const TRENDS_SCHEMA = 1;
 export const TRENDS_FILE = path.join(PUBLIC_DIR, "trends.json");

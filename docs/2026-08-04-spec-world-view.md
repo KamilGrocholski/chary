@@ -1,6 +1,6 @@
 # Spec: jeden widok świata z filtrowaniem historii — 2026-08-04
 
-Po [`2026-08-04-spec-trendy.md`](2026-08-04-spec-trendy.md) projekt ma dwa widoki, które nie
+Po [`2026-08-04-spec-trends.md`](2026-08-04-spec-trends.md) projekt ma dwa widoki, które nie
 umieją tego samego. `index.html` filtruje dokładnie — poziom, honor, profesja, aktywność — ale
 tylko w obrębie **jednej migawki**. `trends.html` pokazuje **całą historię**, ale wyłącznie sumy
 globalne, bez jednego filtra.
@@ -103,7 +103,7 @@ za 0,2-1,9 MB, robiony na wyraźny ruch użytkownika i tylko dla jednego świata
 
 Ten widok **nie dokłada ani jednego bajtu do publikowanych danych** — czyta pliki, które już
 tam leżą, dziś pobierane po jednym. Budżet z
-[`2026-08-01-budzet-rozmiaru.md`](2026-08-01-budzet-rozmiaru.md) nie drgnie: `public/` ma
+[`2026-08-01-size-budget.md`](2026-08-01-size-budget.md) nie drgnie: `public/` ma
 **142,6 MB** z twardego limitu 1 GB, runda dokłada ~13,6 MB, zapasu jest **~63 rundy ≈ 2 lata**.
 
 Jedyny nowy koszt to **transfer**, a nie miejsce. Przy soft-limicie 100 GB/miesiąc na Pages
@@ -287,7 +287,7 @@ nie ucina, a kontrolka, która nigdy się nie renderuje, to dokładnie ten martw
 ten projekt skasował już moduł i stałą. Wejdzie razem z pierwszym światem, który przekroczy okno.
 
 Interakcja z planem ratunkowym budżetu: krok 2 z
-[`2026-08-01-budzet-rozmiaru.md`](2026-08-01-budzet-rozmiaru.md) to gzipowanie `.f.json`
+[`2026-08-01-size-budget.md`](2026-08-01-size-budget.md) to gzipowanie `.f.json`
 w repo z ręczną dekompresją przez `DecompressionStream`. Te dwie rzeczy się nie wykluczają —
 budżet już zakłada dekompresję po stronie przeglądarki, a loader historii jest jedynym miejscem,
 które trzeba by wtedy zmienić.
@@ -323,7 +323,7 @@ Osią tego widoku jest jeden świat i to nie jest tymczasowe.
 ale jedna mapa cieplna poziom × czas to inne pytanie i inny obieg.
 
 **Wyszukiwarki gracza i progresji pojedynczej postaci** — nadal blokowane szwem `charId`
-z [`2026-08-01-audyt-2.md`](2026-08-01-audyt-2.md), a `.n.json` nadal nie ma konsumenta.
+z [`2026-08-01-audit-2.md`](2026-08-01-audit-2.md), a `.n.json` nadal nie ma konsumenta.
 Ta spec go nie dostarcza.
 
 **Rozszerzania `trends.json`** — zostaje na `schema: 1`. Wszystko, co widok potrzebuje ponad

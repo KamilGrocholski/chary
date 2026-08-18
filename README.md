@@ -55,7 +55,7 @@ Kto nie filtruje, nie płaci za dokładność ani bajtem. Kto filtruje, dostaje 
 
 Nicki i `charId` leżą osobno w `.n.json` i nie są pobierane wcale — filtrowaniu są niepotrzebne, a to ~połowa objętości snapshotu. Pobierze je dopiero przyszła wyszukiwarka graczy i widok progresji.
 
-> **Uwaga na metrykę „ostatnio online".** Scrape leci ręcznie, raz o 4 rano, raz o 21, w różne dni tygodnia — a jedna runda trwa ~2 h. Przy populacji zmieniającej się o 0,6% próg „< 24h" waha się o ~15%. Do oceny trendu miarodajniejsze są progi „≤ 7 dni" i „≤ 30 dni"; widok pokazuje wszystkie trzy i podaje godzinę UTC każdej migawki. Szczegóły: [`docs/2026-08-04-spec-trendy.md`](docs/2026-08-04-spec-trendy.md).
+> **Uwaga na metrykę „ostatnio online".** Scrape leci ręcznie, raz o 4 rano, raz o 21, w różne dni tygodnia — a jedna runda trwa ~2 h. Przy populacji zmieniającej się o 0,6% próg „< 24h" waha się o ~15%. Do oceny trendu miarodajniejsze są progi „≤ 7 dni" i „≤ 30 dni"; widok pokazuje wszystkie trzy i podaje godzinę UTC każdej migawki. Szczegóły: [`docs/2026-08-04-spec-trends.md`](docs/2026-08-04-spec-trends.md).
 
 ## Wymagania
 
@@ -172,7 +172,7 @@ git push
 
 Workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) uploaduje katalog `public/` jako artefakt i publikuje go na GitHub Pages. Można też odpalić ręcznie z zakładki **Actions** (`workflow_dispatch`).
 
-> **Uwaga na rozmiar.** Opublikowana strona na GitHub Pages ma twardy limit 1 GB. Stan na 2026-08-01: `public/` waży 118 MB, a każda runda scrape'u dokłada ~14 MB → **zostało ~65 rund, czyli około dwóch lat** przy obecnym tempie. Pełne wyliczenie i co zrobić, gdy zapas się skończy: [`docs/2026-08-01-budzet-rozmiaru.md`](docs/2026-08-01-budzet-rozmiaru.md).
+> **Uwaga na rozmiar.** Opublikowana strona na GitHub Pages ma twardy limit 1 GB. Stan na 2026-08-01: `public/` waży 118 MB, a każda runda scrape'u dokłada ~14 MB → **zostało ~65 rund, czyli około dwóch lat** przy obecnym tempie. Pełne wyliczenie i co zrobić, gdy zapas się skończy: [`docs/2026-08-01-size-budget.md`](docs/2026-08-01-size-budget.md).
 
 ## Struktura projektu
 

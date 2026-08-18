@@ -1,7 +1,7 @@
 # Budżet rozmiaru vs limit GitHub Pages
 
 Stan na **2026-08-01**, po rozdzieleniu snapshotów na `.f.json` / `.n.json`.
-Uzupełnienie [`2026-08-01-audyt.md`](2026-08-01-audyt.md) (sekcja 2), gdzie liczby
+Uzupełnienie [`2026-08-01-audit.md`](2026-08-01-audit.md) (sekcja 2), gdzie liczby
 opisują stan **sprzed** naprawy.
 
 ## Wyliczenie

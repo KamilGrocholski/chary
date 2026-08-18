@@ -7,7 +7,7 @@ formularza i czy da się z tego widoku korzystać bez myszy.
 
 Punkt wyjścia jest taki, że **testy tej warstwy nie dotykają**: `dashboard.test.ts`
 sprawdza literały i liczby, `dom_smoke.ts` buduje atrapę regexem po `id="…"`. Zero CSS-a,
-zero geometrii, zero focusa (`2026-08-04-audyt-3.md:213-216`). Wszystko poniżej trzeba
+zero geometrii, zero focusa (`2026-08-04-audit-3.md:213-216`). Wszystko poniżej trzeba
 było zmierzyć w przeglądarce.
 
 ---
@@ -293,7 +293,7 @@ Ukrycie `#actChartBox` przy progu „< 24h" przesuwa wszystko poniżej o zmierzo
 | D11 | `minLevel > maxLevel` daje „Brak graczy spełniających filtry" zamiast „zakres jest odwrócony"; tekst w polu `type=number` cicho kasuje filtr; `?prof=99` cicho podstawia wszystkie sześć. | Trzy różne rodzaje cichej degradacji, każdy z własną decyzją, co pokazać. |
 | D12 | `profChart` nie oznacza migawek `suspect`, choć dwa pozostałe to robią. `404.html:26` ma `href="/"`, co na project-Pages wyprowadza poza projekt. | Dwa drobiazgi z audytu #3, wciąż otwarte. |
 
-Nie ruszone świadomie, bo odrzucone w `2026-08-04-spec-pasek-filtrow.md:246-251`: lewy
+Nie ruszone świadomie, bo odrzucone w `2026-08-04-spec-filter-bar.md:246-251`: lewy
 pasek boczny, przycisk „Zastosuj", zapisywane zestawy filtrów, nawigacja szersza niż dwie
 kotwice, zmiana wysokości wykresów.
 

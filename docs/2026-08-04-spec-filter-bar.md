@@ -1,6 +1,6 @@
 # Spec: filtr, który nie ucieka na górę — 2026-08-04
 
-Po scaleniu widoków ([`2026-08-04-spec-widok-swiata.md`](2026-08-04-spec-widok-swiata.md))
+Po scaleniu widoków ([`2026-08-04-spec-world-view.md`](2026-08-04-spec-world-view.md))
 jeden panel filtrów steruje **dwiema** sekcjami wyników: przekrojem wybranej migawki
 i historią wszystkich. To był cały sens scalenia — i to samo zrobiło z panelu rzecz,
 do której trzeba wracać, bo od filtra do danych, które się nim dostraja, jest cały ekran.

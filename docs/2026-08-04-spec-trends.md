@@ -2,7 +2,7 @@
 
 Projekt zbiera migawki od 2026-04-17 — dziś **202 migawki z 21 światów, 11 rund, 109 dni** —
 i nie ma ani jednego widoku, który tę historię pokazuje. To pozycja 3 listy pomysłów
-z [`2026-08-01-audyt-2.md`](2026-08-01-audyt-2.md) i główny zarzut audytu #1: „mimo 9 snapshotów
+z [`2026-08-01-audit-2.md`](2026-08-01-audit-2.md) i główny zarzut audytu #1: „mimo 9 snapshotów
 w czasie nie ma żadnego porównania w czasie — czyli tego, po co zbierane są migawki”.
 
 Zakres v1 jest celowo wąski: **jeden świat, wiele dat**. Sum globalnych i zestawiania światów
@@ -79,7 +79,7 @@ Rozważane warianty (całe 202 migawki, `JSON.stringify` bez wcięć):
 | + aktywność × profesja [30] | 42,1 KB | 17,5 KB |
 | + pełny histogram poziom × profesja | 1 655 KB | 382 KB |
 
-Wobec budżetu z [`2026-08-01-budzet-rozmiaru.md`](2026-08-01-budzet-rozmiaru.md): `public/` ma
+Wobec budżetu z [`2026-08-01-size-budget.md`](2026-08-01-size-budget.md): `public/` ma
 137 MB z limitu 1 GB, runda scrapa dokłada ~13,9 MB, zapasu jest ~65 rund. `trends.json` dokłada
 **~2,5 KB na rundę** (21 × 121 B) i po wyczerpaniu całego zapasu miałby ~190 KB. To 0,02%
 przyrostu rundy. Rozmiar nie jest w tej decyzji argumentem po żadnej ze stron.

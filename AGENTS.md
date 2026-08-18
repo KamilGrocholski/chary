@@ -151,7 +151,7 @@ końcu każdej rundy scrapa; migawka bez `startedAt` wypada z niego, bo nie ma j
 postawić na osi czasu.
 
 Pełne uzasadnienie kształtu i pułapki metryki „ostatnio online”:
-[`docs/2026-08-04-spec-trendy.md`](docs/2026-08-04-spec-trendy.md).
+[`docs/2026-08-04-spec-trends.md`](docs/2026-08-04-spec-trends.md).
 
 ### Historia pod filtrem — druga ścieżka tych samych wykresów
 
@@ -188,8 +188,8 @@ Pułapki tej ścieżki:
   i przez to ukrywała ten błąd.
 
 Pomiary, budżet transferu i uzasadnienie scalenia widoków:
-[`docs/2026-08-04-spec-widok-swiata.md`](docs/2026-08-04-spec-widok-swiata.md).
-Osiem błędów, których nie łapało 165 testów: [`docs/2026-08-04-audyt-3.md`](docs/2026-08-04-audyt-3.md).
+[`docs/2026-08-04-spec-world-view.md`](docs/2026-08-04-spec-world-view.md).
+Osiem błędów, których nie łapało 165 testów: [`docs/2026-08-04-audit-3.md`](docs/2026-08-04-audit-3.md).
 
 ---
 
@@ -227,14 +227,14 @@ Pełne uzasadnienia i historia: audyty niżej.
 
 | Plik | Po co |
 |---|---|
-| [`docs/2026-08-01-audyt.md`](docs/2026-08-01-audyt.md) | Audyt #1: czy dane są prawdziwe (są — zweryfikowane wobec żywego rankingu), co było zepsute, co usunięte, czego brakuje. |
-| [`docs/2026-08-01-audyt-2.md`](docs/2026-08-01-audyt-2.md) | Audyt #2 po naprawach: co się obroniło, co poprawione, **dług na przyszłość i lista pomysłów**. |
-| [`docs/2026-08-01-budzet-rozmiaru.md`](docs/2026-08-01-budzet-rozmiaru.md) | Ile rund scrapa zostało do limitu 1 GB na Pages (~65 ≈ 2 lata) i co zrobić, gdy się skończy. |
-| [`docs/2026-08-04-spec-trendy.md`](docs/2026-08-04-spec-trendy.md) | Spec widoku trendów jednego świata w czasie: co pokazać, `trends.json` (**9,0 KB gzip na całą historię**), pułapki metryki „ostatnio online”. |
-| [`docs/2026-08-04-spec-widok-swiata.md`](docs/2026-08-04-spec-widok-swiata.md) | Spec scalenia `index.html` i `trends.html` w jeden widok per świat, z filtrowaniem **całej historii** u klienta: pomiary (**7 ms na 813 tys. wierszy**), leniwe pobieranie, pułapki i próg okna migawek. |
-| [`docs/2026-08-04-audyt-3.md`](docs/2026-08-04-audyt-3.md) | Audyt #3: **osiem błędów, których nie łapało 165 testów**, atrapa DOM-u łagodniejsza od przeglądarki, `Retry-After: 0`, nieatomowy zapis, walidacja CLI — plus dług i pomysły. |
-| [`docs/2026-08-04-spec-pasek-filtrow.md`](docs/2026-08-04-spec-pasek-filtrow.md) | Spec przypiętego paska filtrów: geometria strony (**2806 px**, filtr 961 px od pierwszego wykresu historii, **87% ekranu na telefonie**), warianty, badania i pułapki `position: sticky` w tym markupie. |
-| [`docs/2026-08-05-audyt-ui-ux.md`](docs/2026-08-05-audyt-ui-ux.md) | Audyt #4, pierwszy o **interfejsie**: kontrasty granic (było **1,48:1** przy progu 3:1), chipy ściskane do **0 px** między 721 a 1100 px, focus ginący przy Escape i przy krzyżyku, geometria zmierzona w przeglądarce. Metoda pomiaru, dług i trzy hipotezy obalone. |
+| [`docs/2026-08-01-audit.md`](docs/2026-08-01-audit.md) | Audyt #1: czy dane są prawdziwe (są — zweryfikowane wobec żywego rankingu), co było zepsute, co usunięte, czego brakuje. |
+| [`docs/2026-08-01-audit-2.md`](docs/2026-08-01-audit-2.md) | Audyt #2 po naprawach: co się obroniło, co poprawione, **dług na przyszłość i lista pomysłów**. |
+| [`docs/2026-08-01-size-budget.md`](docs/2026-08-01-size-budget.md) | Ile rund scrapa zostało do limitu 1 GB na Pages (~65 ≈ 2 lata) i co zrobić, gdy się skończy. |
+| [`docs/2026-08-04-spec-trends.md`](docs/2026-08-04-spec-trends.md) | Spec widoku trendów jednego świata w czasie: co pokazać, `trends.json` (**9,0 KB gzip na całą historię**), pułapki metryki „ostatnio online”. |
+| [`docs/2026-08-04-spec-world-view.md`](docs/2026-08-04-spec-world-view.md) | Spec scalenia `index.html` i `trends.html` w jeden widok per świat, z filtrowaniem **całej historii** u klienta: pomiary (**7 ms na 813 tys. wierszy**), leniwe pobieranie, pułapki i próg okna migawek. |
+| [`docs/2026-08-04-audit-3.md`](docs/2026-08-04-audit-3.md) | Audyt #3: **osiem błędów, których nie łapało 165 testów**, atrapa DOM-u łagodniejsza od przeglądarki, `Retry-After: 0`, nieatomowy zapis, walidacja CLI — plus dług i pomysły. |
+| [`docs/2026-08-04-spec-filter-bar.md`](docs/2026-08-04-spec-filter-bar.md) | Spec przypiętego paska filtrów: geometria strony (**2806 px**, filtr 961 px od pierwszego wykresu historii, **87% ekranu na telefonie**), warianty, badania i pułapki `position: sticky` w tym markupie. |
+| [`docs/2026-08-05-audit-ui-ux.md`](docs/2026-08-05-audit-ui-ux.md) | Audyt #4, pierwszy o **interfejsie**: kontrasty granic (było **1,48:1** przy progu 3:1), chipy ściskane do **0 px** między 721 a 1100 px, focus ginący przy Escape i przy krzyżyku, geometria zmierzona w przeglądarce. Metoda pomiaru, dług i trzy hipotezy obalone. |
 | [`DATA-NOTICE.md`](DATA-NOTICE.md) | **Czyje są dane i czego nie licencjonujemy.** Granica kod/dane, klauzule regulaminu Margonem (`XIX.2`, `XIX.4`, `VII.2.m)`, `VII.2.k)`), prawo sui generis do bazy, dane osobowe w `.n.json`, procedura usunięcia, zachowanie scrapera. |
 | [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) | Chart.js (rozpowszechniany — wymaga noty) vs zależności buildu; całe drzewo permisywne, bez copyleftu. |
 | [`README.md`](README.md) | Instrukcja obsługi dla człowieka. |
