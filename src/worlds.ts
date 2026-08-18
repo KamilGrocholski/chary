@@ -1,6 +1,6 @@
-// Lista światów do scrapowania.
-// Edytuj tę listę ręcznie, aby dodać lub usunąć światy.
-// Uruchomienie: bun src/world_scraper.ts (bez argumentów = pobiera tę listę)
+// The list of worlds to scrape.
+// Edit this list by hand to add or remove worlds.
+// Running it: bun src/world_scraper.ts (no arguments = fetches this list)
 export const WORLDS = [
   "aether",
   "aldous",

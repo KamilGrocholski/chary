@@ -17,7 +17,7 @@ import { rebuildTrends } from "./trends.ts";
 import { writeAtomic } from "./atomic.ts";
 import { MAX_PAGE_RETRIES, backoffFor, parseRetryAfter } from "./retry.ts";
 
-// ── Typy błędów ───────────────────────────────────────────────────────────────
+// ── Error types ───────────────────────────────────────────────────────────────
 
 class HttpError extends Error {
   readonly type = "HttpError";
@@ -42,7 +42,7 @@ class IoError extends Error {
 
 type ScraperError = HttpError | ParseError | FetchError | IoError;
 
-// ── Logowanie ─────────────────────────────────────────────────────────────────
+// ── Logging ───────────────────────────────────────────────────────────────────
 
 const LOG_DIR = "logs";
 const LOG_FILE = path.join(LOG_DIR, "scraper.log");
@@ -78,23 +78,23 @@ function logError(err: ScraperError, context?: object) {
   });
 }
 
-// ── Stałe ─────────────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const BASE = "https://www.margonem.pl";
 const FETCH_TIMEOUT_MS = 30_000;
 
 const MIN_INTERVAL_MS = 250;
-/** Powyżej tylu procent odrzuconych wierszy na stronie zakładamy zmianę markupu. */
+/** Above this share of rejected rows on a page we assume the markup changed. */
 const MAX_BAD_ROW_RATIO = 0.01;
 
-/** Nazwa świata trafia i do URL-a, i do ścieżki pliku — musi być nudna. */
+/** A world name goes into a URL and into a file path alike — it has to be boring. */
 const WORLD_NAME = /^[a-z0-9-]+$/;
 
-// ── Helpery ───────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-// Uwaga: stary format `/ladder/players,<świat>?page=N` robi 301 na
-// `/ladder/<Świat>/players` GUBIĄC parametr `page` — pobierałby w kółko stronę 1.
+// Note: the old form `/ladder/players,<world>?page=N` 301s to `/ladder/<World>/players`
+// and LOSES the `page` parameter — it would fetch page 1 over and over.
 function buildUrl(world: string, page: number) {
   return `${BASE}/ladder/${world}?page=${page}`;
 }
@@ -108,7 +108,7 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ── Pobieranie strony ─────────────────────────────────────────────────────────
+// ── Fetching a page ───────────────────────────────────────────────────────────
 
 async function fetchPage(world: string, page: number): Promise<string> {
   const url = buildUrl(world, page);
@@ -127,10 +127,10 @@ async function fetchPage(world: string, page: number): Promise<string> {
     throw new HttpError(res.status, url, parseRetryAfter(res.headers.get("retry-after")));
   }
 
-  // Przekierowanie, które zgubiło numer strony, oznacza że pobralibyśmy w kółko
-  // to samo — lepiej wywalić się głośno niż zapisać 400 kopii strony 1.
+  // A redirect that lost the page number means we would fetch the same thing over and
+  // over — better to fail loudly than to write 400 copies of page 1.
   if (page > 1 && !res.url.includes(`page=${page}`)) {
-    throw new FetchError(`Przekierowanie zgubiło paginację (${res.url})`, url);
+    throw new FetchError(`redirect lost the pagination (${res.url})`, url);
   }
 
   return res.text();
@@ -146,7 +146,7 @@ async function scrapePage(world: string, page: number): Promise<PageResult> {
   const ratio = errors.length / Math.max(1, rows.length + errors.length);
   if (ratio > MAX_BAD_ROW_RATIO) {
     throw new ParseError(
-      `Odrzucono ${errors.length}/${rows.length + errors.length} wierszy — pierwszy: ${errors[0]}`,
+      `rejected ${errors.length}/${rows.length + errors.length} rows — first: ${errors[0]}`,
       world,
       page,
     );
@@ -155,7 +155,7 @@ async function scrapePage(world: string, page: number): Promise<PageResult> {
   return { rows, totalPages: parseTotalPages($), badRows: errors };
 }
 
-/** Ponawia POJEDYNCZĄ stronę — poprzednio retry cofał cały świat do strony 1. */
+/** Retries a SINGLE page — retrying used to rewind the whole world to page 1. */
 async function scrapePageWithRetry(world: string, page: number): Promise<PageResult> {
   let attempt = 0;
   while (true) {
@@ -168,7 +168,7 @@ async function scrapePageWithRetry(world: string, page: number): Promise<PageRes
 
       const suggested = e instanceof HttpError ? e.retryAfterMs : undefined;
       const backoff = backoffFor(attempt, suggested);
-      await log("WARN", `Próba ${attempt}/${MAX_PAGE_RETRIES} nieudana (${world} s.${page}), ponawiam za ${backoff}ms`, {
+      await log("WARN", `attempt ${attempt}/${MAX_PAGE_RETRIES} failed (${world} p.${page}), retrying in ${backoff}ms`, {
         world,
         page,
         backoffMs: backoff,
@@ -179,7 +179,7 @@ async function scrapePageWithRetry(world: string, page: number): Promise<PageRes
   }
 }
 
-// ── Scrapowanie świata ────────────────────────────────────────────────────────
+// ── Scraping a world ──────────────────────────────────────────────────────────
 
 async function scrapeWorld(world: string, interval: number): Promise<PopulationDrop | null> {
   const startedAt = new Date();
@@ -188,18 +188,18 @@ async function scrapeWorld(world: string, interval: number): Promise<PopulationD
   let page = 1;
   let maxPages = 1;
 
-  await log("INFO", `Start`, { world, interval });
-  process.stdout.write(`\n⟳ ${world} — łączenie...\n`);
+  await log("INFO", `start`, { world, interval });
+  process.stdout.write(`\n⟳ ${world} — connecting...\n`);
 
   while (page <= maxPages) {
     const result = await scrapePageWithRetry(world, page);
     if (page === 1) maxPages = result.totalPages;
 
     allRows.push(...result.rows);
-    badRows.push(...result.badRows.map((e) => `s.${page}: ${e}`));
+    badRows.push(...result.badRows.map((e) => `p.${page}: ${e}`));
 
-    await log("DEBUG", `strona ${page}/${maxPages}: ${result.rows.length} wierszy`, { world });
-    process.stdout.write(`\r  ${world}: strona ${page}/${maxPages} (${allRows.length} graczy)`);
+    await log("DEBUG", `page ${page}/${maxPages}: ${result.rows.length} rows`, { world });
+    process.stdout.write(`\r  ${world}: page ${page}/${maxPages} (${allRows.length} players)`);
     page++;
 
     if (page <= maxPages) await sleep(interval);
@@ -224,20 +224,20 @@ async function scrapeWorld(world: string, interval: number): Promise<PopulationD
     await writeAtomic(filterPathFor(dir, timestamp), JSON.stringify(filters));
     await writeAtomic(namesPathFor(dir, timestamp), JSON.stringify(names));
   } catch (e) {
-    throw new IoError(`Nie udało się zapisać snapshotu ${world}: ${e instanceof Error ? e.message : String(e)}`, e);
+    throw new IoError(`could not write the ${world} snapshot: ${e instanceof Error ? e.message : String(e)}`, e);
   }
 
   if (badRows.length > 0) {
-    await log("WARN", `Pominięto ${badRows.length} wierszy`, { world, examples: badRows.slice(0, 5) });
+    await log("WARN", `skipped ${badRows.length} rows`, { world, examples: badRows.slice(0, 5) });
   }
 
   if (suspect) {
-    await log("WARN", `Podejrzana migawka: ${suspect.reason}`, { world, ...suspect });
-    process.stdout.write(`\r⚠ ${world}: ${allRows.length} graczy — ${suspect.reason}\n`);
+    await log("WARN", `suspect snapshot: ${suspect.reason}`, { world, ...suspect });
+    process.stdout.write(`\r⚠ ${world}: ${allRows.length} players — ${suspect.reason}\n`);
   } else {
-    process.stdout.write(`\r✓ ${world}: ${allRows.length} graczy, ${maxPages} stron — zapisano\n`);
+    process.stdout.write(`\r✓ ${world}: ${allRows.length} players, ${maxPages} pages — written\n`);
   }
-  await log("INFO", `Koniec`, {
+  await log("INFO", `done`, {
     world,
     rows: allRows.length,
     pages: maxPages,
@@ -250,14 +250,14 @@ async function scrapeWorld(world: string, interval: number): Promise<PopulationD
 
 // ── Dry-run ───────────────────────────────────────────────────────────────────
 
-/** Pobiera tylko stronę 1 i raportuje, czy parser radzi sobie z aktualnym markupem. */
+/** Fetches page 1 only and reports whether the parser copes with the current markup. */
 async function dryRunWorld(world: string): Promise<boolean> {
   try {
     const { rows, totalPages, badRows } = await scrapePage(world, 1);
     const [first] = rows;
     process.stdout.write(
-      `✓ ${world.padEnd(9)} ${String(rows.length).padStart(3)} wierszy, ${String(totalPages).padStart(4)} stron` +
-        `${badRows.length ? `, ${badRows.length} pominiętych` : ""}` +
+      `✓ ${world.padEnd(9)} ${String(rows.length).padStart(3)} rows, ${String(totalPages).padStart(4)} pages` +
+        `${badRows.length ? `, ${badRows.length} skipped` : ""}` +
         `${first ? ` — #1 ${first[1]} (lvl ${first[3]}, prof ${first[4]}, PH ${first[5]})` : ""}\n`,
     );
     return true;
@@ -273,19 +273,19 @@ const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const positional = args.filter((a) => !a.startsWith("--"));
 
-// Nieznana flaga nie może być po cichu wyrzucona z `positional`: literówka
-// w `--dry-run` uruchamiała wtedy PEŁNY scrape — ~1,6 h i 202 nadpisane pliki.
+// An unknown flag must not be silently dropped from `positional`: a typo in `--dry-run`
+// then started a FULL scrape — ~1.6 h and 202 overwritten files.
 const unknownFlags = args.filter((a) => a.startsWith("--") && a !== "--dry-run" && !a.startsWith("--drop-threshold="));
 if (unknownFlags.length > 0) {
-  console.error(`nieznane opcje: ${unknownFlags.join(", ")}\nznane: --dry-run, --drop-threshold=<0-1>`);
+  console.error(`unknown options: ${unknownFlags.join(", ")}\nknown: --dry-run, --drop-threshold=<0-1>`);
   process.exit(1);
 }
 
-// Próg strażnika obciętego scrapu, np. --drop-threshold=0.1 dla 10%.
+// The truncated-scrape guard's threshold, e.g. --drop-threshold=0.1 for 10%.
 const dropThresholdArg = args.find((a) => a.startsWith("--drop-threshold="))?.split("=")[1];
 const dropThreshold = dropThresholdArg === undefined ? DEFAULT_DROP_THRESHOLD : Number(dropThresholdArg);
 if (!Number.isFinite(dropThreshold) || dropThreshold < 0 || dropThreshold > 1) {
-  console.error("--drop-threshold musi być liczbą z zakresu 0-1 (udział, nie procent)");
+  console.error("--drop-threshold must be a number in 0-1 (a share, not a percentage)");
   process.exit(1);
 }
 
@@ -293,18 +293,18 @@ const worlds = positional[0]
   ? positional[0].split(",").map((w) => w.trim().toLowerCase()).filter(Boolean)
   : DEFAULT_WORLDS;
 
-// Nazwa świata idzie do URL-a ORAZ do `path.join(WORLDS_DIR, world)`, więc bez
-// walidacji `scrape ../../tmp/x` zapisywał migawki poza `public/`.
+// A world name goes into the URL AND into `path.join(WORLDS_DIR, world)`, so without
+// validation `scrape ../../tmp/x` wrote snapshots outside `public/`.
 const badWorlds = worlds.filter((w) => !WORLD_NAME.test(w));
 if (badWorlds.length > 0) {
-  console.error(`nazwa świata może zawierać tylko [a-z0-9-]: ${badWorlds.join(", ")}`);
+  console.error(`a world name may contain only [a-z0-9-]: ${badWorlds.join(", ")}`);
   process.exit(1);
 }
 
-// `scrape ,` dawało pustą listę, pętla nie robiła nic, a proces kończył się
-// kodem 0 i komunikatem „✓ 0/0 światów” — dokładnie klasa błędu z zasady #2.
+// `scrape ,` produced an empty list, the loop did nothing, and the process exited with
+// code 0 and "✓ 0/0 worlds" — exactly the class of failure rule #3 is about.
 if (worlds.length === 0) {
-  console.error("nie podano żadnego świata");
+  console.error("no world given");
   process.exit(1);
 }
 
@@ -312,20 +312,20 @@ let interval = 1000;
 if (positional[1]) {
   const parsed = Number.parseInt(positional[1], 10);
   if (Number.isNaN(parsed) || parsed < MIN_INTERVAL_MS) {
-    console.error(`interval musi być liczbą ≥ ${MIN_INTERVAL_MS} (ms)`);
+    console.error(`interval must be a number ≥ ${MIN_INTERVAL_MS} (ms)`);
     process.exit(1);
   }
   interval = parsed;
 }
 
 if (dryRun) {
-  process.stdout.write(`Dry-run: sprawdzam parser na stronie 1 (${worlds.length} światów), nic nie zapisuję.\n\n`);
+  process.stdout.write(`Dry run: checking the parser on page 1 (${worlds.length} worlds), writing nothing.\n\n`);
   let failed = 0;
   for (const [i, world] of worlds.entries()) {
     if (!(await dryRunWorld(world))) failed++;
     if (i < worlds.length - 1) await sleep(interval);
   }
-  process.stdout.write(`\n${worlds.length - failed}/${worlds.length} światów OK\n`);
+  process.stdout.write(`\n${worlds.length - failed}/${worlds.length} worlds OK\n`);
   process.exit(failed > 0 ? 1 : 0);
 }
 
@@ -339,30 +339,30 @@ for (const world of worlds) {
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     failures.push({ world, error: message });
-    await log("FATAL", `Świat ${world} nieudany — pomijam`, { world, error: message });
+    await log("FATAL", `world ${world} failed — skipping`, { world, error: message });
     process.stdout.write(`\r✗ ${world}: ${message}\n`);
   }
 }
 
 await rebuildManifest();
 
-// Trendy przebudowujemy w całości — inaczej `public/trends.json` opisywałby stan
-// sprzed rundy, a widok historii pokazywałby wszystko poza tym, co przed chwilą zeszło.
+// The trends are rebuilt in full — otherwise `public/trends.json` would describe the state
+// before the round, and the history view would show everything except what just came down.
 const { skipped } = await rebuildTrends();
 if (skipped > 0) {
-  await log("WARN", `Trendy: pominięto ${skipped} migawek bez startedAt`, { skipped });
+  await log("WARN", `trends: skipped ${skipped} snapshots with no startedAt`, { skipped });
 }
 
 if (suspects.length > 0) {
-  // Migawki są zapisane — to ostrzeżenie do sprawdzenia, nie porażka runu.
-  process.stdout.write(`\n⚠ ${suspects.length} migawek wymaga sprawdzenia:\n`);
+  // The snapshots are written — this is a warning to look into, not a failed run.
+  process.stdout.write(`\n⚠ ${suspects.length} snapshots need checking:\n`);
   for (const s of suspects) process.stdout.write(`  ⚠ ${s.world}: ${s.reason}\n`);
 }
 
 if (failures.length > 0) {
-  process.stdout.write(`\n${failures.length}/${worlds.length} światów nie zostało pobranych:\n`);
+  process.stdout.write(`\n${failures.length}/${worlds.length} worlds were not fetched:\n`);
   for (const f of failures) process.stdout.write(`  ✗ ${f.world}: ${f.error}\n`);
   process.exit(1);
 }
 
-process.stdout.write(`\n✓ ${worlds.length}/${worlds.length} światów pobranych\n`);
+process.stdout.write(`\n✓ ${worlds.length}/${worlds.length} worlds fetched\n`);

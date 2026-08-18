@@ -4,24 +4,26 @@ import { PUBLIC_DIR, WORLDS_DIR } from "./manifest.ts";
 import { timestampFromFileName, type FilterFile } from "./snapshot.ts";
 import { writeAtomic } from "./atomic.ts";
 
-// Zwinięta historia jednego świata: po jednej liczbie na migawkę zamiast setek tysięcy
-// wierszy. Cała historia (202 migawki, 21 światów) mieści się w ~24 KB, czyli 9 KB po
-// gzipie — wobec 14,9 MB, które kosztowałoby pobranie tych samych migawek z `.f.json`.
+// The folded history of one world: a single number per snapshot instead of hundreds of
+// thousands of rows. The whole history (202 snapshots, 21 worlds) fits in ~24 KB, i.e.
+// 9 KB gzipped — against the 14.9 MB it would cost to fetch the same snapshots as
+// `.f.json`.
 //
-// Kształt jest podyktowany tym, co rysuje `public/trends.js`, i niczym więcej: bez
-// rozkładu poziomów (43× większy plik) i bez koszyków honoru, których ten widok nie
-// czyta. Poprzednik, `src/aggregate.ts`, został skasowany właśnie za produkowanie pól
-// bez konsumenta — patrz docs/2026-08-04-spec-trends.md.
+// The shape is dictated by what `public/history.js` draws and by nothing else: no level
+// distribution (a 43× larger file) and no honor buckets, which that view does not read.
+// Its predecessor, `src/aggregate.ts`, was deleted for exactly that — producing fields
+// with no consumer. See docs/2026-08-04-spec-trends.md.
 
 export const TRENDS_SCHEMA = 1;
 export const TRENDS_FILE = path.join(PUBLIC_DIR, "trends.json");
 
 /**
- * Koszyk aktywności: 0 = <24h, 1 = 1-7 dni, 2 = 8-30 dni, 3 = >30 dni, 4 = nigdy.
+ * The activity bucket: 0 = <24h, 1 = 1-7 days, 2 = 8-30 days, 3 = >30 days, 4 = never.
  *
- * Koszyki są **rozłączne**, nie skumulowane — „aktywni ≤7 dni” to suma koszyków 0 i 1.
- * Musi zgadzać się co do wartości z `activityBucket` w `public/shared.js`; pilnuje tego
- * test, bo rozjazd tych dwóch funkcji dałby wykres niezgodny z dashboardem migawki.
+ * The buckets are **disjoint**, not cumulative — "active ≤7 days" is the sum of buckets
+ * 0 and 1. It must agree value for value with `activityBucket` in `public/shared.js`;
+ * a test holds that, because the two drifting apart would give a chart that disagrees
+ * with the snapshot dashboard.
  */
 export function activityBucket(days: number | null | undefined): number {
   if (days === null || days === undefined) return 4;
@@ -33,9 +35,9 @@ export function activityBucket(days: number | null | undefined): number {
 
 export type SnapshotSummary = {
   total: number;
-  /** Liczności koszyków aktywności, indeksy jak w `activityBucket`. */
+  /** Activity bucket counts, indexed as in `activityBucket`. */
   act: number[];
-  /** Liczności profesji 1-6. */
+  /** Counts for professions 1-6. */
   byProf: number[];
 };
 
@@ -47,8 +49,9 @@ export function summarizeSnapshot(filters: FilterFile): SnapshotSummary {
   for (let i = 0; i < filters.count; i++) {
     const level = filters.level[i]!;
     const profession = filters.profession[i]!;
-    // Ten sam warunek, co `matches` w public/app.js: wiersz bez poziomu albo z profesją
-    // spoza 1-6 nie trafia na żaden wykres, więc nie może się liczyć do populacji.
+    // The same condition as `matches` in public/filters.js: a row with no level, or with
+    // a profession outside 1-6, reaches no chart, so it must not count towards the
+    // population.
     if (!level || level < 1 || profession < 1 || profession > 6) continue;
 
     total += 1;
@@ -59,7 +62,7 @@ export function summarizeSnapshot(filters: FilterFile): SnapshotSummary {
   return { total, act, byProf };
 }
 
-/** Historia jednego świata, kolumnowo. Wiersz i każdej kolumny to ta sama migawka. */
+/** One world's history, columnar. Row i of every column is the same snapshot. */
 export type WorldTrend = {
   id: string[];
   startedAt: string[];
@@ -76,9 +79,10 @@ export type Trends = {
 };
 
 /**
- * Migawki bez `startedAt` są pomijane: identyfikator nie jest datą (pliki sprzed
- * sierpnia 2026 mają w nazwie czas lokalny), więc nie ma ich gdzie postawić na osi
- * czasu. Ile ich wypadło, raportuje `rebuildTrends` — po cichu gubić danych nie wolno.
+ * Snapshots without `startedAt` are skipped: the identifier is not a date (files from
+ * before August 2026 carry local time in the name), so there is nowhere to put them on the
+ * time axis. How many dropped out is reported by `rebuildTrends` — losing data silently is
+ * not allowed.
  */
 export function buildWorldTrend(snapshots: { id: string; filters: FilterFile }[]): WorldTrend {
   const trend: WorldTrend = {
@@ -107,9 +111,9 @@ export function buildWorldTrend(snapshots: { id: string; filters: FilterFile }[]
 }
 
 /**
- * Przebudowuje `public/trends.json` w całości. Osobne przejście po `.f.json` niż
- * manifest — to ~0,9 s wobec ~1,6 h rundy scrapa, a cena za to, że trendy da się
- * odbudować bez ruszania manifestu i odwrotnie.
+ * Rebuilds `public/trends.json` in full. A separate pass over the `.f.json` files from the
+ * manifest's — that is ~0.9 s against a ~1.6 h scrape round, and the price of being able to
+ * rebuild the trends without touching the manifest and the other way round.
  */
 export async function rebuildTrends(): Promise<{ trends: Trends; skipped: number }> {
   const worldDirs = (await readdir(WORLDS_DIR, { withFileTypes: true }))
@@ -126,14 +130,14 @@ export async function rebuildTrends(): Promise<{ trends: Trends; skipped: number
 
     const snapshots: { id: string; filters: FilterFile }[] = [];
     for (const file of files) {
-      // Nieczytelny plik pomijamy z ostrzeżeniem zamiast wywalać całą przebudowę —
-      // inaczej jedna migawka obcięta przez Ctrl-C blokuje `bun run rebuild`, czyli
-      // dokładnie to polecenie, którym miałoby się ją naprawić.
+      // An unreadable file is skipped with a warning rather than taking down the whole
+      // rebuild — otherwise a single snapshot truncated by Ctrl-C blocks `bun run rebuild`,
+      // which is exactly the command meant to repair it.
       let filters: FilterFile;
       try {
         filters = JSON.parse(await Bun.file(path.join(dir, file)).text()) as FilterFile;
       } catch (e) {
-        console.warn(`⚠ pominięto nieczytelny snapshot ${world}/${file}: ${e instanceof Error ? e.message : e}`);
+        console.warn(`⚠ skipped unreadable snapshot ${world}/${file}: ${e instanceof Error ? e.message : e}`);
         continue;
       }
       snapshots.push({ id: timestampFromFileName(file), filters });
@@ -141,7 +145,7 @@ export async function rebuildTrends(): Promise<{ trends: Trends; skipped: number
 
     const trend = buildWorldTrend(snapshots);
     skipped += snapshots.length - trend.id.length;
-    // Świat bez ani jednej datowanej migawki nie miałby czego pokazać na osi czasu.
+    // A world without a single dated snapshot would have nothing to show on a time axis.
     if (trend.id.length > 0) worlds[world] = trend;
   }
 

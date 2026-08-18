@@ -1,10 +1,10 @@
 import path from "node:path";
 
-// Lokalny podgląd tego, co ląduje na GitHub Pages.
+// A local preview of what lands on GitHub Pages.
 const ROOT = path.resolve("public");
 
 function resolveInsideRoot(pathname: string): string | null {
-  // Bez normalizacji `/../src/world_scraper.ts` wychodziło poza public/.
+  // Without normalising, `/../src/world_scraper.ts` escaped public/.
   const resolved = path.resolve(ROOT, `.${path.posix.normalize(pathname)}`);
   return resolved === ROOT || resolved.startsWith(ROOT + path.sep) ? resolved : null;
 }

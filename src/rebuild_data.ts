@@ -12,11 +12,11 @@ import {
 import { rebuildTrends } from "./trends.ts";
 import { writeAtomic } from "./atomic.ts";
 
-// Utrzymanie danych w public/:
-//   - migracja snapshotów z jednego pliku do pary `.f.json` / `.n.json`,
-//   - przebudowa manifestu,
-//   - przebudowa trendów (`public/trends.json`).
-// Bezpieczne do wielokrotnego uruchamiania.
+// Data maintenance in public/:
+//   - migrating single-file snapshots into a `.f.json` / `.n.json` pair,
+//   - rebuilding the manifest,
+//   - rebuilding the trends (`public/trends.json`).
+// Safe to run repeatedly.
 
 const args = process.argv.slice(2);
 const keepLegacy = args.includes("--keep-legacy");
@@ -65,22 +65,23 @@ for (const world of worldDirs) {
     migrated++;
   }
 
-  process.stdout.write(`✓ ${world.padEnd(9)} ${String(legacy.length).padStart(2)} zmigrowanych\n`);
+  process.stdout.write(`✓ ${world.padEnd(9)} ${String(legacy.length).padStart(2)} migrated\n`);
 }
 
 const manifest = await rebuildManifest();
 const { trends, skipped } = await rebuildTrends();
 
 if (migrated > 0) {
-  process.stdout.write(`\nZmigrowano ${migrated} snapshotów: ${mb(before)} → ${mb(after)}\n`);
+  process.stdout.write(`\nMigrated ${migrated} snapshots: ${mb(before)} → ${mb(after)}\n`);
 } else {
-  process.stdout.write(`\nNic do migracji — wszystkie snapshoty są już rozdzielone.\n`);
+  process.stdout.write(`\nNothing to migrate — every snapshot is already split.\n`);
 }
-process.stdout.write(`Manifest: ${manifest.worlds.length} światów\n`);
+process.stdout.write(`Manifest: ${manifest.worlds.length} worlds\n`);
 
 const points = Object.values(trends.worlds).reduce((sum, w) => sum + w.id.length, 0);
-process.stdout.write(`Trendy: ${Object.keys(trends.worlds).length} światów, ${points} migawek\n`);
+process.stdout.write(`Trends: ${Object.keys(trends.worlds).length} worlds, ${points} snapshots\n`);
 if (skipped > 0) {
-  // Migawka bez `startedAt` nie ma gdzie stanąć na osi czasu — ale musi być widać, że wypadła.
-  process.stdout.write(`  ⚠ pominięto ${skipped} migawek bez startedAt\n`);
+  // A snapshot without `startedAt` has nowhere to stand on a time axis — but it has to be
+  // visible that it dropped out.
+  process.stdout.write(`  ⚠ skipped ${skipped} snapshots with no startedAt\n`);
 }

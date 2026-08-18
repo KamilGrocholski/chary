@@ -1,11 +1,11 @@
 import * as cheerio from "cheerio";
 
-// ── Schemat wiersza (v2) ──────────────────────────────────────────────────────
+// ── The row schema (v2) ───────────────────────────────────────────────────────
 //
-// Snapshoty sprzed sierpnia 2026 mają schemat v1:
+// Snapshots from before August 2026 use schema v1:
 //   [rank, name, level, profession, honor, lastOnlineText, lastOnlineISO]
-// gdzie lastOnlineISO był wyliczany z tekstu i czasu scrape'u — udawał precyzję,
-// której źródło nie podaje. v2 zapisuje wprost liczbę dni:
+// where lastOnlineISO was derived from the text and the scrape time — it faked a
+// precision the source does not give. v2 stores the number of days outright:
 
 export type PlayerRow = [
   rank: number,
@@ -14,15 +14,16 @@ export type PlayerRow = [
   level: number,
   profession: number,
   honor: number,
-  // 0 = „Mniej niż 24h temu”, N = „N dni temu”, null = konto nigdy nieużywane
+  // 0 = "less than 24 h ago", N = "N days ago", null = an account never used
   lastOnlineDays: number | null,
 ];
 
 export const ROW_SCHEMA = 2;
 
-// Ranking pokazuje ~20655 dni („1969 r.”) dla kont, które nigdy nie były online.
+// The ranking shows ~20655 days ("1969") for accounts that have never been online.
 const NEVER_ONLINE_DAYS = 10_000;
 
+// Polish, because these are the game's own names — see "Language" in AGENTS.md.
 export const PROFESSIONS: Record<number, string> = {
   1: "Wojownik",
   2: "Mag",
@@ -32,7 +33,7 @@ export const PROFESSIONS: Record<number, string> = {
   6: "Łowca",
 };
 
-// Litera doklejana do poziomu w kolumnie „Poziom” (np. „378t”).
+// The letter appended to the level in the "Poziom" column (e.g. "378t").
 const PROFESSION_BY_LETTER: Record<string, number> = {
   w: 1,
   m: 2,
@@ -60,11 +61,11 @@ export class ParseError extends Error {
 
 export type ParsedTable = {
   rows: PlayerRow[];
-  /** Wiersze odrzucone wraz z powodem — scraper decyduje, czy próg został przekroczony. */
+  /** Rejected rows with the reason — the scraper decides whether the threshold was crossed. */
   errors: string[];
 };
 
-// ── Helpery ───────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function normalize(text: string): string {
   return text
@@ -75,7 +76,7 @@ function normalize(text: string): string {
     .replace(/\p{Diacritic}/gu, "");
 }
 
-/** Zwraca null, gdy tekst nie zawiera poprawnej liczby całkowitej. */
+/** Returns null when the text holds no valid integer. */
 export function parseIntStrict(text: string): number | null {
   const cleaned = text.replace(/[^\d-]/g, "");
   if (cleaned === "" || cleaned === "-") return null;
@@ -92,8 +93,8 @@ export function professionToId(title: string, levelText: string): number | null 
 }
 
 /**
- * „Mniej niż 24h temu” → 0, „N dni temu” → N, konto nigdy nieużywane → null.
- * Zwraca undefined dla formatu, którego nie rozpoznajemy (sygnał do zgłoszenia).
+ * "Mniej niż 24h temu" → 0, "N dni temu" → N, an account never used → null.
+ * Returns undefined for a format we do not recognise — a signal to report it.
  */
 export function parseLastOnlineDays(text: string): number | null | undefined {
   const t = normalize(text);
@@ -120,8 +121,8 @@ export function parseTotalPages($: cheerio.CheerioAPI): number {
   const fromInput = parseIntStrict($("input[name='page'][max]").attr("max") ?? "");
   if (fromInput && fromInput > 0) return fromInput;
 
-  // Najwyższy numer strony wśród linków paginacji. Uwaga: numery MUSZĄ być
-  // parsowane osobno — sklejenie ich w jeden string dawało liczby typu 234390.
+  // The highest page number among the pagination links. Note: the numbers MUST be
+  // parsed one at a time — joining them into one string produced figures like 234390.
   const fromLinks = $(".pagination a[href*='page=']")
     .map((_, el) => parseIntStrict($(el).attr("href")?.match(/page=(\d+)/)?.[1] ?? ""))
     .get()
@@ -130,7 +131,7 @@ export function parseTotalPages($: cheerio.CheerioAPI): number {
   return fromLinks.length > 0 ? Math.max(...fromLinks) : 1;
 }
 
-// ── Tabela rankingu ───────────────────────────────────────────────────────────
+// ── The ranking table ─────────────────────────────────────────────────────────
 
 function findLadderTable($: cheerio.CheerioAPI) {
   return $("table")
@@ -142,27 +143,27 @@ function findLadderTable($: cheerio.CheerioAPI) {
 }
 
 /**
- * Parsuje jedną stronę rankingu. Wadliwe wiersze trafiają do `errors` zamiast
- * przerywać całą stronę — o przerwaniu decyduje wywołujący na podstawie progu.
- * Rzuca tylko wtedy, gdy nie znajdzie tabeli albo nie sparsuje ani jednego wiersza.
+ * Parses one page of the ranking. Faulty rows go into `errors` instead of aborting the
+ * whole page — the caller decides whether to abort, based on the threshold. Throws only
+ * when it cannot find the table or cannot parse a single row.
  */
 export function parseTable($: cheerio.CheerioAPI, world: string, page: number): ParsedTable {
   const table = findLadderTable($);
   if (table.length === 0) {
-    throw new ParseError("Nie znaleziono tabeli rankingu (zmiana markupu?)", world, page);
+    throw new ParseError("ladder table not found (did the markup change?)", world, page);
   }
 
   const rows: PlayerRow[] = [];
   const errors: string[] = [];
-  // Miejsca 1-3 mają w kolumnie „#” portret zamiast liczby — rangę odtwarzamy
-  // z pozycji względem pierwszego wiersza, w którym numer faktycznie jest.
+  // Places 1-3 carry a portrait instead of a number in the "#" column — we reconstruct
+  // the rank from the offset against the first row that does have a number.
   const parsed: { index: number; rank: number | null; row: PlayerRow }[] = [];
 
   table.find("tbody tr").each((index, tr) => {
     const $tr = $(tr);
     const tds = $tr.children("td");
     if (tds.length < 5) {
-      errors.push(`wiersz ${index}: ${tds.length} kolumn, oczekiwano 5`);
+      errors.push(`row ${index}: ${tds.length} columns, expected 5`);
       return;
     }
 
@@ -178,40 +179,40 @@ export function parseTable($: cheerio.CheerioAPI, world: string, page: number): 
 
     const name = nameCell.text().trim();
     if (!name) {
-      errors.push(`wiersz ${index}: pusty nick`);
+      errors.push(`row ${index}: empty nickname`);
       return;
     }
 
     const charId = parseCharId(nameCell.find("a").first().attr("href") ?? "");
     if (charId === null) {
-      errors.push(`wiersz ${index} ("${name}"): brak char_id w linku profilu`);
+      errors.push(`row ${index} ("${name}"): no char_id in the profile link`);
       return;
     }
 
     const levelText = levelCell.text().trim();
     const level = parseIntStrict(levelText);
     if (level === null || level < 1) {
-      errors.push(`wiersz ${index} ("${name}"): błędny poziom ${JSON.stringify(levelText)}`);
+      errors.push(`row ${index} ("${name}"): invalid level ${JSON.stringify(levelText)}`);
       return;
     }
 
     const profession = professionToId(levelCell.find("[title]").first().attr("title") ?? "", levelText);
     if (profession === null) {
-      errors.push(`wiersz ${index} ("${name}"): nieznana profesja w ${JSON.stringify(levelText)}`);
+      errors.push(`row ${index} ("${name}"): unknown profession in ${JSON.stringify(levelText)}`);
       return;
     }
 
     const honorText = honorCell.text().trim();
     const honor = parseIntStrict(honorText);
     if (honor === null) {
-      errors.push(`wiersz ${index} ("${name}"): błędne PH ${JSON.stringify(honorText)}`);
+      errors.push(`row ${index} ("${name}"): invalid honor ${JSON.stringify(honorText)}`);
       return;
     }
 
     const lastOnlineText = lastOnlineCell.text().trim();
     const lastOnlineDays = parseLastOnlineDays(lastOnlineText);
     if (lastOnlineDays === undefined) {
-      errors.push(`wiersz ${index} ("${name}"): nierozpoznane "ostatnio online" ${JSON.stringify(lastOnlineText)}`);
+      errors.push(`row ${index} ("${name}"): unrecognised "last online" ${JSON.stringify(lastOnlineText)}`);
       return;
     }
 
@@ -225,14 +226,14 @@ export function parseTable($: cheerio.CheerioAPI, world: string, page: number): 
 
   if (parsed.length === 0) {
     throw new ParseError(
-      `Nie sparsowano żadnego wiersza${errors.length ? `; pierwszy błąd: ${errors[0]}` : ""}`,
+      `not a single row parsed${errors.length ? `; first error: ${errors[0]}` : ""}`,
       world,
       page,
     );
   }
 
-  // Kotwica: pierwszy wiersz z jawnym numerem rangi. Gdy strona nie ma żadnego
-  // (teoretycznie możliwe), wracamy do wyliczenia z numeru strony.
+  // The anchor: the first row with an explicit rank number. When a page has none
+  // (theoretically possible), we fall back to deriving it from the page number.
   const anchor = parsed.find((p) => p.rank !== null);
   const anchorRank = anchor?.rank ?? (page - 1) * 100 + (parsed[0]?.index ?? 0) + 1;
   const anchorIndex = anchor?.index ?? parsed[0]?.index ?? 0;

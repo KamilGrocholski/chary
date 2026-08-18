@@ -1,16 +1,16 @@
 import { rename, unlink } from "node:fs/promises";
 
 /**
- * Zapis, który albo podmienia plik w całości, albo nie rusza go wcale.
+ * A write that either replaces the file entirely or does not touch it at all.
  *
- * `Bun.write` to obcięcie + zapis, więc przerwanie w trakcie — Ctrl-C, brak miejsca,
- * OOM — zostawia plik obcięty. W tym repo to najgorsza możliwa awaria: dane
- * w `public/worlds/` są nieodtwarzalne (zasada #5), a uszkodzona migawka wywalała
- * `JSON.parse` przy budowie manifestu i trendów, czyli **i** ogon 1,6-godzinnej rundy,
- * **i** `bun run rebuild`, którym miałoby się to naprawić.
+ * `Bun.write` is truncate + write, so an interruption partway through — Ctrl-C, a full
+ * disk, an OOM — leaves the file truncated. That is the worst failure available in this
+ * repo: the data in `public/worlds/` cannot be reproduced (rule #6), and a corrupted
+ * snapshot took down `JSON.parse` while building the manifest and the trends, which is
+ * **both** the tail of a 1.6-hour round **and** the `bun run rebuild` meant to repair it.
  *
- * `rename` w obrębie jednego katalogu jest na POSIX atomowy: czytelnik widzi albo
- * starą zawartość, albo nową, nigdy połowy.
+ * `rename` within a single directory is atomic on POSIX: a reader sees either the old
+ * contents or the new ones, never half of each.
  */
 export async function writeAtomic(filePath: string, contents: string): Promise<void> {
   const tmp = `${filePath}.tmp`;
@@ -18,8 +18,8 @@ export async function writeAtomic(filePath: string, contents: string): Promise<v
     await Bun.write(tmp, contents);
     await rename(tmp, filePath);
   } catch (e) {
-    // Plik tymczasowy nie może zostać: `.tmp` w `public/worlds/` trafiłby na Pages,
-    // a przy kolejnym zapisie udawał, że wszystko jest w porządku.
+    // The temp file must not survive: a `.tmp` in `public/worlds/` would ship to Pages,
+    // and on the next write it would pretend everything was fine.
     await unlink(tmp).catch(() => {});
     throw e;
   }

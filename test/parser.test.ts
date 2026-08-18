@@ -174,7 +174,7 @@ describe("odporność parseTable", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.[1]).toBe("Ktoś");
     expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain("nieznana profesja");
+    expect(errors[0]).toContain("unknown profession");
   });
 
   test("brak tabeli rankingu → ParseError", () => {

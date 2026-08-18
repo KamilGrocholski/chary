@@ -2,51 +2,52 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { parseLastOnlineDays, type PlayerRow } from "./parser.ts";
 
-// Snapshot jest zapisywany w dwóch komplementarnych plikach o tej samej kolejności
-// wierszy (wiersz i ↔ ranga i+1), więc razem odtwarzają go 1:1 i nic się nie dubluje:
+// A snapshot is written as two complementary files sharing one row order
+// (row i ↔ rank i+1), so together they reconstruct it 1:1 and nothing is duplicated:
 //
-//   <ts>.f.json  — kolumnowo poziom/profesja/honor/dni. To wszystko, czego potrzebuje
-//                  filtrowanie i wykres, więc dashboard ładuje ten plik zawsze
-//                  (~100 KB po gzipie dla największego świata ~200 KB).
-//   <ts>.n.json  — nicki i charId. Potrzebne dopiero przy wyszukiwarce gracza
-//                  i śledzeniu progresji, więc pobierane dopiero wtedy.
+//   <ts>.f.json  — level/profession/honor/days, columnar. That is everything filtering
+//                  and the charts need, so the dashboard always loads this file
+//                  (~100 KB gzipped, ~200 KB for the largest world).
+//   <ts>.n.json  — nicknames and charIds. Needed only for a player search and for
+//                  following progression, so fetched only then.
 //
-// Nicki i charId to ~2/3 objętości snapshotu, a do filtrowania są bezużyteczne —
-// stąd ten podział.
+// Nicknames and charIds are ~2/3 of a snapshot's volume and useless to filtering —
+// hence the split.
 
 export const SNAPSHOT_SCHEMA = 3;
 
 export type SnapshotMeta = {
   world: string;
   /**
-   * Identyfikator migawki (trzon nazwy pliku), NIE data. Pliki sprzed sierpnia 2026
-   * mają w nim czas lokalny, nowsze UTC — do wyświetlania i liczenia odstępów służy
-   * wyłącznie `startedAt`. Nazwa pola została taka, jaka była w zapisanych danych;
-   * przemianowanie kosztowałoby przepisanie 362 plików dla samej kosmetyki.
+   * The snapshot's identifier (the stem of the filename), NOT a date. Files from before
+   * August 2026 carry local time in it, newer ones UTC — displaying a date and measuring
+   * intervals use `startedAt` and nothing else. The field name stayed as it is in the
+   * written data; renaming it would mean rewriting 362 files for cosmetics.
    */
   timestamp: string;
   startedAt?: string;
   finishedAt?: string;
   pages?: number;
   skippedRows?: number;
-  /** Ustawiane, gdy populacja świata spadła podejrzanie mocno — patrz `checkPopulationDrop`. */
+  /** Set when a world's population dropped suspiciously far — see `checkPopulationDrop`. */
   suspect?: PopulationDrop;
 };
 
 /**
- * Sygnał, że migawka może być obcięta. Ranking potrafi w czasie awarii zwrócić mniej
- * stron, a taki snapshot jest formalnie poprawny — jedyne, co go zdradza, to nagły
- * spadek populacji względem poprzedniej migawki (normalnie ułamki procenta na rundę).
+ * The signal that a snapshot may be truncated. During an outage the ranking can return
+ * fewer pages, and the resulting snapshot is formally valid — the only thing that gives it
+ * away is a sudden population drop against the previous one (normally fractions of
+ * a percent per round).
  */
 export type PopulationDrop = {
   reason: string;
   previousCount: number;
   count: number;
-  /** Udział utraconych graczy, np. 0.12 = −12%. */
+  /** The share of players lost, e.g. 0.12 = −12%. */
   drop: number;
 };
 
-/** Domyślny próg: spadek powyżej 5% populacji świata między rundami. */
+/** The default threshold: a drop of more than 5% of a world's population between rounds. */
 export const DEFAULT_DROP_THRESHOLD = 0.05;
 
 export function checkPopulationDrop(
@@ -54,13 +55,15 @@ export function checkPopulationDrop(
   previousCount: number | null,
   threshold = DEFAULT_DROP_THRESHOLD,
 ): PopulationDrop | null {
-  // Wzrost populacji jest normalny i niczego nie sygnalizuje — patrzymy tylko na spadki.
+  // Population growth is normal and signals nothing — we only look at drops.
   if (previousCount === null || previousCount <= 0 || count >= previousCount) return null;
 
   const drop = (previousCount - count) / previousCount;
   if (drop <= threshold) return null;
 
   return {
+    // Polish on purpose: the dashboard renders this sentence to a player verbatim
+    // (`suspect` in public/app.js). See "Language" in AGENTS.md.
     reason: `populacja spadła o ${(drop * 100).toFixed(1)}% względem poprzedniej migawki (${previousCount} → ${count}) — migawka może być obcięta`,
     previousCount,
     count,
@@ -75,7 +78,7 @@ export type FilterFile = SnapshotMeta & {
   level: number[];
   profession: number[];
   honor: number[];
-  /** 0 = „Mniej niż 24h temu”, N = „N dni temu”, null = konto nigdy nieużywane. */
+  /** 0 = "less than 24 h ago", N = "N days ago", null = an account never used. */
   days: (number | null)[];
 };
 
@@ -86,11 +89,11 @@ export type NamesFile = {
   timestamp: string;
   count: number;
   name: string[];
-  /** Brak dla snapshotów sprzed sierpnia 2026 — ranking nie był wtedy tak parsowany. */
+  /** Absent for snapshots from before August 2026 — the ranking was not parsed this way then. */
   charId?: (number | null)[];
 };
 
-/** Znormalizowany wiersz, niezależny od schematu, w jakim snapshot był zapisany. */
+/** A normalised row, independent of the schema the snapshot was written in. */
 export type NormalizedRow = {
   name: string;
   charId: number | null;
@@ -125,8 +128,8 @@ export function splitSnapshot(rows: PlayerRow[], meta: SnapshotMeta): { filters:
 }
 
 /**
- * Czyta stary snapshot (schemat v1 sprzed 07.2026 lub v2) i zwraca znormalizowane
- * wiersze — używane przy migracji historii do formatu rozdzielonego.
+ * Reads an old snapshot (schema v1 from before 07.2026, or v2) and returns normalised
+ * rows — used when migrating the history into the split format.
  *
  * v1: [rank, name, level, prof, honor, lastOnlineText, lastOnlineISO]
  * v2: [rank, name, charId, level, prof, honor, lastOnlineDays]
@@ -183,9 +186,9 @@ export function splitNormalized(rows: NormalizedRow[], meta: SnapshotMeta): { fi
 }
 
 /**
- * Liczba graczy w najnowszej migawce świata — punkt odniesienia dla strażnika.
- * Brak katalogu, brak migawek albo nieczytelny plik to nie błąd: nowy świat
- * po prostu nie ma z czym się porównać.
+ * The player count of a world's newest snapshot — the guard's reference point.
+ * A missing directory, no snapshots or an unreadable file is not an error: a new world
+ * simply has nothing to compare against.
  */
 export async function latestSnapshotCount(dir: string): Promise<number | null> {
   try {
@@ -200,7 +203,7 @@ export async function latestSnapshotCount(dir: string): Promise<number | null> {
   }
 }
 
-// ── Ścieżki ───────────────────────────────────────────────────────────────────
+// ── Paths ─────────────────────────────────────────────────────────────────────
 
 export function filterPathFor(dir: string, timestamp: string) {
   return path.join(dir, `${timestamp}.f.json`);
@@ -210,7 +213,7 @@ export function namesPathFor(dir: string, timestamp: string) {
   return path.join(dir, `${timestamp}.n.json`);
 }
 
-/** Czy nazwa pliku to snapshot w starym, jednoplikowym formacie. */
+/** Whether the filename is a snapshot in the old, single-file format. */
 export function isLegacySnapshot(fileName: string) {
   return fileName.endsWith(".json") && !/\.(f|n)\.json$/.test(fileName);
 }
