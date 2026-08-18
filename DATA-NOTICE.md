@@ -1,181 +1,181 @@
-# DATA-NOTICE — czyje są dane w tym repozytorium
+# DATA-NOTICE — whose the data in this repository is
 
-Ten plik istnieje, bo [`LICENSE`](LICENSE) nie może objąć wszystkiego, co leży
-w tym repo. Licencję można udzielić tylko do tego, do czego ma się prawa. Kod
-jest mój i idzie na MIT. **Dane rankingu nie są moje i nie mogę ich nikomu
-licencjonować** — ten dokument mówi, co z nimi wolno, a czego nie, i nie udaje,
-że sprawa jest prostsza, niż jest.
+This file exists because [`LICENSE`](LICENSE) cannot cover everything that sits in this
+repo. You can only license what you have rights to. The code is mine and goes under MIT.
+**The ranking data is not mine and I cannot license it to anybody** — this document says
+what may and may not be done with it, and does not pretend the matter is simpler than it
+is.
 
-To nie jest opinia prawna. To opis stanu faktycznego i podstaw, które go dotyczą.
+This is not legal advice. It is a description of the facts and of the grounds that bear on
+them.
 
-> **Dlaczego zastrzeżenia nie ma w samym `LICENSE`.** Plik `LICENSE` jest dosłownym,
-> niezmienionym tekstem MIT — GitHub rozpoznaje licencję przez podobieństwo do wzorca
-> (próg ~98%), więc kilkunastowierszowy dopisek zmieniłby wykrytą licencję na „Other"
-> i projekt przestałby być widoczny jako open source. Zakres siedzi tu i w `README.md`.
-> **Nie dopisuj wyjątków do `LICENSE`** — dopisz je w tym pliku.
+> **Why the caveat is not in `LICENSE` itself.** The `LICENSE` file is the literal,
+> unmodified MIT text — GitHub detects a licence by similarity to a template (a ~98%
+> threshold), so a dozen-line addition would change the detected licence to "Other" and the
+> project would stop showing up as open source. The scope lives here and in `README.md`.
+> **Do not add exceptions to `LICENSE`** — add them to this file.
 
 ---
 
-## Granica
+## The boundary
 
-| Objęte licencją MIT | **Nieobjęte** |
+| Covered by the MIT licence | **Not covered** |
 |---|---|
-| `src/`, `test/*.ts` | `public/worlds/**` (~137 MB, 404 pliki, 202 migawki) |
+| `src/`, `test/*.ts` | `public/worlds/**` (~137 MB, 404 files, 202 snapshots) |
 | `public/*.html`, `public/*.js` | `public/manifest.json`, `public/trends.json` |
 | `docs/`, `README.md`, `AGENTS.md` | `test/fixtures/ladder-aether-p1.html`, `test/fixtures/legacy-snapshot-aether.json` |
 | | `public/vendor/` → [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) |
 
-Kolumna prawa to materiał pochodzący z margonem.pl. Kolumna lewa to program,
-który go pobiera i rysuje — i tylko ona jest open source.
+The right-hand column is material originating from margonem.pl. The left-hand column is the
+program that fetches and draws it — and only that column is open source.
 
 ---
 
-## Skąd pochodzą dane
+## Where the data comes from
 
-Wyłącznie z publicznie dostępnych stron rankingu:
+Exclusively from publicly available ranking pages:
 
 ```
-https://www.margonem.pl/ladder/<świat>/players?page=N
+https://www.margonem.pl/ladder/<world>/players?page=N
 ```
 
-Bez logowania, bez konta, bez cookies, bez żadnego API gry, wyłącznie żądania
-`GET`. Do serwisu nic nie jest zapisywane ani w grze nie jest wykonywana żadna
-akcja. Szczegóły zachowania scrapera niżej.
+No login, no account, no cookies, no game API of any kind, `GET` requests only. Nothing is
+written to the site and no action is taken in the game. Details of the scraper's behaviour
+below.
 
-## Czyje są
+## Whose it is
 
-Prawa do serwisu i do bazy rankingu przysługują wydawcy Margonem (w regulaminie
-serwisu: **„Usługodawca"**). Znaczenie mają dwie niezależne podstawy:
+The rights to the site and to the ranking database belong to the publisher of Margonem (in
+the site's terms of service: **"Usługodawca"**, the service provider). Two independent
+grounds matter:
 
-**1. Regulamin Serwisu i Gry Margonem** ([pomoc.margonem.pl](https://pomoc.margonem.pl/index/view,323)).
-Wiąże każdego odwiedzającego, nie tylko zalogowanych graczy — `I.4.g)` definiuje
-*Użytkownika* jako „każdą osobę korzystającą z Serwisu w jakiejkolwiek formie,
-w tym przeglądając go". Istotne klauzule:
+**1. The Terms of Service of the Margonem Site and Game**
+([pomoc.margonem.pl](https://pomoc.margonem.pl/index/view,323)). They bind every visitor,
+not only logged-in players — `I.4.g)` defines a *Użytkownik* (User) as "każdą osobę
+korzystającą z Serwisu w jakiejkolwiek formie, w tym przeglądając go" ("any person using the
+Site in any form, including by browsing it"). The relevant clauses:
 
-| Klauzula | Treść w skrócie |
+| Clause | In brief |
 |---|---|
-| `XIX.2` | licencja na korzystanie z Serwisu obejmuje **cele osobiste** |
-| `XIX.4` | zezwolenie **nie obejmuje** rozpowszechniania na innych stronach internetowych |
-| `VII.2.m)` | zakaz kopiowania i rozpowszechniania Serwisu lub jego elementów |
-| `VII.2.k)` | zakaz korzystania z Serwisu w **celach komercyjnych** lub politycznych |
+| `XIX.2` | the licence to use the Site covers **personal purposes** |
+| `XIX.4` | the permission **does not cover** redistribution on other websites |
+| `VII.2.m)` | copying and redistributing the Site or its elements is forbidden |
+| `VII.2.k)` | using the Site for **commercial** or political purposes is forbidden |
 
-Sekcja `VII` to „DZIAŁANIA ZABRONIONE", sekcja `XIX` to „LICENCJA NA KORZYSTANIE
-Z SERWISU".
+Section `VII` is "DZIAŁANIA ZABRONIONE" (Forbidden Actions), section `XIX` is "LICENCJA NA
+KORZYSTANIE Z SERWISU" (Licence to Use the Site).
 
-**2. Prawo sui generis do bazy danych** — ustawa o ochronie baz danych, wdrażająca
-dyrektywę 96/9/WE. Chroni bazę niezależnie od praw autorskich i **niezależnie od
-regulaminu**: zakazuje pobierania i wtórnego wykorzystania *istotnej części*
-zawartości bazy. 202 migawki po ~586 tys. wierszy w rundzie nie są „nieistotną
-częścią" w żadnej sensownej interpretacji.
+**2. The sui generis database right** — the Polish Act on the Protection of Databases,
+implementing Directive 96/9/EC. It protects a database independently of copyright and
+**independently of the terms of service**: it forbids the extraction and re-utilisation of
+*a substantial part* of a database's contents. 202 snapshots of ~586 thousand rows per round
+are not "an insubstantial part" under any sensible reading.
 
-**Uczciwy wniosek: publiczne udostępnianie tych danych na GitHub Pages odbywa się
-bez zgody uprawnionego i nie jest objęte licencją z `XIX.2`.** Projekt istnieje
-w tym stanie świadomie, jako niekomercyjne narzędzie dla społeczności gry, i jest
-gotowy zniknąć na żądanie — patrz „Usunięcie danych".
+**The honest conclusion: publishing this data on GitHub Pages happens without the
+rightsholder's consent and is not covered by the licence in `XIX.2`.** The project exists in
+that state knowingly, as a non-commercial tool for the game's community, and is ready to
+disappear on request — see "Deleting data".
 
-## Czego ten projekt NIE udziela
+## What this project does NOT grant
 
-Nie mam praw do danych rankingu, więc **nie udzielam do nich żadnej licencji**.
-W szczególności:
+I have no rights to the ranking data, so **I grant no licence to it**. In particular:
 
-- dane w `public/worlds/`, `manifest.json`, `trends.json` i zrzuty w `test/fixtures/`
-  **nie są** open source, nie są public domain i nie są objęte MIT-em z `LICENSE`;
-- forknięcie tego repo **nie daje** prawa do redystrybucji danych. Dostajesz kod;
-  dane w forku pozostają w tej samej sytuacji prawnej, co tutaj, i odpowiadasz za
-  nie sam;
-- **nie wolno używać tych danych komercyjnie** — zabrania tego `VII.2.k)`
-  regulaminu, a ja nie mogę zwolnić nikogo z cudzego regulaminu;
-- nie udzielam żadnej gwarancji poprawności ani kompletności danych.
+- the data in `public/worlds/`, `manifest.json`, `trends.json` and the captures in
+  `test/fixtures/` **are not** open source, are not public domain and are not covered by the
+  MIT licence in `LICENSE`;
+- forking this repo **does not give** you the right to redistribute the data. You get the
+  code; the data in a fork remains in exactly the same legal situation as here, and you
+  answer for it yourself;
+- **this data must not be used commercially** — `VII.2.k)` of the terms forbids it, and I
+  cannot release anybody from somebody else's terms of service;
+- I give no warranty as to the correctness or completeness of the data.
 
-Jeśli potrzebujesz danych rankingu na jakiejkolwiek pewnej podstawie — pytaj
-Administrację Margonem, nie mnie.
+If you need ranking data on any firm footing — ask the Margonem administration, not me.
 
-## Znaki towarowe
+## Trademarks
 
-„Margonem" oraz nazwy światów, profesji i pozostałe oznaczenia gry są znakami
-i dobrami niematerialnymi jej wydawcy. Używane są tu wyłącznie opisowo, żeby
-wskazać, czego dotyczą statystyki. Projekt **nie jest** powiązany z wydawcą
-Margonem, nie jest przez niego wspierany ani autoryzowany.
+"Margonem", the world and profession names and the game's other marks are the trademarks and
+intangible property of its publisher. They are used here descriptively only, to say what the
+statistics are about. This project **is not** affiliated with, supported by or authorised by
+the publisher of Margonem.
 
 ---
 
-## Dane osobowe (RODO)
+## Personal data (GDPR / RODO)
 
-Migawki zawierają dane dotyczące osób fizycznych, i trzeba to nazwać wprost.
-Na jedną postać zapisywane jest:
+The snapshots contain data relating to natural persons, and that has to be said outright.
+Per character, what is stored is:
 
-| Pole | Plik | Co to |
+| Field | File | What it is |
 |---|---|---|
-| `name` | `.n.json` | nick postaci |
-| `charId` | `.n.json` | stabilne ID postaci z linku profilu |
-| `level`, `profession`, `honor` | `.f.json` | postęp w grze |
-| `days` | `.f.json` | ile dni temu konto było ostatnio online |
+| `name` | `.n.json` | the character's nickname |
+| `charId` | `.n.json` | the stable character ID from the profile link |
+| `level`, `profession`, `honor` | `.f.json` | progress in the game |
+| `days` | `.f.json` | how many days ago the account was last online |
 
-Nick to pseudonim, ale pseudonim powiązany z danymi o aktywności może stanowić
-**dane osobowe** w rozumieniu art. 4 pkt 1 RODO, jeżeli osoba jest identyfikowalna
-— a profile Margonem są publiczne i nick prowadzi do nich bezpośrednio. Pole
-`days` jest przy tym daną behawioralną: mówi, kiedy konkretna osoba ostatnio grała.
+A nickname is a pseudonym, but a pseudonym tied to activity data may constitute **personal
+data** within the meaning of Art. 4(1) GDPR if the person is identifiable — and Margonem
+profiles are public, with the nickname leading straight to them. The `days` field is
+behavioural data on top of that: it says when a particular person last played.
 
-Stan faktyczny, bez upiększania:
+The facts, without embellishment:
 
-- dane pochodzą ze **źródła publicznie dostępnego**, opublikowanego przez sam
-  serwis, i nie są tu w żaden sposób wzbogacane danymi z innych źródeł;
-- nie zbieram adresów e-mail, IP, danych kontaktowych ani niczego poza tym, co
-  ranking pokazuje każdemu odwiedzającemu;
-- **`.n.json` nie jest nigdzie czytany** — dashboard filtruje i rysuje wyłącznie
-  z `.f.json`; nicki leżą w repo jako materiał na przyszłą wyszukiwarkę, której
-  nie ma;
-- brak formalnej noty o przetwarzaniu, wskazanego administratora i udokumentowanej
-  podstawy prawnej to **znana luka**, nie przeoczenie ukryte pod dywanem.
+- the data comes from a **publicly available source**, published by the site itself, and is
+  in no way enriched here with data from other sources;
+- I collect no email addresses, IP addresses, contact details or anything beyond what the
+  ranking shows to every visitor;
+- **`.n.json` is not read anywhere** — the dashboard filters and draws from `.f.json` alone;
+  the nicknames sit in the repo as material for a future search that does not exist;
+- the absence of a formal processing notice, a named controller and a documented legal basis
+  is a **known gap**, not an oversight swept under the rug.
 
-### Usunięcie danych
+### Deleting data
 
-Jeżeli jesteś graczem i nie chcesz, aby Twój nick lub `charId` znajdowały się
-w tym repozytorium — **napisz, usunę.** Bez pytań o powód, bez uzasadniania.
+If you are a player and do not want your nickname or `charId` to be in this repository —
+**write to me and I will remove it.** No questions about why, no justification needed.
 
-Jeżeli reprezentujesz wydawcę Margonem i chcesz, aby dane lub cały dashboard
-zniknęły — **napisz, wyłączam.** Nie będę tego przeciągał ani negocjował.
+If you represent the publisher of Margonem and want the data or the whole dashboard gone —
+**write to me and I will take it down.** I will not drag it out or negotiate.
 
-**Kontakt:** mikololo26@gmail.com
-lub zgłoszenie w [Issues](https://github.com/KamilGrocholski/chary/issues).
+**Contact:** mikololo26@gmail.com
+or an issue in [Issues](https://github.com/KamilGrocholski/chary/issues).
 
-Uwaga techniczna: dane historyczne rankingu są nieodtwarzalne (serwis nie
-udostępnia historii), więc usunięcie jest nieodwracalne. To nie jest argument
-przeciw usunięciu — to informacja, że nie ma po nim drogi powrotnej.
+A technical note: historical ranking data cannot be reproduced (the site publishes no
+history), so deletion is irreversible. That is not an argument against deleting — it is
+notice that there is no way back afterwards.
 
 ---
 
-## Jak zachowuje się scraper
+## How the scraper behaves
 
-Zapisane tu, bo dobra wiara jest sprawdzalna w kodzie, nie deklaratywna:
+Written down here because good faith is checkable in the code, not declarative:
 
 | | |
 |---|---|
-| Ścieżki | tylko `/ladder/<świat>/players` — **wypisane w [`sitemap.xml`](https://www.margonem.pl/sitemap.xml) Margonem**, czyli same zaproszone do indeksowania |
-| `robots.txt` | nie zabrania `/ladder`; blokuje wyłącznie `/intro?url=`, `/intro?googlelogin=1`, `/intro?applelogin=1`, `/newintro/` |
-| Tempo | 1 żądanie/s domyślnie, twarda podłoga 250 ms (`MIN_INTERVAL_MS`) |
-| User-Agent | `Mozilla/5.0 (margostat scraper)` — identyfikuje się, nie podszywa pod gracza |
-| Błędy | honorowany `Retry-After`, backoff 5 s → 10 s → 20 s, sufit 120 s, 3 próby na stronę |
-| Uwierzytelnianie | brak — żadnego konta, logowania ani cookies |
-| Kierunek | wyłącznie `GET`; zero zapisów do serwisu, zero akcji w grze |
-| Częstotliwość | ręcznie, kilka razy w miesiącu (odstępy 3-17 dni), nie z crona |
+| Paths | only `/ladder/<world>/players` — **listed in Margonem's own [`sitemap.xml`](https://www.margonem.pl/sitemap.xml)**, i.e. invited for indexing |
+| `robots.txt` | does not forbid `/ladder`; it blocks only `/intro?url=`, `/intro?googlelogin=1`, `/intro?applelogin=1`, `/newintro/` |
+| Pace | 1 request/s by default, a hard floor of 250 ms (`MIN_INTERVAL_MS`) |
+| User-Agent | `Mozilla/5.0 (margostat scraper)` — it identifies itself, it does not impersonate a player |
+| Errors | `Retry-After` honoured, backoff 5 s → 10 s → 20 s, a 120 s ceiling, 3 attempts per page |
+| Authentication | none — no account, no login, no cookies |
+| Direction | `GET` only; nothing written to the site, no action in the game |
+| Frequency | by hand, a few times a month (intervals of 3-17 days), not from cron |
 
-Klauzula regulaminu o „Niedozwolonym Oprogramowaniu" (`VII.2.g)`) dotyczy
-oprogramowania wchodzącego w interakcję z Grą przez przechwytywanie, emulowanie
-lub przekierowywanie komunikacji, automatyzacji rozgrywki, modyfikowania działania
-Gry i ukrywania danych identyfikacyjnych. Czytnik HTML-a rankingu, działający bez
-konta i nieuczestniczący w grze, nie robi żadnej z tych rzeczy. **Problemem tego
-projektu jest redystrybucja danych, a nie sposób ich pobierania** — i tak należy
-czytać ten dokument.
+The terms' clause on "Niedozwolone Oprogramowanie" (Prohibited Software, `VII.2.g)`) concerns
+software that interacts with the Game by intercepting, emulating or redirecting its
+communication, automating play, modifying how the Game works and hiding identifying data. A
+reader of the ranking's HTML, running without an account and taking no part in the game, does
+none of those things. **This project's problem is the redistribution of the data, not the way
+it is fetched** — and that is how this document is to be read.
 
 ---
 
-## Jeśli forkujesz
+## If you fork this
 
-1. Kod bierz swobodnie — MIT, rób co chcesz.
-2. **Nie zakładaj, że dane możesz republikować.** Prawo do nich nie przechodzi
-   razem z forkiem.
-3. Zanim odpalisz scraper: `bun run scrape:check`, zostaw interwał na 1 s i nie
-   podszywaj się UA pod przeglądarkę. Serwis, z którego korzystasz, utrzymuje
-   ktoś inny za swoje pieniądze.
-4. Komercyjnie — nie. Patrz `VII.2.k)`.
+1. Take the code freely — MIT, do as you like.
+2. **Do not assume you may republish the data.** The right to it does not travel with the
+   fork.
+3. Before starting the scraper: `bun run scrape:check`, leave the interval at 1 s and do not
+   disguise the UA as a browser. The site you are using is maintained by somebody else, at
+   their own expense.
+4. Commercially — no. See `VII.2.k)`.
