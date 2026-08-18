@@ -1,24 +1,26 @@
-// Historia jednego świata: skumulowane progi aktywności, serie do wykresów oraz
-// pobieranie surowych migawek, gdy agregat przestaje wystarczać.
+// One world's history: cumulative activity thresholds, the series for the charts, and
+// fetching raw snapshots once the aggregate stops being enough.
 //
-// Widok ma dwie ścieżki i to jest cały jego sens:
-//   • filtr domyślny → `trends.json`, 9 KB, jeden fetch, natychmiast
-//   • filtr ustawiony → `.f.json` tego jednego świata, do 1,9 MB, dopiero na żądanie
-// Obie kończą się obiektem o tym samym kształcie, więc rysowanie ich nie odróżnia.
+// The view has two paths, and that is its entire point:
+//   • the default filter → `trends.json`, 9 KB, one fetch, immediately
+//   • a filter set → the `.f.json` files of that one world, up to 1.9 MB, on demand only
+// Both end in an object of the same shape, so the drawing cannot tell them apart.
 //
-// Bez DOM-u. `fetch` tak — to nie przeglądarkowy interfejs dokumentu i testy podstawiają
-// go atrapą.
+// No DOM. `fetch` yes — that is not the browser's document interface, and the tests
+// substitute a stub for it.
+//
+// The labels below are Polish because a player reads them — see "Language" in AGENTS.md.
 
 import { daysBetween } from "./shared.js";
 import { isDefaultFilters, summarizeFiltered } from "./filters.js";
 
 /**
- * Progi aktywności — **skumulowane**, w odróżnieniu od rozłącznych koszyków
- * `act` w pliku i `ACTIVITY_BOUNDS` w `filters.js`. „≤ 7 dni” to koszyki 0 i 1 razem;
- * pomylenie tych dwóch skal dałoby wykres zaniżony o cały koszyk „< 24h”.
+ * The activity thresholds — **cumulative**, unlike the disjoint `act` buckets in the file
+ * and `ACTIVITY_BOUNDS` in `filters.js`. "≤ 7 dni" is buckets 0 and 1 together; confusing
+ * the two scales would give a chart understated by the whole "< 24h" bucket.
  *
- * `bound` to najwyższa liczba dni, którą próg jeszcze obejmuje — służy do wykrycia
- * progów, które pod filtrem aktywności przestają cokolwiek mówić (`usableThresholds`).
+ * `bound` is the highest number of days a threshold still covers — it is what detects the
+ * thresholds that stop saying anything under an activity filter (`usableThresholds`).
  */
 export const ACTIVITY_THRESHOLDS = [
   { key: "24h", label: "< 24h", buckets: [0], bound: 0 },
@@ -26,17 +28,18 @@ export const ACTIVITY_THRESHOLDS = [
   { key: "30d", label: "≤ 30 dni", buckets: [0, 1, 2], bound: 30 },
 ];
 
-// Domyślnie ≤ 7 dni: „< 24h” waha się o 14,7% przy populacji stabilnej na 0,6%,
-// bo zależy od godziny i dnia tygodnia scrapa. Patrz docs/2026-08-04-spec-trends.md.
+// ≤ 7 days by default: "< 24h" swings by 14.7% while the population is steady at 0.6%,
+// because it depends on the hour and weekday of the scrape. See
+// docs/2026-08-04-spec-trends.md.
 export const DEFAULT_THRESHOLD = "7d";
 
 /**
- * Progi, które przy danym filtrze aktywności jeszcze coś mówią.
+ * The thresholds that still say something under a given activity filter.
  *
- * Gdy użytkownik odfiltruje „online ≤ 7 dni”, to w zbiorze nie ma już nikogo powyżej
- * siedmiu dni — próg „≤ 7 dni” zrówna się z liczbą pasujących, a „≤ 30 dni” tak samo.
- * Trzy linie jedna na drugiej wyglądają jak potwierdzenie czegokolwiek, a są tym samym
- * pytaniem zadanym trzy razy, więc próg szerszy od filtra po prostu znika z wyboru.
+ * Once the user filters to "online ≤ 7 days", the set holds nobody past seven days — the
+ * "≤ 7 dni" threshold equals the match count, and "≤ 30 dni" likewise. Three lines on top
+ * of each other look like confirmation of something, while being the same question asked
+ * three times, so a threshold wider than the filter simply leaves the picker.
  */
 export function usableThresholds(maxDays = Infinity) {
   return ACTIVITY_THRESHOLDS.filter((t) => t.bound < maxDays);
@@ -52,30 +55,30 @@ export function thresholdByKey(key, maxDays = Infinity) {
   );
 }
 
-/** Liczba aktywnych w każdej migawce przy danym progu. */
+/** The number of active players in each snapshot at a given threshold. */
 export function activeCounts(trend, key, maxDays = Infinity) {
   const threshold = thresholdByKey(key, maxDays);
   if (!threshold) return trend.total.slice();
   return trend.total.map((_, i) => threshold.buckets.reduce((sum, bucket) => sum + trend.act[bucket][i], 0));
 }
 
-/** Udział w populacji, w procentach. Migawka bez graczy daje 0, nie NaN. */
+/** The share of the population, as a percentage. A snapshot with no players gives 0, not NaN. */
 export function shareSeries(counts, totals) {
   return counts.map((count, i) => (totals[i] > 0 ? (count / totals[i]) * 100 : 0));
 }
 
-/** Migawki jako wpisy `{ id, startedAt }` — format, który rozumieją funkcje z shared.js. */
+/** Snapshots as `{ id, startedAt }` entries — the format the functions in shared.js read. */
 export function snapshotEntries(trend) {
   return trend.id.map((id, i) => ({ id, startedAt: trend.startedAt[i], suspect: trend.suspect[i] === 1 }));
 }
 
 /**
- * Zmiany między kolejnymi migawkami. `perDay` jest tu ważniejsze niż `delta`:
- * odstępy między migawkami wynoszą 3-17 dni, więc „−120 graczy” z dwóch wierszy
- * tabeli znaczy dwie różne rzeczy, dopóki nie podzieli się przez czas.
+ * The changes between consecutive snapshots. `perDay` matters more here than `delta`: the
+ * intervals run 3-17 days, so "−120 players" on two rows of the table means two different
+ * things until it is divided by time.
  *
- * To samo dzielenie ratuje historię wczytaną częściowo: brakująca migawka robi
- * dłuższy odstęp, a nie fałszywy skok, bo `perDay` dzieli przez realny czas.
+ * That same division rescues a partially loaded history: a missing snapshot makes a longer
+ * interval rather than a false jump, because `perDay` divides by real elapsed time.
  */
 export function changeRows(trend) {
   const entries = snapshotEntries(trend);
@@ -95,7 +98,7 @@ export function changeRows(trend) {
   return rows;
 }
 
-/** Podsumowanie całej historii świata — od pierwszej migawki do ostatniej. */
+/** A world's whole history summarised — from the first snapshot to the last. */
 export function summarize(trend) {
   const last = trend.total.length - 1;
   if (last < 0) return null;
@@ -112,7 +115,10 @@ export function summarize(trend) {
   };
 }
 
-// ── Stan widoku w URL-u (wszystko poza filtrami) ────────────────────────────
+// ── The view state in the URL (everything except the filters) ───────────────
+//
+// `prog` and `udzial` are Polish and stay that way: they are the contract of links people
+// have already shared, which is why trends.html still exists. See "Language" in AGENTS.md.
 
 export function viewToParams(view) {
   const params = new URLSearchParams();
@@ -133,31 +139,31 @@ export function viewFromParams(params) {
   };
 }
 
-// ── Surowe migawki: konwersja, pamięć, pobieranie ───────────────────────────
+// ── Raw snapshots: conversion, memory, fetching ─────────────────────────────
 
 /**
- * Ile migawek świata wczytujemy domyślnie.
+ * How many of a world's snapshots we load by default.
  *
- * Historia rośnie o ~185 KB gzip na migawkę największego świata, więc bez sufitu
- * ten widok co rundę drożeje i nikt tego nie zauważy. Dziś najdłuższa historia ma
- * 11 migawek, czyli okno jeszcze niczego nie ucina — ale gdy zacznie, użytkownik
- * ma to zobaczyć w liczniku „N z M”, a nie zgadywać.
+ * The history grows by ~185 KB gzip per snapshot of the largest world, so without a ceiling
+ * this view gets more expensive every round and nobody notices. Today the longest history
+ * has 11 snapshots, so the window cuts nothing yet — but when it starts to, the user is to
+ * see it in the "N of M" counter rather than guess.
  */
 export const HISTORY_WINDOW = 12;
 
-/** Ostatnie `HISTORY_WINDOW` migawek — wpisy przychodzą posortowane po `startedAt`. */
+/** The last `HISTORY_WINDOW` snapshots — the entries arrive sorted by `startedAt`. */
 export function windowedEntries(entries, size = HISTORY_WINDOW) {
   return entries.length <= size ? entries.slice() : entries.slice(entries.length - size);
 }
 
 /**
- * Surowy `.f.json` → tablice typowane. Zwykłe tablice JS trzymane dla dziesięciu
- * migawek naraz to kilkukrotnie większy narzut; tutaj wychodzi 11 B na wiersz.
+ * A raw `.f.json` → typed arrays. Plain JS arrays held for ten snapshots at once cost
+ * several times the overhead; this comes to 11 B per row.
  *
- * `days` celowo w `Int32Array`, nie `Int16Array`: zakres realnych wartości mieści się
- * w 16 bitach z zapasem, ale przepełnienie zawinęłoby się na liczbę ujemną, czyli
- * po cichu przerobiło gracza sprzed lat na konto nigdy nieużywane. Dwa bajty na wiersz
- * to tania cena za brak takiej klasy błędu.
+ * `days` is deliberately an `Int32Array`, not an `Int16Array`: the range of real values fits
+ * into 16 bits with room to spare, but an overflow would wrap to a negative number, i.e.
+ * silently turn a player from years ago into an account never used. Two bytes per row is a
+ * cheap price for not having that class of bug.
  */
 export function toTypedSnapshot(json) {
   const count = json.count;
@@ -177,8 +183,8 @@ export function toTypedSnapshot(json) {
   };
 }
 
-// Migawki trzymamy w pamięci per świat. Bez sufitu przełączanie światów po kolei
-// zebrałoby w karcie wszystkie 21, czyli grubo ponad 100 MB.
+// The snapshots are held in memory per world. Without a ceiling, switching worlds one by
+// one would collect all 21 in the tab, well over 100 MB.
 const MAX_CACHED_WORLDS = 2;
 const cache = new Map();
 
@@ -192,27 +198,27 @@ export function cachedSnapshots(world) {
   return store;
 }
 
-/** Ile z podanych migawek leży już w pamięci. */
+/** How many of the given snapshots are already in memory. */
 export function loadedCount(store, entries) {
   return entries.reduce((n, e) => n + (store.has(e.id) ? 1 : 0), 0);
 }
 
-// Trwające pobrania, po jednym na świat.
+// Fetches in flight, one per world.
 //
-// Bez tego każde zdarzenie `input` w polu filtra startowało własny przelot: lista
-// brakujących migawek jest liczona w momencie startu, więc trzy znaki wpisane w „Min
-// level” ciągnęły ten sam komplet plików trzy razy. Dla gordiona to 5,7 MB zamiast
-// 1,9 MB — czyli dokładne zaprzeczenie obietnicy, że transfer kupuje się świadomie.
+// Without this, every `input` event in a filter field started its own pass: the list of
+// missing snapshots is computed at start, so three characters typed into "Min level" pulled
+// the same set of files three times. For gordion that is 5.7 MB instead of 1.9 MB — the
+// exact opposite of the promise that transfer is bought knowingly.
 const inFlight = new Map();
 
 /**
- * Dociąga brakujące migawki świata, `concurrency` naraz. Drugie wywołanie dla tego
- * samego świata dostaje trwający przelot zamiast startować własny.
+ * Fetches a world's missing snapshots, `concurrency` at a time. A second call for the same
+ * world receives the pass already running instead of starting its own.
  *
- * `isStale()` pozwala porzucić robotę, gdy użytkownik zdążył przełączyć świat —
- * bez tego wolniejsza odpowiedź dosypywałaby dane do widoku, którego już nie ma.
- * Migawka, której nie udało się pobrać, ląduje w `failed` i po prostu nie ma jej
- * na wykresie: jedna zepsuta odpowiedź nie może wywalić całej historii.
+ * `isStale()` lets the work be abandoned once the user has switched worlds — without it a
+ * slower response would feed data into a view that no longer exists. A snapshot that could
+ * not be fetched lands in `failed` and simply has no point on the chart: one broken
+ * response must not take down the whole history.
  */
 export function loadHistory(world, entries, options = {}) {
   const running = inFlight.get(world);
@@ -236,7 +242,7 @@ async function fetchMissing(world, entries, options) {
       const entry = missing[next++];
       try {
         const res = await fetch(entry.filters);
-        if (!res.ok) throw new Error(`HTTP ${res.status} dla ${entry.filters}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status} for ${entry.filters}`);
         const json = await res.json();
         if (isStale()) return;
         store.set(entry.id, toTypedSnapshot(json));
@@ -252,22 +258,23 @@ async function fetchMissing(world, entries, options) {
 }
 
 /**
- * Historia pod filtrem — ten sam kształt, co wpis świata w `trends.json`.
+ * History under a filter — the same shape as a world's entry in `trends.json`.
  *
- * Przy filtrze domyślnym oddaje agregat bez dotykania czegokolwiek: to jest ta ścieżka,
- * za którą nikt niefiltrujący nie płaci ani bajtem ponad 9 KB.
+ * Under the default filter it returns the aggregate without touching anything: this is the
+ * path on which nobody who does not filter pays a byte over 9 KB.
  *
- * Przy filtrze ustawionym liczy z wczytanych migawek — i **tylko** z wczytanych.
- * Migawka jeszcze niepobrana nie dostaje punktu; nie wolno jej ani interpolować, ani
- * podstawić pod nią niefiltrowanej liczby z agregatu, bo wykres pokazałby wtedy skok,
- * którego w danych nie ma.
+ * With a filter set it computes from the loaded snapshots — and from **only** those. A
+ * snapshot not yet fetched gets no point; it may be neither interpolated nor backfilled
+ * with the unfiltered number from the aggregate, because the chart would then show a jump
+ * that is not in the data.
  *
- * `population` to zawsze **niefiltrowana** populacja tych samych migawek — mianownik
- * dla trybu „udział”. Udział liczony względem przefiltrowanego zbioru sumowałby się
- * do 100% i nie mówiłby nic.
+ * `population` is always the **unfiltered** population of those same snapshots — the
+ * denominator for "share" mode. A share computed against the filtered set would sum to 100%
+ * and say nothing.
  *
- * `allowed` zawęża wynik do okna migawek (`windowedEntries`). Przy filtrze domyślnym
- * nie obowiązuje: agregat i tak jest już pobrany, więc ucinanie go niczego nie oszczędza.
+ * `allowed` narrows the result to the snapshot window (`windowedEntries`). It does not
+ * apply under the default filter: the aggregate is already fetched, so trimming it saves
+ * nothing.
  *
  * @param {Set<string>|null} [allowed]
  */

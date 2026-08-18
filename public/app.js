@@ -1,13 +1,14 @@
-// Widok jednego świata: przekrój wybranej migawki i historia wszystkich, pod jednym
-// filtrem. To jedyny moduł, który dotyka DOM-u — cała logika liczenia siedzi
-// w `filters.js` i `history.js` i jest testowana bez przeglądarki.
+// The view of one world: the chosen snapshot in cross-section and the history of all of
+// them, under one filter. This is the only module that touches the DOM — all the counting
+// logic sits in `filters.js` and `history.js` and is tested without a browser.
 //
-// Dwie ścieżki danych, celowo nierównoważne:
-//   • filtr domyślny → historia z `trends.json` (9 KB), pobranego i tak
-//   • filtr ustawiony → historia liczona z `.f.json` tego świata (do 1,9 MB),
-//     dociąganych dopiero po pierwszym ruchu filtrem i dopełniających wykres
-//     migawka po migawce
-// Kto nie filtruje, nie płaci za dokładność ani bajtem.
+// Two data paths, deliberately unequal:
+//   • the default filter → history from `trends.json` (9 KB), fetched anyway
+//   • a filter set → history computed from that world's `.f.json` (up to 1.9 MB), pulled
+//     only after the first filter move and filling the chart in snapshot by snapshot
+// Whoever does not filter does not pay a byte for the precision.
+//
+// The strings a reader sees are Polish — see "Language" in AGENTS.md.
 
 import { PROF, PROF_COLORS, capitalize, formatSnapshotDate, shortDate, utcTime } from "./shared.js";
 import {
@@ -42,7 +43,7 @@ import {
 function setupView() {
   const el = (id) => {
     const node = document.getElementById(id);
-    if (!node) throw new Error(`Brak elementu #${id}`);
+    if (!node) throw new Error(`no element #${id}`);
     return node;
   };
 
@@ -50,19 +51,19 @@ function setupView() {
   let trends = null;
   let renderTimer = null;
 
-  // Historia jest kupowana świadomie: dopóki nikt nie ruszył filtra, `trends.json`
-  // wystarcza i nie ma powodu ściągać megabajtów.
-  let worldToken = 0; // unieważnia pobieranie po przełączeniu świata
-  let snapshotToken = 0; // to samo dla pojedynczej migawki przekroju
+  // The history is bought knowingly: as long as nobody has moved the filter, `trends.json`
+  // is enough and there is no reason to pull megabytes.
+  let worldToken = 0; // invalidates a fetch after the world is switched
+  let snapshotToken = 0; // the same for the single snapshot being cross-sectioned
   let progress = { loaded: 0, expected: 0, failed: 0, running: false };
 
   const charts = {};
-  // Oś X jest liniowa w milisekundach epoki, więc odstępy 3-17 dni są widoczne jako
-  // różne. Chart.js ma do tego skalę czasu, ale wymaga adaptera dat, którego nie
-  // wendorujemy — podpisy generujemy sami, a podziałki stawiamy dokładnie w migawkach.
+  // The X axis is linear in epoch milliseconds, so 3-17 day intervals are visibly
+  // different. Chart.js has a time scale for this, but it needs a date adapter we do not
+  // vendor — so we generate the labels ourselves and put the ticks exactly at the snapshots.
   let tickValues = [];
   let entriesByTime = new Map();
-  let thresholdKeys = ""; // ostatnio wypełniony zestaw progów, żeby nie kasować wyboru
+  let thresholdKeys = ""; // the last set of thresholds filled in, so the choice is not cleared
 
   if (window.Chart) {
     Chart.defaults.color = "#a0a09a";
@@ -87,7 +88,7 @@ function setupView() {
     });
   })();
 
-  // ── Odczyt stanu z formularza ─────────────────────────────────────────────
+  // ── Reading the state out of the form ─────────────────────────────────────
 
   function numberOr(id, fallback) {
     const value = el(id).value;
@@ -119,7 +120,7 @@ function setupView() {
     };
   }
 
-  /** Odwrotność readFilters — wsadza stan z URL-a z powrotem w pola formularza. */
+  /** The inverse of readFilters — puts the state from the URL back into the form fields. */
   function applyFilters(f) {
     const put = (id, value) => {
       el(id).value = Number.isFinite(value) ? String(value) : "";
@@ -147,19 +148,19 @@ function setupView() {
     const params = filtersToParams(readFilters());
     for (const [key, value] of viewToParams(readView())) params.set(key, value);
     params.sort();
-    // Kotwica zostaje: bez niej pierwsza zmiana filtra po kliknięciu „Historia”
-    // kasowała `#historia` z adresu, więc przeładowanie wracało na górę strony.
+    // The anchor stays: without it the first filter change after clicking "Historia"
+    // wiped the anchor out of the address, so a reload returned to the top of the page.
     const hash = location.hash || "";
     const query = params.toString();
     const url = `${location.pathname}${query ? `?${query}` : ""}${hash}`;
-    // `render()` leci przy każdym znaku i przy każdym pobranym pliku historii.
-    // Safari przerywa po ~100 wywołaniach `replaceState` na 30 s, a wyjątek
-    // wywaliłby render w połowie — więc piszemy tylko wtedy, gdy adres się zmienił.
+    // `render()` runs on every character and on every history file fetched. Safari cuts
+    // in after ~100 `replaceState` calls per 30 s, and an exception would take down the
+    // render halfway — so we write only when the address actually changed.
     if (url === `${location.pathname}${location.search || ""}${hash}`) return;
     history.replaceState(null, "", url);
   }
 
-  // ── Dane ──────────────────────────────────────────────────────────────────
+  // ── Data ──────────────────────────────────────────────────────────────────
 
   const getWorlds = () => manifest?.worlds || [];
   const currentWorld = () => el("worldSelect").value;
@@ -168,7 +169,7 @@ function setupView() {
   const baseTrend = () => trends?.worlds[currentWorld()] ?? null;
   const currentSnapshot = () => cachedSnapshots(currentWorld()).get(el("snapshotSelect").value) ?? null;
 
-  /** Migawki, które w ogóle mogą trafić na oś czasu: datowane i mieszczące się w oknie. */
+  /** The snapshots that can reach the time axis at all: dated and inside the window. */
   function historyEntries() {
     const base = baseTrend();
     if (!base) return [];
@@ -176,19 +177,20 @@ function setupView() {
     return windowedEntries(currentWorldEntries().filter((e) => dated.has(e.id)));
   }
 
-  // ── Formatowanie liczb ────────────────────────────────────────────────────
+  // ── Formatting numbers ────────────────────────────────────────────────────
 
   const num = (n) => n.toLocaleString("pl-PL");
-  // Ułamki też po polsku — „−5,3%” obok „23 719” zamiast „−5.3%” z dwoma konwencjami naraz.
+  // Fractions in Polish too — "−5,3%" next to "23 719" rather than "−5.3%", two
+  // conventions at once.
   const dec = (n, digits = 1) =>
     n.toLocaleString("pl-PL", { minimumFractionDigits: digits, maximumFractionDigits: digits });
   const signed = (n, format = num) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${format(Math.abs(n))}`;
 
   /**
-   * Wyjątek na komunikat dla człowieka. Wcześniej w pasek błędu szedł surowy tekst
-   * wyjątku — „Failed to fetch” albo „HTTP 500 dla worlds/gordion/2026-…f.json” —
-   * czyli komunikat po angielsku, ze ścieżką pliku i bez podpowiedzi, co zrobić.
-   * Ścieżka nie znika z widoku: stoi w polu „Plik” w szufladzie filtrów.
+   * An exception turned into a message for a person. The error bar used to carry the raw
+   * exception text — "Failed to fetch", or "HTTP 500 for worlds/gordion/2026-…f.json" —
+   * i.e. a message in English, with a file path and no hint about what to do. The path does
+   * not disappear from the view: it stands in the "Plik" field in the filter drawer.
    */
   function describeFailure(error, what) {
     const message = String(error?.message ?? error);
@@ -200,7 +202,7 @@ function setupView() {
     return `Nie udało się pobrać ${what} — wygląda na brak połączenia. Odśwież stronę i spróbuj ponownie.`;
   }
 
-  // ── Wykres przekroju: poziomy według profesji ─────────────────────────────
+  // ── The cross-section chart: levels by profession ─────────────────────────
 
   function levelChartOptions() {
     return {
@@ -246,7 +248,7 @@ function setupView() {
       .filter((e) => e.val > 0)
       .sort((a, b) => b.val - a.val)
       .map((e) => {
-        // Ten sam zapis, co w pasku i w tabeli: „12,3%” i „1 234”, nie „12.3%” i „1234”.
+        // The same notation as in the bar and the table: "12,3%" and "1 234", not "12.3%".
         const pct = total ? dec((e.val / total) * 100, 1) : dec(0, 1);
         return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
           <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${e.color};flex-shrink:0"></span>
@@ -270,8 +272,8 @@ function setupView() {
     let y = pos.top + tooltip.caretY - 10;
     if (x + node.offsetWidth > window.innerWidth - 8) x = pos.left + tooltip.caretX - node.offsetWidth - 12;
     if (y + node.offsetHeight > window.innerHeight - 8) y = window.innerHeight - node.offsetHeight - 8;
-    // Pasek filtrów jest przyklejony i ma wyższy z-index niż dymek, więc górna klamra
-    // musi kończyć się pod nim, a nie na 8 px od krawędzi okna.
+    // The filter bar is sticky and has a higher z-index than the tooltip, so the upper
+    // clamp has to end below it rather than 8 px from the window's edge.
     const barBottom = el("filterBar").getBoundingClientRect().bottom || 0;
     if (y < barBottom + 8) y = barBottom + 8;
 
@@ -301,14 +303,14 @@ function setupView() {
       return;
     }
 
-    // Podmiana danych zamiast destroy()/new Chart() — filtrowanie 40 tys.
-    // wierszy przy każdym znaku w polu było zauważalnie zacinające.
+    // Swapping the data instead of destroy()/new Chart() — filtering 40k rows on every
+    // character typed into a field stuttered noticeably.
     charts.professionChart.data.labels = labels;
     charts.professionChart.data.datasets = datasets;
     charts.professionChart.update();
   }
 
-  // ── Wykresy historii ──────────────────────────────────────────────────────
+  // ── The history charts ────────────────────────────────────────────────────
 
   function timeChartOptions(title, { percent = false } = {}) {
     return {
@@ -324,7 +326,7 @@ function setupView() {
             title: (items) => {
               const entry = entriesByTime.get(items[0].parsed.x);
               if (!entry) return "";
-              // Godzina UTC, bo to ona tłumaczy skoki metryki „ostatnio online”.
+              // The UTC hour, because it is what explains the jumps in "last online".
               return `${formatSnapshotDate(entry)} (${utcTime(entry.startedAt)} UTC)`;
             },
             label: (item) => `${item.dataset.label}: ${percent ? `${dec(item.parsed.y)}%` : num(item.parsed.y)}`,
@@ -350,7 +352,7 @@ function setupView() {
     };
   }
 
-  /** Punkt podejrzanej migawki rysujemy pusty — inaczej obcięty scrape wygląda jak spadek. */
+  /** A suspect snapshot's point is drawn hollow — otherwise a truncated scrape looks like a drop. */
   function pointStyle(trend, color) {
     return {
       pointBackgroundColor: trend.suspect.map((s) => (s ? "transparent" : color)),
@@ -376,8 +378,8 @@ function setupView() {
   }
 
   function renderHistoryCharts(trend, population, filters, share) {
-    // Przy filtrze domyślnym „udział pasujących w populacji” to z definicji 100% —
-    // wykres populacji zostaje wtedy w liczbach zamiast rysować płaską linię bez treści.
+    // Under the default filter, "the matches' share of the population" is 100% by
+    // definition — so the population chart stays in counts instead of drawing a flat line.
     const filtered = !isDefaultFilters(filters);
     const popShare = share && filtered;
 
@@ -428,7 +430,7 @@ function setupView() {
     const profOptions = timeChartOptions(share ? "Udział profesji w populacji" : "Profesje w czasie", {
       percent: share,
     });
-    // Jedyny wykres z sześcioma seriami, więc jako jedyny potrzebuje legendy.
+    // The only chart with six series, so the only one that needs a legend.
     profOptions.plugins.legend = { display: true, position: "bottom", labels: { boxWidth: 12, usePointStyle: true } };
 
     drawChart(
@@ -451,10 +453,10 @@ function setupView() {
     );
   }
 
-  // ── Renderowanie tekstu ───────────────────────────────────────────────────
+  // ── Rendering the text ────────────────────────────────────────────────────
 
-  // Grupy, które kasuje krzyżyk na chipie. Nigdy pojedyncze pole: „Poziom 250-400”
-  // to jeden byt dla czytającego, choć dwa `<input>` dla kodu.
+  // The groups a chip's close button clears. Never a single field: "Poziom 250-400" is one
+  // thing to the reader, though two `<input>`s to the code.
   const FILTER_GROUPS = {
     level: ["minLevel", "maxLevel"],
     honor: ["minHonor", "maxHonor"],
@@ -472,19 +474,19 @@ function setupView() {
   }
 
   /**
-   * Chipy aktywnych filtrów w pasku. Baymard: strony pokazujące aktywne filtry naraz
-   * w panelu i jako podsumowanie nad wynikami mają wyraźnie mniej błędów użytkownika
-   * niż te z jednym z tych wzorców — więc mamy oba.
+   * The chips for the active filters in the bar. Baymard: sites showing the active filters
+   * both in the panel and as a summary above the results have markedly fewer user errors
+   * than sites with only one of those patterns — so we have both.
    *
-   * Chipy są widokiem `readFilters()`, nie własnym stanem: etykiety liczy
-   * `describeFilters`, a krzyżyk pisze z powrotem do tych samych pól formularza.
+   * The chips are a view of `readFilters()`, not their own state: `describeFilters`
+   * computes the labels, and the close button writes back into the same form fields.
    */
   function renderChips(filters) {
     const chips = describeFilters(filters);
     const box = el("filterChips");
-    // Chipy są przebudowywane przy każdym renderze, więc naciśnięcie krzyżyka
-    // niszczyło element, który miał focus — ten wracał na `<body>` i nie dało się
-    // usunąć dwóch filtrów pod rząd z klawiatury. Zapamiętujemy więc, gdzie był.
+    // The chips are rebuilt on every render, so pressing a close button destroyed the
+    // element that held focus — focus fell back to `<body>` and two filters could not be
+    // removed in a row from the keyboard. So we remember where it was.
     const active = typeof document !== "undefined" ? document.activeElement : null;
     const hadFocus = active && box.contains?.(active) ? (active.dataset?.clear ?? "") : null;
 
@@ -498,16 +500,16 @@ function setupView() {
 
     if (hadFocus === null) return;
     const buttons = [...box.querySelectorAll("button")];
-    // Ten sam chip, jeśli przeżył; inaczej pierwszy pozostały; a gdy zniknął ostatni —
-    // przycisk, spod którego chipy wyrastają.
+    // The same chip if it survived; otherwise the first one left; and when the last one is
+    // gone — the button the chips grow out from.
     const next = buttons.find((b) => b.dataset?.clear === hadFocus) ?? buttons[0] ?? el("filtersToggle");
     next.focus?.();
   }
 
   function setFieldsOpen(open) {
-    // Zamknięcie chowa szufladę przez `display: none`. Gdyby focus był w środku,
-    // przeglądarka zrzuciłaby go na `<body>` i następny Tab startowałby od początku
-    // dokumentu — więc oddajemy go przyciskowi, który szufladę otwiera.
+    // Closing hides the drawer with `display: none`. If focus were inside, the browser
+    // would drop it onto `<body>` and the next Tab would start from the top of the
+    // document — so we hand it to the button that opens the drawer.
     const fields = el("filterFields");
     const active = typeof document !== "undefined" ? document.activeElement : null;
     const focusWasInside = !open && active && fields.contains?.(active);
@@ -528,18 +530,18 @@ function setupView() {
   function renderStats(counts, activity, maxDays, professions) {
     const { perProfession } = totalsFromCounts(counts);
 
-    // Zero trafień to nie jest rozkład złożony z samych zer: sześć profesji i pięć
-    // koszyków aktywności wypisanych jako „0” czyta się jak zepsute dane, a nie jak
-    // odpowiedź „nikt nie pasuje”. To ta sama zasada, co `visibleActivityBuckets`.
+    // Zero matches is not a distribution made of zeros: six professions and five activity
+    // buckets printed as "0" read like broken data, not like the answer "nobody matches".
+    // The same principle as `visibleActivityBuckets`.
     if (perProfession.every((n) => n === 0)) {
       el("stats").innerHTML =
         `<div class="stats-line">Żaden gracz w tej migawce nie spełnia filtrów — rozkładu nie ma z czego złożyć.</div>`;
       return;
     }
 
-    // Profesja odznaczona w filtrze nie ma czego wnosić — „Mag: 0” obok wyniku
-    // filtra „tylko Wojownik i Tropiciel” wygląda jak brak danych, a nie jak
-    // wykluczenie. `profChart` rysuje tylko wybrane serie; tu było inaczej.
+    // A profession unchecked in the filter has nothing to contribute — "Mag: 0" next to
+    // the result of a "Wojownik and Tropiciel only" filter looks like missing data rather
+    // than exclusion. `profChart` draws only the chosen series; here it did not.
     const badges = Object.entries(PROF)
       .filter(([id]) => professions.has(Number(id)))
       .map(([id, name]) => ({ name, color: PROF_COLORS[id], count: perProfession[id - 1] }))
@@ -566,9 +568,9 @@ function setupView() {
   }
 
   /**
-   * Scraper oznacza migawkę, której populacja spadła podejrzanie mocno — najczęściej
-   * znaczy to, że ranking podczas awarii oddał mniej stron. Bez tego paska flaga
-   * byłaby zapisywana dla nikogo.
+   * The scraper flags a snapshot whose population dropped suspiciously far — most often
+   * that means the ranking returned fewer pages during an outage. Without this bar the flag
+   * would be written for nobody.
    */
   function showSuspect(suspect) {
     const node = el("suspect");
@@ -603,11 +605,11 @@ function setupView() {
 
   function renderTable(trend) {
     const rows = changeRows(trend).reverse(); // najnowsze na górze
-    // Świat z jedną migawką nie ma czego z czym porównać. Samo wyczyszczenie treści
-    // zostawiało `.card` z ramką i paddingiem — puste pudełko, które nadal łapało
-    // tabulator (`tabindex="0"`) i nadal było ogłaszane jako region „Zmiany populacji
-    // między migawkami”, tyle że bez zawartości. Notka `#singlePoint` wyżej mówi już,
-    // dlaczego tabeli nie ma, więc karta ma zniknąć w całości.
+    // A world with one snapshot has nothing to compare against anything. Clearing the
+    // content alone left the `.card` with its border and padding — an empty box that still
+    // caught the tab key (`tabindex="0"`) and was still announced as the region "Zmiany
+    // populacji między migawkami", only with no content. The `#singlePoint` note above
+    // already says why there is no table, so the card is to disappear entirely.
     el("changeTable").hidden = rows.length === 0;
     if (rows.length === 0) {
       el("changeTable").innerHTML = "";
@@ -636,16 +638,17 @@ function setupView() {
   }
 
   /**
-   * Progi szersze niż filtr aktywności znikają z wyboru: pod takim filtrem liczyłyby
-   * dokładnie tych samych graczy, co wykres pasujących, więc pokrywałyby się z nim
-   * w jedną linię wyglądającą na potwierdzenie czegoś.
+   * Thresholds wider than the activity filter leave the picker: under such a filter they
+   * would count exactly the same players as the matches chart, so they would collapse onto
+   * it into one line that looks like confirmation of something.
    */
   function fillThresholdSelect(maxDays, preferred) {
     const usable = usableThresholds(maxDays);
     const keys = usable.map((t) => t.key).join(",");
-    // Wybór czytamy PRZED podmianą opcji. `innerHTML` na `<select>` zeruje wartość
-    // na pierwszą opcję, więc odczyt po podmianie zawsze dawałby „< 24h” — czyli
-    // cofałby użytkownika na serię wahającą się o 14,7% i utrwalał to w linku.
+    // The choice is read BEFORE the options are replaced. `innerHTML` on a `<select>`
+    // resets the value to the first option, so reading it afterwards would always give
+    // "< 24h" — dropping the user onto a series that swings by 14.7% and freezing that
+    // into the link.
     const wanted = preferred ?? el("thresholdSelect").value;
 
     if (keys !== thresholdKeys) {
@@ -680,19 +683,20 @@ function setupView() {
       node.textContent = `${expected} ${expected === 1 ? "migawka" : "migawek"}`;
       return;
     }
-    // Komplet się nie zebrał. „Wczytywanie…” wolno napisać tylko wtedy, gdy coś
-    // jeszcze leci — inaczej status zostaje na zawsze na pasku postępu, który stoi.
+    // The full set did not come together. "Wczytywanie…" may be written only while
+    // something is still in flight — otherwise the status stays forever on a progress bar
+    // that has stopped.
     node.textContent = progress.running
       ? `wczytywanie dokładnych danych… ${loaded} z ${expected} migawek`
       : `${loaded} z ${expected} migawek · ${progress.failed} nie wczytano`;
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Rendering ─────────────────────────────────────────────────────────────
 
   /**
-   * Czyści wykresy historii. Bez tego wczesne wyjścia z `renderHistory` zostawiały
-   * na ekranie serie **poprzedniego świata** pod nagłówkiem i tabelą nowego — razem
-   * z dymkami pokazującymi daty tamtych migawek.
+   * Clears the history charts. Without this, early returns from `renderHistory` left the
+   * **previous world's** series on screen under the new world's heading and table —
+   * tooltips showing those snapshots' dates included.
    */
   function clearHistoryCharts() {
     tickValues = [];
@@ -702,9 +706,9 @@ function setupView() {
       charts[id].data.datasets = [];
       charts[id].update();
     }
-    // Ukrywana z tego samego powodu, co przy jednej migawce: pusta karta z ramką
-    // to widoczne puste pudełko i martwy przystanek tabulatora. `renderTable`
-    // odsłoni ją z powrotem, gdy będzie miała co pokazać.
+    // Hidden for the same reason as with a single snapshot: an empty card with a border is
+    // a visible empty box and a dead tab stop. `renderTable` will bring it back once it has
+    // something to show.
     el("changeTable").hidden = true;
     el("changeTable").innerHTML = "";
   }
@@ -715,7 +719,7 @@ function setupView() {
     if (!data) {
       el("stats").textContent = "Ładowanie…";
       el("matchLine").textContent = "Ładowanie…";
-      // Histogram też jest z poprzedniej migawki, dopóki nowa nie dojdzie.
+      // The histogram is from the previous snapshot too, until the new one arrives.
       if (charts.professionChart) {
         charts.professionChart.data.labels = [];
         charts.professionChart.data.datasets = [];
@@ -751,8 +755,9 @@ function setupView() {
     );
 
     renderHistoryStatus(loaded, expected);
-    // Notka wisi na tym, ile realnie brakuje — nie na tym, czy coś jeszcze leci.
-    // Inaczej przy nieudanym pobraniu znikała, zostawiając niepełny wykres bez słowa.
+    // The note hangs on how much is genuinely missing — not on whether anything is still in
+    // flight. Otherwise a failed fetch made it disappear, leaving an incomplete chart with
+    // nothing said about it.
     el("partialNote").hidden = loaded >= expected;
     if (!el("partialNote").hidden) {
       const stalled = !progress.running;
@@ -768,7 +773,7 @@ function setupView() {
     const usable = fillThresholdSelect(filters.maxDays);
     const share = el("modeSelect").value === "udzial";
 
-    // Jeden punkt to poprawny stan, nie błąd — luvia dołączyła w ostatniej rundzie.
+    // One point is a valid state, not an error — luvia joined in the last round.
     el("singlePoint").hidden = trend.id.length !== 1 || expected !== 1;
     el("suspectNote").hidden = !trend.suspect.some((s) => s === 1);
     el("onlineNote").hidden = usable.length === 0;
@@ -796,9 +801,9 @@ function setupView() {
   }
 
   /**
-   * Render i ewentualne dociągnięcie historii idą **razem, za tym samym debounce'em**.
-   * Pobieranie wywoływane wprost z handlera `input` startowało jeden przelot na każdy
-   * wciśnięty klawisz — patrz `inFlight` w history.js.
+   * The render and any history fetch go **together, behind the same debounce**. A fetch
+   * called straight from the `input` handler started one pass per keystroke — see
+   * `inFlight` in history.js.
    */
   function scheduleRender() {
     clearTimeout(renderTimer);
@@ -809,10 +814,10 @@ function setupView() {
   }
 
   /**
-   * Bez zwłoki — dla kontrolek, które zmieniają się skokowo. Debounce istnieje po to,
-   * żeby pisanie w polu liczbowym nie startowało renderu na każdy znak; wybór opcji
-   * z listy i kliknięcie przycisku to jedno zdarzenie, więc czekanie 150 ms jest tam
-   * wyłącznie opóźnieniem odczuwalnym przez użytkownika.
+   * With no delay — for controls that change in one step. The debounce exists so that
+   * typing into a number field does not start a render per character; picking an option
+   * from a list or clicking a button is a single event, so waiting 150 ms there is nothing
+   * but latency the user can feel.
    */
   function renderNow() {
     clearTimeout(renderTimer);
@@ -820,7 +825,7 @@ function setupView() {
     void ensureHistory();
   }
 
-  // ── Pobieranie ────────────────────────────────────────────────────────────
+  // ── Fetching ──────────────────────────────────────────────────────────────
 
   async function loadSnapshot(entry) {
     if (!entry) return;
@@ -831,8 +836,8 @@ function setupView() {
     el("sourceInfo").textContent = entry.filters;
     el("snapshotMeta").textContent = formatSnapshotDate(entry);
 
-    // Błąd poprzedniej migawki nie opisuje tej — czyszczony na obu ścieżkach,
-    // także wtedy, gdy dane są już w pamięci i nic nie pobieramy.
+    // The previous snapshot's error does not describe this one — cleared on both paths,
+    // including when the data is already in memory and nothing is fetched.
     el("error").textContent = "";
 
     if (store.has(entry.id)) {
@@ -848,32 +853,32 @@ function setupView() {
       const res = await fetch(entry.filters);
       if (!res.ok) throw new Error(`HTTP ${res.status} dla ${entry.filters}`);
       const json = await res.json();
-      // Odpowiedź na porzucone żądanie — użytkownik zdążył przełączyć świat/datę.
+      // A response to an abandoned request — the user has switched world or date.
       if (token !== snapshotToken) return;
 
       store.set(entry.id, toTypedSnapshot(json));
       showSuspect(json.suspect);
       render();
     } catch (e) {
-      // Ten sam strażnik co przy sukcesie: odrzucenie porzuconego żądania nie może
-      // skasować poprawnie wyrenderowanego przekroju innej migawki.
+      // The same guard as on success: a rejected abandoned request must not wipe out a
+      // correctly rendered cross-section of another snapshot.
       if (token !== snapshotToken) return;
       el("error").textContent = describeFailure(e, "migawki przekroju");
       el("stats").textContent = "—";
-      // Bez tego pasek zostawał na liczbach poprzedniej migawki albo na „Ładowanie…”,
-      // czyli obok czerwonego błędu stał wynik, którego nie ma czym poprzeć.
+      // Without this the bar stayed on the previous snapshot's numbers or on "Ładowanie…",
+      // i.e. a result with nothing behind it stood next to a red error.
       el("matchLine").textContent = "—";
     }
   }
 
   /**
-   * Dociąga historię tego świata, jeśli filtr przestał być domyślny. Wywoływane przy
-   * każdej zmianie filtra, ale robi coś tylko raz na świat — reszta to sprawdzenie mapy.
+   * Pulls this world's history if the filter has stopped being the default one. Called on
+   * every filter change, but does anything only once per world — the rest is a map lookup.
    */
   async function ensureHistory() {
     if (isDefaultFilters(readFilters())) {
-      // Historia idzie wtedy z kompletnego agregatu, więc licznik porażek
-      // z poprzedniego filtra nie ma prawa jej opisywać.
+      // The history then comes from the complete aggregate, so the failure counter from the
+      // previous filter has no business describing it.
       if (progress.expected !== 0 || progress.failed !== 0) {
         progress = { loaded: 0, expected: 0, failed: 0, running: false };
         render();
@@ -901,14 +906,14 @@ function setupView() {
     });
 
     if (token !== worldToken) return;
-    // Nieudane migawki opisuje `#partialNote` w sekcji HISTORIA, a nie `#error` nad
-    // PRZEKROJEM: tamten pasek dotyczy migawki przekroju i stoi 1500 px od danych,
-    // o których mowa.
+    // Failed snapshots are described by `#partialNote` in the HISTORIA section, not by
+    // `#error` above PRZEKRÓJ: that bar is about the snapshot being cross-sectioned and
+    // stands 1500 px away from the data in question.
     progress = { loaded: loadedCount(store, entries), expected: entries.length, failed: failed.length, running: false };
     render();
   }
 
-  // ── Selecty ───────────────────────────────────────────────────────────────
+  // ── The selects ───────────────────────────────────────────────────────────
 
   function fillWorldSelect(selected) {
     el("worldSelect").innerHTML = getWorlds()
@@ -948,26 +953,28 @@ function setupView() {
       el("modeSelect").value = view.share ? "udzial" : "liczba";
 
 
-      // Link z filtrami ma działać od razu — historia startuje bez czekania na ruch myszą.
+      // A link carrying filters is to work straight away — the history starts without
+      // waiting for a mouse move.
       await selectAndLoad();
     } catch (e) {
       el("error").textContent = describeFailure(e, "indeksu migawek");
       el("stats").textContent = "—";
       el("matchLine").textContent = "—";
-      // `#summary` zostawało na „Ładowanie…” na zawsze — obok komunikatu o błędzie
-      // stał więc napis obiecujący dane, które nigdy nie dojdą.
+      // `#summary` stayed on "Ładowanie…" forever — so a line promising data that will
+      // never arrive stood next to the error message.
       el("summary").textContent = "—";
     }
   }
 
-  // ── Zdarzenia ─────────────────────────────────────────────────────────────
+  // ── Events ────────────────────────────────────────────────────────────────
 
   el("worldSelect").addEventListener("change", async () => {
     worldToken += 1; // porzuca historię poprzedniego świata
     progress = { loaded: 0, expected: 0, failed: 0, running: false };
-    // Gasimy wykresy od razu, synchronicznie. Pierwszy render nowego świata przychodzi
-    // dopiero po pobraniu migawki, więc bez tego przez kilkaset milisekund pod nowym
-    // nagłówkiem stoją serie poprzedniego świata — z dymkami pokazującymi tamte daty.
+    // The charts are cleared at once, synchronously. The first render of a new world comes
+    // only after a snapshot is fetched, so without this the previous world's series stand
+    // under the new heading for a few hundred milliseconds — with tooltips showing those
+    // dates.
     clearHistoryCharts();
     el("historyStatus").textContent = "—";
     fillSnapshotSelect();
@@ -990,9 +997,9 @@ function setupView() {
     el(id).addEventListener("change", renderNow);
   }
 
-  // Literały, nie pętla po tablicy: test „każdy element pobierany ma swój węzeł
-  // w markupie” szuka wywołań z identyfikatorem wpisanym wprost, więc identyfikator
-  // schowany w zmiennej przestaje być przez cokolwiek pilnowany.
+  // Literals, not a loop over an array: the test "every element fetched has its node in the
+  // markup" looks for calls with the identifier written out, so an identifier hidden in a
+  // variable stops being held by anything.
   const resetAndRender = () => {
     resetFilters();
     renderNow();
@@ -1000,16 +1007,16 @@ function setupView() {
   el("resetBtn").addEventListener("click", resetAndRender);
   el("emptyResetBtn").addEventListener("click", resetAndRender);
 
-  // Listenery paska rejestrujemy NA KOŃCU. `test/dom_smoke.ts` wywołuje pierwszy
-  // zarejestrowany listener węzła (`handlers[0]`), więc wepchnięcie czegokolwiek przed
-  // istniejące podpięcia zmieniłoby to, co test naprawdę uruchamia.
+  // The bar's listeners are registered LAST. `test/dom_smoke.ts` calls a node's
+  // first-registered listener (`handlers[0]`), so pushing anything ahead of the existing
+  // bindings would change what the test actually runs.
   el("filtersToggle").addEventListener("click", (event) => {
     event.stopPropagation?.();
     setFieldsOpen(el("filterFields").hidden);
   });
 
-  // Szuflada zamyka się jak każda inna: Escape albo klik poza nią. Bez tego zasłania
-  // wykresy, a jedyne wyjście to trafienie w ten sam przycisk.
+  // The drawer closes like any other: Escape, or a click outside it. Without that it covers
+  // the charts and the only way out is hitting the same button again.
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !el("filterFields").hidden) setFieldsOpen(false);
   });
@@ -1026,8 +1033,8 @@ function setupView() {
   init();
 }
 
-// Moduły są odroczone, więc dokument jest już sparsowany — ale gdyby plik
-// trafił tu wcześniej, czekamy na DOM zamiast wywalać się na brakującym #id.
+// Modules are deferred, so the document is already parsed — but should this file ever
+// arrive earlier, we wait for the DOM instead of failing on a missing #id.
 if (typeof document !== "undefined") {
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", setupView);

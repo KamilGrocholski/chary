@@ -1,9 +1,11 @@
-// Wspólne słownictwo całego frontu: stałe, czas i koszykowanie aktywności.
+// The shared vocabulary of the whole front end: constants, time and activity bucketing.
 //
-// Ten moduł nie może dotykać DOM-u ani niczego uruchamiać przy imporcie — importują
-// go moduły czyste (`filters.js`, `history.js`) i warstwa widoku (`app.js`), a widok
-// startuje sam po załadowaniu. Gdyby cokolwiek tutaj sięgnęło po `document`, testy
-// modułów czystych przestałyby się dać uruchomić poza przeglądarką. Pilnuje tego test.
+// This module must not touch the DOM or run anything on import — it is imported by the
+// pure modules (`filters.js`, `history.js`) and by the view layer (`app.js`), and the view
+// starts by itself once loaded. If anything here reached for `document`, the pure modules'
+// tests could no longer run outside a browser. A test holds this.
+//
+// The strings below are Polish because a player reads them — see "Language" in AGENTS.md.
 
 export const PROF = {
   1: "Wojownik",
@@ -14,40 +16,41 @@ export const PROF = {
   6: "Łowca",
 };
 
-// Paleta serii margometera (walidowana pod kontrast/CVD na ciemnym tle).
+// margometer's series palette (validated for contrast/CVD on a dark background).
 export const PROF_COLORS = {
-  1: "#3987e5", // Wojownik — niebieski
+  1: "#3987e5", // Wojownik — blue
   2: "#d55181", // Mag — magenta
-  3: "#199e70", // Paladyn — akwamaryna
-  4: "#c98500", // Tropiciel — żółty
-  5: "#9085e9", // Tancerz ostrzy — fioletowy
-  6: "#e66767", // Łowca — czerwony
+  3: "#199e70", // Paladyn — aquamarine
+  4: "#c98500", // Tropiciel — yellow
+  5: "#9085e9", // Tancerz ostrzy — violet
+  6: "#e66767", // Łowca — red
 };
 
 /**
- * Konto nigdy nieużywane — ranking pokazuje dla niego datę z 1969 r.
+ * An account never used — the ranking shows a date in 1969 for it.
  *
- * Surowy `.f.json` zapisuje taki wiersz jako `null`, ale tablice typowane nie umieją
- * `null`-a, więc po konwersji w `history.js` jest to **−1**. Oba zapisy znaczą to samo
- * i muszą wypadać z każdego progu aktywności.
+ * A raw `.f.json` stores such a row as `null`, but typed arrays cannot hold `null`, so
+ * after the conversion in `history.js` it is **−1**. Both spellings mean the same thing
+ * and must fall out of every activity threshold.
  *
- * **To sprawdzenie musi iść przed porównaniem `days > maxDays`.** `−1 > cokolwiek`
- * jest fałszem, więc filtr, który zapyta najpierw o próg, wpuści konta nigdy nieużywane
- * do *każdego* progu aktywności — dokładnie odwrotnie, niż wynika z danych.
+ * **This check has to come before the `days > maxDays` comparison.** `−1 > anything` is
+ * false, so a filter that asks about the threshold first lets accounts never used into
+ * *every* activity threshold — the exact opposite of what the data says.
  */
 export function isNeverOnline(days) {
   return days === null || days === undefined || days < 0;
 }
 
 /**
- * Koszyk aktywności: 0 = <24h, 1 = 1-7 dni, 2 = 8-30 dni, 3 = >30 dni, 4 = nigdy.
- * Koszyki są **rozłączne**, nie skumulowane — skumulowane progi mieszkają
- * w `ACTIVITY_THRESHOLDS` w `history.js` i to są dwie różne skale.
+ * The activity bucket: 0 = <24h, 1 = 1-7 days, 2 = 8-30 days, 3 = >30 days, 4 = never.
+ * The buckets are **disjoint**, not cumulative — the cumulative thresholds live in
+ * `ACTIVITY_THRESHOLDS` in `history.js`, and those are two different scales.
  *
- * Ta sama funkcja co `activityBucket` w `src/trends.ts`, z jedną różnicą: tamta nie
- * zna wartownika −1, bo po stronie serwera nie ma tablic typowanych i nie ma go skąd
- * dostać. Na wartościach, które scraper potrafi wyprodukować, obie muszą dawać to
- * samo — rozjazd dałby historię niezgodną z przekrojem. Pilnuje tego test.
+ * The same function as `activityBucket` in `src/trends.ts`, with one difference: that one
+ * does not know the −1 sentinel, because there are no typed arrays on the server side and
+ * nowhere for it to come from. On the values the scraper can produce, both must give the
+ * same answer — drift would give a history that disagrees with the snapshot view. A test
+ * holds this.
  */
 export function activityBucket(days) {
   if (isNeverOnline(days)) return 4;
@@ -62,12 +65,12 @@ export function capitalize(s) {
 }
 
 /**
- * Data migawki w czasie lokalnym przeglądarki, liczona z `startedAt`.
+ * The snapshot's date in the browser's local time, computed from `startedAt`.
  *
- * Identyfikator migawki (trzon nazwy pliku) NIE nadaje się na datę: do lipca 2026
- * powstawał z czasu lokalnego scrapera, później z UTC, więc dwie migawki obok siebie
- * pokazywałyby dwa różne zegary. Gdy `startedAt` brakuje, wracamy do identyfikatora
- * i mówimy wprost, że to przybliżenie.
+ * A snapshot's identifier (the stem of the filename) is NOT usable as a date: until July
+ * 2026 it came from the scraper's local time, afterwards from UTC, so two snapshots side
+ * by side would show two different clocks. When `startedAt` is missing we fall back to the
+ * identifier and say outright that it is an approximation.
  */
 export function formatSnapshotDate(entry) {
   if (entry?.startedAt) {
@@ -82,22 +85,23 @@ export function formatSnapshotDate(entry) {
   return m ? `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]} (?)` : String(entry?.id ?? "—");
 }
 
-/** Podpis podziałki osi czasu — `DD.MM` w czasie lokalnym. */
+/** A tick label on the time axis — `DD.MM` in local time. */
 export function shortDate(ms) {
   const d = new Date(ms);
   return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
 /**
- * Godzina UTC migawki — jedyne miejsce, gdzie świadomie pokazujemy czas nie-lokalny.
- * To ona tłumaczy skoki metryki „ostatnio online”: rundy schodzą raz o 4 rano, raz o 21.
+ * The snapshot's UTC hour — the only place where we deliberately show a non-local time.
+ * It is what explains the jumps in the "last online" metric: rounds run once at 4 a.m. and
+ * once at 9 p.m.
  */
 export function utcTime(startedAt) {
   const d = new Date(startedAt);
   return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(11, 16);
 }
 
-/** Odstęp między migawkami w dniach — liczony wyłącznie z `startedAt`. */
+/** The interval between snapshots in days — computed from `startedAt` and nothing else. */
 export function daysBetween(a, b) {
   if (!a?.startedAt || !b?.startedAt) return null;
   const diff = new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();

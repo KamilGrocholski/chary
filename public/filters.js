@@ -1,17 +1,19 @@
-// Filtr i zliczanie — rdzeń, którego używa i przekrój jednej migawki, i historia
-// wszystkich. Bez DOM-u, bez `fetch`-a, bez niczego uruchamianego przy imporcie.
+// Filtering and counting — the core used by the view of a single snapshot and by the
+// history of all of them alike. No DOM, no `fetch`, nothing run on import.
 //
-// Działa na dwóch reprezentacjach migawki naraz i musi tak zostać:
-//   • surowy `.f.json` — `level/profession/honor` to `number[]`, `days` to `(number|null)[]`
-//   • migawka po konwersji w `history.js` — tablice typowane, `null` zapisany jako −1
-// Różnicę zna wyłącznie `isNeverOnline` z `shared.js`, więc jest tu jedna ścieżka kodu.
+// It works on two representations of a snapshot at once, and has to stay that way:
+//   • a raw `.f.json` — `level/profession/honor` are `number[]`, `days` is `(number|null)[]`
+//   • a snapshot after the conversion in `history.js` — typed arrays, `null` stored as −1
+// Only `isNeverOnline` from `shared.js` knows the difference, so there is one code path here.
+//
+// The strings below are Polish because a player reads them — see "Language" in AGENTS.md.
 
 import { PROF, activityBucket, isNeverOnline } from "./shared.js";
 
-// Zakresy koszyków aktywności (w dniach). Koszyk 4 to konta nigdy nieużywane.
-// Koszyki są rozłączne, nie skumulowane — etykiety muszą to oddawać, bo „≤ 7 dni”
-// przy koszyku 1-7 sugerowało, że to wszyscy z ostatniego tygodnia, a to tylko ci,
-// których nie ma w koszyku „< 24h”.
+// The bounds of the activity buckets (in days). Bucket 4 is accounts never used.
+// The buckets are disjoint, not cumulative — the labels have to convey that, because
+// "≤ 7 dni" over the 1-7 bucket suggested it was everyone from the last week, when it is
+// only those not in the "< 24h" bucket.
 export const ACTIVITY_BOUNDS = [
   [0, 0],
   [1, 7],
@@ -20,8 +22,8 @@ export const ACTIVITY_BOUNDS = [
 ];
 
 /**
- * Etykieta koszyka przycięta do aktywnego progu — przy filtrze „14 dni” koszyk
- * 8-30 zawiera realnie 8-14 dni i tak ma być podpisany.
+ * A bucket's label trimmed to the active threshold — under a "14 days" filter the 8-30
+ * bucket really holds 8-14 days, and that is how it is to be labelled.
  */
 export function activityLabel(bucket, maxDays = Infinity) {
   if (bucket === 4) return "nigdy";
@@ -35,15 +37,15 @@ export function activityLabel(bucket, maxDays = Infinity) {
 }
 
 /**
- * Koszyki, które przy danym progu mogą być niepuste. Bez tego widok pokazywał
- * „> 30 dni: 0 · nigdy: 0” — zera z definicji, wyglądające jak zepsute dane.
+ * The buckets that can be non-empty under a given threshold. Without this the view showed
+ * "> 30 dni: 0 · nigdy: 0" — zeros by definition, looking like broken data.
  */
 export function visibleActivityBuckets(maxDays = Infinity) {
   if (maxDays === Infinity) return [0, 1, 2, 3, 4];
   return ACTIVITY_BOUNDS.map(([from], bucket) => (from <= maxDays ? bucket : null)).filter((b) => b !== null);
 }
 
-// ── Filtry ──────────────────────────────────────────────────────────────────
+// ── Filters ─────────────────────────────────────────────────────────────────
 
 export function emptyFilters() {
   return {
@@ -57,9 +59,9 @@ export function emptyFilters() {
 }
 
 /**
- * Czy filtr niczego nie odrzuca. To nie jest kosmetyka: przy filtrze domyślnym widok
- * historii bierze gotowy `trends.json` (9 KB) zamiast pobierać migawki jednego świata
- * (do 1,9 MB). Cała leniwa ścieżka pobierania wisi na tej funkcji.
+ * Whether the filter rejects nothing. This is not cosmetic: under the default filter the
+ * history view takes the ready-made `trends.json` (9 KB) instead of fetching one world's
+ * snapshots (up to 1.9 MB). The whole lazy fetching path hangs on this function.
  */
 export function isDefaultFilters(f) {
   return (
@@ -73,13 +75,14 @@ export function isDefaultFilters(f) {
 }
 
 /**
- * Aktywne filtry jako lista chipów — jedyne miejsce zamieniające filtr na etykiety.
+ * The active filters as a list of chips — the only place turning a filter into labels.
  *
- * `key` mówi, którą **grupę** kontrolek czyści krzyżyk na chipie; nigdy pojedyncze pole,
- * bo „Poziom 250-400” to jeden byt dla czytającego, choć dwa `<input>` dla kodu.
+ * `key` says which **group** of controls the chip's close button clears; never a single
+ * field, because "Poziom 250-400" is one thing to the reader though two `<input>`s to the
+ * code.
  *
- * Chipy są widokiem `readFilters()`, nie osobnym stanem — inaczej byłoby to drugie
- * miejsce, które może rozjechać się z formularzem.
+ * The chips are a view of `readFilters()`, not separate state — otherwise they would be a
+ * second place able to drift from the form.
  */
 export function describeFilters(f) {
   const n = (value) => value.toLocaleString("pl-PL");
@@ -99,16 +102,16 @@ export function describeFilters(f) {
   range("honor", "Honor", f.minHonor, f.maxHonor);
 
   if (Number.isFinite(f.maxDays)) {
-    const dni = f.maxDays === 1 ? "1 dzień" : `${n(f.maxDays)} dni`;
-    chips.push({ key: "days", label: f.maxDays === 0 ? "Online < 24h" : `Online ≤ ${dni}` });
+    const days = f.maxDays === 1 ? "1 dzień" : `${n(f.maxDays)} dni`;
+    chips.push({ key: "days", label: f.maxDays === 0 ? "Online < 24h" : `Online ≤ ${days}` });
   }
 
   if (f.professions.size !== 6) {
     const names = [...f.professions].sort((a, b) => a - b).map((p) => PROF[p]);
     chips.push({
       key: "prof",
-      // Powyżej dwóch nazw etykieta rozpycha pasek ponad jedną linię, a i tak nikt jej
-      // nie czyta w całości — wtedy liczy się sama liczba.
+      // Past two names the label pushes the bar beyond one line, and nobody reads it whole
+      // anyway — at that point only the count matters.
       label: names.length === 0 ? "Żadna profesja" : names.length <= 2 ? names.join(", ") : `${names.length} z 6 profesji`,
     });
   }
@@ -124,16 +127,16 @@ export function matches(data, i, f) {
   const honor = data.honor[i];
   if (honor < f.minHonor || honor > f.maxHonor) return false;
 
-  // „nigdy online” wypada przy każdym progu aktywności — i musi być sprawdzone
-  // przed progiem, bo wartownik −1 przechodzi każde porównanie `>`.
+  // "never online" falls out under every activity threshold — and it has to be checked
+  // before the threshold, because the −1 sentinel passes every `>` comparison.
   const days = data.days[i];
   if (f.maxDays !== Infinity && (isNeverOnline(days) || days > f.maxDays)) return false;
   return true;
 }
 
-// ── Zliczanie ───────────────────────────────────────────────────────────────
+// ── Counting ────────────────────────────────────────────────────────────────
 
-/** Mapa poziom → [liczba dla profesji 1..6]. Potrzebna tylko przekrojowi jednej migawki. */
+/** A map level → [count for professions 1..6]. Needed only by the single-snapshot view. */
 export function countByLevel(data, f) {
   const counts = new Map();
   for (let i = 0; i < data.count; i++) {
@@ -172,16 +175,16 @@ export function totalsFromCounts(counts) {
 }
 
 /**
- * Podsumowanie migawki pod filtrem — **kształt wiersza `trends.json`**, tyle że
- * policzony u klienta i z filtrem. Dzięki temu wykresy historii dostają dokładnie
- * te dane, które rysowały wcześniej z agregatu, i nie potrzebują ani linijki
- * nowego kodu rysującego.
+ * A snapshot summarised under a filter — **the shape of a `trends.json` row**, only
+ * computed on the client and with a filter applied. That is what lets the history charts
+ * receive exactly the data they used to draw from the aggregate, needing not one line of
+ * new drawing code.
  *
- * Jeden przelot, nie trzy: dla całej historii świata `countByLevel` i `countByActivity`
- * osobno oznaczałyby 2N przejść po tablicy zamiast N.
+ * One pass, not three: across a world's whole history, `countByLevel` and `countByActivity`
+ * separately would mean 2N passes over the array instead of N.
  *
- * Przy filtrze domyślnym musi dawać co do liczby to samo, co `summarizeSnapshot`
- * z `src/trends.ts` policzył na serwerze — pilnuje tego test na wszystkich migawkach.
+ * Under the default filter it must give number for number what `summarizeSnapshot` from
+ * `src/trends.ts` computed on the server — a test over every snapshot holds this.
  */
 export function summarizeFiltered(data, f) {
   const act = [0, 0, 0, 0, 0];
@@ -197,11 +200,11 @@ export function summarizeFiltered(data, f) {
   return { total, act, byProf };
 }
 
-// ── Stan filtrów w URL-u ────────────────────────────────────────────────────
+// ── The filter state in the URL ─────────────────────────────────────────────
 //
-// Bez tego adres w pasku przeglądarki opisywał widok domyślny — ktoś, kto ustawił
-// poziom 250-320 i honor > 100k, po skopiowaniu adresu albo po przeładowaniu strony
-// dostawał co innego, niż miał na ekranie.
+// Without this the address in the browser's bar described the default view — somebody who
+// set level 250-320 and honor > 100k got something other than what was on their screen
+// after copying the address or reloading the page.
 
 export function filtersToParams(f) {
   const params = new URLSearchParams();
@@ -241,8 +244,8 @@ export function filtersFromParams(params) {
     maxLevel: num("maxLevel", Infinity),
     minHonor: num("minHonor", -Infinity),
     maxHonor: num("maxHonor", Infinity),
-    // Ujemny próg dni nie znaczy nic — traktujemy jak brak filtra zamiast
-    // po cichu pokazywać pustą stronę.
+    // A negative day threshold means nothing — we treat it as no filter rather than
+    // silently showing an empty page.
     maxDays: maxDays < 0 ? Infinity : maxDays,
     professions: new Set(parsed.length > 0 ? parsed : [1, 2, 3, 4, 5, 6]),
   };
