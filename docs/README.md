@@ -1,21 +1,21 @@
-# docs/ — audyty i notatki
+# docs/ — audits and notes
 
-Datowane zapisy z konkretnych obiegów pracy: co sprawdzono, co naprawiono, co świadomie
-zostawiono na później. To kontekst decyzji, nie bieżąca dokumentacja — nie aktualizuj starych
-notatek, dopisuj nowe.
+Dated records from particular rounds of work: what was checked, what was fixed, what was
+deliberately left for later. This is the context behind decisions, not current
+documentation — do not update old notes, add new ones.
 
-Zaczynasz pracę nad projektem? Najpierw [`../AGENTS.md`](../AGENTS.md), nie ten katalog.
+Starting work on the project? Read [`../AGENTS.md`](../AGENTS.md) first, not this directory.
 
-| Plik | Po co |
+| File | What for |
 |---|---|
-| [`2026-08-01-audit.md`](2026-08-01-audit.md) | Audyt #1: czy dane są prawdziwe (są — zweryfikowane wobec żywego rankingu), co było zepsute, co usunięte, czego brakuje. |
-| [`2026-08-01-audit-2.md`](2026-08-01-audit-2.md) | Audyt #2 po naprawach: co się obroniło, co poprawione, **dług na przyszłość i lista pomysłów**. |
-| [`2026-08-01-size-budget.md`](2026-08-01-size-budget.md) | Ile rund scrapa zostało do limitu 1 GB na Pages (~65 ≈ 2 lata) i co zrobić, gdy się skończy. |
-| [`2026-08-04-spec-trends.md`](2026-08-04-spec-trends.md) | Spec widoku trendów jednego świata w czasie: co pokazać, `trends.json` (**9,0 KB gzip na całą historię**), pułapki metryki „ostatnio online”. |
-| [`2026-08-04-spec-world-view.md`](2026-08-04-spec-world-view.md) | Spec scalenia obu widoków w jeden per świat i filtrowania **całej historii** po stronie klienta (**7 ms na 813 tys. wierszy, zero bajtów do limitu Pages**). |
-| [`2026-08-04-audit-3.md`](2026-08-04-audit-3.md) | Audyt #3 po scaleniu widoków: **osiem błędów, których nie łapało 165 testów**, atrapa DOM-u łagodniejsza od przeglądarki, dług i lista pomysłów. |
-| [`2026-08-04-spec-filter-bar.md`](2026-08-04-spec-filter-bar.md) | Spec przypiętego paska filtrów: strona ma **2806 px**, a na telefonie panel zjada **87% pierwszego ekranu**. Warianty, badania (NN/g, Baymard) i przykłady z innych serwisów. |
-| [`2026-08-05-audit-ui-ux.md`](2026-08-05-audit-ui-ux.md) | Audyt #4, pierwszy o interfejsie: granice kontrolek miały **1,48:1** przy progu 3:1, chipy znikały do **0 px** w paśmie 721-1100 px, focus ginął przy Escape i przy krzyżyku na chipie. Plus trzy hipotezy obalone pomiarem. |
+| [`2026-08-01-audit.md`](2026-08-01-audit.md) | Audit #1: is the data real (it is — verified against the live ranking), what was broken, what was deleted, what is missing. |
+| [`2026-08-01-audit-2.md`](2026-08-01-audit-2.md) | Audit #2 after the fixes: what held up, what was corrected, **the debt ahead and a list of ideas**. |
+| [`2026-08-01-size-budget.md`](2026-08-01-size-budget.md) | How many scrape rounds are left before the 1 GB Pages limit (~65 ≈ 2 years) and what to do when they run out. |
+| [`2026-08-04-spec-trends.md`](2026-08-04-spec-trends.md) | The spec for one world's trends over time: what to show, `trends.json` (**9.0 KB gzip for the whole history**), the traps in the "last online" metric. |
+| [`2026-08-04-spec-world-view.md`](2026-08-04-spec-world-view.md) | The spec for merging both views into one per world and filtering **the whole history** on the client (**7 ms over 813k rows, zero bytes against the Pages limit**). |
+| [`2026-08-04-audit-3.md`](2026-08-04-audit-3.md) | Audit #3 after the views were merged: **eight bugs that 165 tests did not catch**, a DOM stub gentler than a browser, the debt and a list of ideas. |
+| [`2026-08-04-spec-filter-bar.md`](2026-08-04-spec-filter-bar.md) | The spec for the pinned filter bar: the page is **2806 px**, and on a phone the panel eats **87% of the first screen**. The variants, the research (NN/g, Baymard) and examples from other sites. |
+| [`2026-08-05-audit-ui-ux.md`](2026-08-05-audit-ui-ux.md) | Audit #4, the first one about the interface: the borders of controls measured **1.48:1** against a 3:1 threshold, chips vanished to **0 px** in the 721-1100 px band, focus was lost on Escape and on a chip's close button. Plus three hypotheses disproved by measurement. |
 
-Nazwy plików: `RRRR-MM-DD-<temat>.md`. Nową notatkę dopisz do tabeli wyżej **oraz** do sekcji
-„Co czytać dalej” w [`../AGENTS.md`](../AGENTS.md) — inaczej nikt jej nie znajdzie.
+Filenames: `YYYY-MM-DD-<topic>.md`. Add a new note to the table above **and** to the "What
+to read next" section in [`../AGENTS.md`](../AGENTS.md) — otherwise nobody will find it.

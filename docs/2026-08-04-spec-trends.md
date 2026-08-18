@@ -1,42 +1,46 @@
-# Spec: trendy jednego świata w czasie — 2026-08-04
+# Spec: one world's trends over time — 2026-08-04
 
-Projekt zbiera migawki od 2026-04-17 — dziś **202 migawki z 21 światów, 11 rund, 109 dni** —
-i nie ma ani jednego widoku, który tę historię pokazuje. To pozycja 3 listy pomysłów
-z [`2026-08-01-audit-2.md`](2026-08-01-audit-2.md) i główny zarzut audytu #1: „mimo 9 snapshotów
-w czasie nie ma żadnego porównania w czasie — czyli tego, po co zbierane są migawki”.
+The project has been collecting snapshots since 2026-04-17 — today **202 snapshots from 21
+worlds, 11 rounds, 109 days** — and there is not one view that shows that history. This is
+item 3 on the list of ideas in [`2026-08-01-audit-2.md`](2026-08-01-audit-2.md) and the main
+charge of audit #1: "despite 9 snapshots over time there is no comparison over time at all —
+which is what the snapshots are collected for".
 
-Zakres v1 jest celowo wąski: **jeden świat, wiele dat**. Sum globalnych i zestawiania światów
-ze sobą tu nie ma — powody w sekcji „Czego świadomie nie ma w v1”. Ten dokument jest też
-zdarzeniem, na które czekał skasowany `src/aggregate.ts` (commit `3811cea`): agregat wraca
-dopiero wtedy, gdy istnieje widok wielu migawek naraz, i w kształcie, którego ten widok naprawdę
-potrzebuje. Kodu tu nie ma — zgodnie z zasadą #3 z [`../AGENTS.md`](../AGENTS.md).
-
----
-
-## Co ma pokazywać
-
-Wybierasz świat, dostajesz jego historię. Trzy wykresy i jedna tabela, wszystko z jednego pliku
-i wszystko o tym jednym świecie.
-
-1. **Populacja w czasie** — linia, oś X to rzeczywisty `startedAt`. Odpowiada na „czy ten świat
-   się wyludnia”. Dane już to pokazują: `fobos` 25 037 → 23 719 (**−5,3%**) w 109 dni, `hutena`
-   −3,2%, przy `classic` +0,6%.
-2. **Aktywni w czasie** — ta sama oś, przełącznik progu `<24h / ≤7 dni / ≤30 dni`
-   (domyślnie **≤7 dni**, powód w pułapkach) oraz *liczba / udział w populacji*. Udział jest tu
-   ważniejszy niż liczba: świat może tracić graczy i jednocześnie się zagęszczać.
-3. **Profesje w czasie** — sześć linii z `byProf`, przełącznik *liczba / udział*. Odpowiada na
-   „czy rozkład profesji dryfuje”, czego pojedyncza migawka pokazać nie może.
-4. **Tabela zmian między kolejnymi migawkami** — data, odstęp w dniach, populacja, delta
-   bezwzględna i **delta na dobę**. Odstępy wynoszą 3-17 dni, więc bez dzielenia przez czas
-   „−120 graczy” z dwóch wierszy znaczy dwie różne rzeczy. To pierwszy konsument `daysBetween`
-   (`public/app.js:218`), dziś eksportowanego i otestowanego, ale nieużywanego.
+The scope of v1 is deliberately narrow: **one world, many dates**. Global totals and
+comparisons between worlds are not here — the reasons are in "What v1 deliberately does not
+have". This document is also the event the deleted `src/aggregate.ts` (commit `3811cea`) was
+waiting for: an aggregate returns only once a view spanning several snapshots exists, and in
+the shape that view actually needs. There is no code here — per rule #4 in
+[`../AGENTS.md`](../AGENTS.md).
 
 ---
 
-## Skąd dane — `public/trends.json`
+## What it is to show
 
-Jeden plik na całą historię, kolumnowo per świat. Powtarzalne klucze obiektów to połowa
-objętości, a Chart.js i tak przyjmuje tablice.
+You pick a world and get its history. Three charts and one table, all from a single file and
+all about that one world.
+
+1. **Population over time** — a line, with the real `startedAt` on the X axis. It answers "is
+   this world emptying out". The data already shows it: `fobos` 25,037 → 23,719 (**−5.3%**) in
+   109 days, `hutena` −3.2%, against `classic` +0.6%.
+2. **Active players over time** — the same axis, a threshold switch `<24h / ≤7 days /
+   ≤30 days` (**≤7 days** by default, the reason is in the traps) plus *count / share of the
+   population*. The share matters more here than the count: a world can be losing players and
+   growing denser at the same time.
+3. **Professions over time** — six lines from `byProf`, with a *count / share* switch. It
+   answers "is the distribution of professions drifting", which a single snapshot cannot show.
+4. **A table of changes between consecutive snapshots** — the date, the interval in days, the
+   population, the absolute delta and **the delta per day**. The intervals run 3-17 days, so
+   without dividing by time "−120 players" on two rows means two different things. This is the
+   first consumer of `daysBetween` (`public/app.js:218`), which is exported and tested today
+   but unused.
+
+---
+
+## Where the data comes from — `public/trends.json`
+
+One file for the whole history, columnar per world. Repeated object keys are half the volume,
+and Chart.js takes arrays anyway.
 
 ```json
 { "schema": 1, "builtAt": "2026-08-04T…",
@@ -50,142 +54,156 @@ objętości, a Chart.js i tak przyjmuje tablice.
     "suspect":   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] } } }
 ```
 
-`act` w kolejności `[<24h, ≤7 dni, ≤30 dni, >30 dni, nigdy]` — koszyki są **rozłączne**, tak jak
-w `activityBucket` (`public/app.js:64`), więc „aktywni ≤7 dni” to suma dwóch pierwszych. `byProf`
-w kolejności profesji 1-6. Wiersz *i* każdej kolumny to ta sama migawka — dokładnie ta sama
-konwencja, co para `.f.json`/`.n.json`.
+`act` is ordered `[<24h, ≤7 days, ≤30 days, >30 days, never]` — the buckets are **disjoint**,
+as in `activityBucket` (`public/app.js:64`), so "active ≤7 days" is the sum of the first two.
+`byProf` is ordered by profession 1-6. Row *i* of every column is the same snapshot — exactly
+the same convention as the `.f.json`/`.n.json` pair.
 
-Struktura jest zawężona zakresem widoku, ale nie zamyka drogi dalej: sumy globalne i zestawienia
-światów liczy się z tego samego pliku, bez regeneracji czegokolwiek.
+The structure is narrowed by the view's scope, but it does not close the road ahead: global
+totals and comparisons between worlds are computed from this same file, with nothing
+regenerated.
 
-**Jeden plik, nie plik per świat.** Całość to 23,9 KB surowo / **9,0 KB po gzipie**; slice jednego
-świata to ~0,6 KB gzip, ale 21 osobnych plików waży razem 11,9 KB, bo każdy płaci własny nagłówek
-kompresji. Przy 9 KB na komplet przełączenie świata ma być natychmiastowe, bez kolejnego fetcha.
+**One file, not a file per world.** The whole thing is 23.9 KB raw / **9.0 KB gzipped**; a
+slice for one world is ~0.6 KB gzip, but 21 separate files weigh 11.9 KB together, because
+each pays its own compression header. At 9 KB for the full set, switching worlds is to be
+instant, with no further fetch.
 
-## Czy to za dużo danych? Nie, i to o trzy rzędy wielkości
+## Is that too much data? No, and by three orders of magnitude
 
-Gdyby widok pobierał `.f.json` dla każdej daty, historia jednego gordiona to 1,8 MB po gzipie
-i 800 tys. wierszy do sparsowania przy każdym wejściu; całość to **64,0 MB surowo / 14,9 MB po
-gzipie** i 5 579 205 rekordów. Agregat to 9,0 KB na wszystkie 202 migawki — jeden fetch,
-**~1 700× mniej transferu**, ~121 B na migawkę.
+If the view fetched `.f.json` for every date, one gordion's history alone would be 1.8 MB
+gzipped and 800 thousand rows to parse on every visit; the whole thing is **64.0 MB raw /
+14.9 MB gzipped** and 5,579,205 records. The aggregate is 9.0 KB for all 202 snapshots — one
+fetch, **~1,700× less transfer**, ~121 B per snapshot.
 
-Rozważane warianty (całe 202 migawki, `JSON.stringify` bez wcięć):
+The variants considered (all 202 snapshots, `JSON.stringify` without indentation):
 
-| wariant | surowo | gzip |
+| variant | raw | gzip |
 |---|---|---|
-| tylko `total` + aktywność [5] | 13,4 KB | 4,9 KB |
-| **wybrany: + profesje [6], `id`, `suspect`** | **23,9 KB** | **9,0 KB** |
-| + kwantyle poziomu (p50/p90/p99/max) | 22,3 KB | 8,6 KB |
-| + aktywność × profesja [30] | 42,1 KB | 17,5 KB |
-| + pełny histogram poziom × profesja | 1 655 KB | 382 KB |
+| `total` + activity [5] only | 13.4 KB | 4.9 KB |
+| **chosen: + professions [6], `id`, `suspect`** | **23.9 KB** | **9.0 KB** |
+| + level quantiles (p50/p90/p99/max) | 22.3 KB | 8.6 KB |
+| + activity × profession [30] | 42.1 KB | 17.5 KB |
+| + a full level × profession histogram | 1,655 KB | 382 KB |
 
-Wobec budżetu z [`2026-08-01-size-budget.md`](2026-08-01-size-budget.md): `public/` ma
-137 MB z limitu 1 GB, runda scrapa dokłada ~13,9 MB, zapasu jest ~65 rund. `trends.json` dokłada
-**~2,5 KB na rundę** (21 × 121 B) i po wyczerpaniu całego zapasu miałby ~190 KB. To 0,02%
-przyrostu rundy. Rozmiar nie jest w tej decyzji argumentem po żadnej ze stron.
+Against the budget in [`2026-08-01-size-budget.md`](2026-08-01-size-budget.md): `public/` is
+137 MB out of a 1 GB limit, a scrape round adds ~13.9 MB, and there is headroom for ~65 rounds.
+`trends.json` adds **~2.5 KB per round** (21 × 121 B) and would be ~190 KB once the entire
+headroom is used up. That is 0.02% of a round's growth. Size is not an argument on either side
+of this decision.
 
-Ostatni wiersz tabeli to powód, dla którego histogramu poziomów w czasie tu nie ma: 43× więcej,
-wymusza podział na plik per świat i odpowiada na inne pytanie.
+The last row of the table is why a level histogram over time is not here: 43× larger, it forces
+a file-per-world split and answers a different question.
 
-## Kto to buduje
+## What builds it
 
-Nowy `src/trends.ts`, czysta funkcja nad typem `FilterFile` z `src/snapshot.ts` — kształt jak
-skasowany `buildAggregate` (`git show 3811cea^:src/aggregate.ts`), ale bez `levels` i bez
-`HONOR_BUCKETS`, których ten widok nie czyta. Wołana z `src/rebuild_data.ts` i na końcu rundy
-scrapa obok `rebuildManifest()` (`src/world_scraper.ts`).
+A new `src/trends.ts`, a pure function over the `FilterFile` type from `src/snapshot.ts` — the
+shape of the deleted `buildAggregate` (`git show 3811cea^:src/aggregate.ts`), but without
+`levels` and without `HONOR_BUCKETS`, which this view does not read. Called from
+`src/rebuild_data.ts` and at the end of a scrape round alongside `rebuildManifest()`
+(`src/world_scraper.ts`).
 
-Pełen skan 202 plików z liczeniem koszyków trwa **0,9 s** w Bunie — osobne przejście niż
-manifest, mimo że `rebuildManifest()` parsuje te same 64 MB, żeby wyciągnąć `startedAt`
-(`src/manifest.ts:31-80`). Oszczędność byłaby warta 0,9 s przy rundzie trwającej ~1,6 h, a ceną
-byłoby zszycie dwóch modułów tak, że trendów nie da się odbudować bez manifestu i odwrotnie.
-Plik przebudowujemy w całości: to tańsze niż pilnowanie spójności inkrementu.
+A full scan of 202 files with the bucket counting takes **0.9 s** under Bun — a separate pass
+from the manifest's, even though `rebuildManifest()` parses the same 64 MB to lift out
+`startedAt` (`src/manifest.ts:31-80`). The saving would be worth 0.9 s against a round lasting
+~1.6 h, and the price would be sewing the two modules together so that the trends cannot be
+rebuilt without the manifest, or the other way round. The file is rebuilt in full: cheaper
+than keeping an incremental update consistent.
 
-Migawka bez `startedAt` jest pomijana — nie ma jej gdzie postawić na osi czasu — a ile ich
-wypadło, wypisuje `bun run rebuild`. Po cichu gubić danych nie wolno.
+A snapshot without `startedAt` is skipped — there is nowhere to put it on the time axis — and
+`bun run rebuild` prints how many dropped out. Losing data silently is not allowed.
 
-## Gdzie żyje widok
+## Where the view lives
 
-Osobna strona `public/trends.html` + `public/trends.js`, link w nagłówku obu stron: zero ryzyka
-regresji dla działającego dashboardu, osobny stan URL, osobny plik testowy. Kosztem jest
-duplikacja CSS między stronami.
+A separate page, `public/trends.html` + `public/trends.js`, with a link in both pages' headers:
+zero risk of regression for the working dashboard, its own URL state, its own test file. The
+price is duplicated CSS between the pages.
 
-Wspólne kawałki (`PROF`, `PROF_COLORS`, `activityBucket`, `capitalize`, `formatSnapshotDate`,
-`daysBetween`) wychodzą z `app.js` do nowego `public/shared.js`. To musi być osobny moduł, a nie
-import z `app.js`: `app.js` startuje `setupDashboard()` od razu po załadowaniu, więc pożyczenie
-z niego jednej funkcji wywaliłoby trends.html na brakującym `#profCheckboxes`. Pilnuje tego test.
-`index.html` dostaje tylko link w nagłówku; reszta dashboardu bez zmian.
+The shared pieces (`PROF`, `PROF_COLORS`, `activityBucket`, `capitalize`, `formatSnapshotDate`,
+`daysBetween`) move out of `app.js` into a new `public/shared.js`. It has to be a separate
+module rather than an import from `app.js`: `app.js` starts `setupDashboard()` as soon as it
+loads, so borrowing one function from it would break trends.html on a missing
+`#profCheckboxes`. A test holds this. `index.html` gets only a link in its header; the rest of
+the dashboard is unchanged.
 
-Chart.js jest już wendorowany lokalnie i typ `line` starcza na wszystkie trzy wykresy, ale **oś X
-nie może być skalą czasu** — ta wymaga adaptera dat, którego nie wendorujemy, a dokładanie drugiej
-zależności frontowej dla trzech wykresów się nie opłaca. Zamiast tego skala liniowa w
-milisekundach epoki, z podziałkami postawionymi dokładnie w migawkach: odstępy 3-17 dni wychodzą
-proporcjonalnie, a podpisy formatujemy sami.
+Chart.js is already vendored locally and the `line` type is enough for all three charts, but
+**the X axis cannot be a time scale** — that needs a date adapter we do not vendor, and adding
+a second front-end dependency for three charts does not pay. Instead: a linear scale in epoch
+milliseconds, with ticks placed exactly at the snapshots, so 3-17 day intervals come out
+proportional and we format the labels ourselves.
 
 ---
 
-## Pułapki
+## Traps
 
-**„Online <24h” mierzy godzinę scrapa, nie grę.** Rundy startowały o 04Z, 06Z, 09Z, 10Z, 14Z,
-15Z, 20Z i 21Z, w różne dni tygodnia, a jedna runda trwa ~1,9 h, więc nawet światy w tej samej
-rundzie są próbkowane o różnych porach. Efekt na 20 stałych światach przez 10 rund:
+**"Online <24h" measures the hour of the scrape, not the game.** The rounds started at 04Z,
+06Z, 09Z, 10Z, 14Z, 15Z, 20Z and 21Z, on different weekdays, and one round lasts ~1.9 h, so
+even worlds within the same round are sampled at different times. The effect across 20 stable
+worlds over 10 rounds:
 
-| metryka | zmienność (CV) |
+| metric | variability (CV) |
 |---|---|
-| populacja | **0,6%** |
-| aktywni ≤30 dni | 3,4% |
-| aktywni ≤7 dni | 8,1% |
-| online <24h | **14,7%** |
+| population | **0.6%** |
+| active ≤30 days | 3.4% |
+| active ≤7 days | 8.1% |
+| online <24h | **14.7%** |
 
-Rozstrzygnięcie: pokazujemy wszystkie trzy progi, domyślnie ≤7 dni, w tooltipie godzina UTC
-migawki, nad wykresem jedno zdanie ostrzeżenia. Ukrywanie <24h byłoby ukrywaniem danych.
+The resolution: show all three thresholds, default to ≤7 days, put the snapshot's UTC hour in
+the tooltip, and one sentence of warning above the chart. Hiding <24h would be hiding data.
 
-**Odstępy migawek są nierówne — 3-17 dni.** Oś X musi być czasem ciągłym z `startedAt`, nigdy
-indeksem migawki, a każda delta między sąsiednimi punktami wymaga podzielenia przez
-`daysBetween`, inaczej porównuje przyrost z trzech dni z przyrostem z siedemnastu.
+**The intervals between snapshots are uneven — 3-17 days.** The X axis has to be continuous
+time from `startedAt`, never a snapshot index, and every delta between neighbouring points has
+to be divided by `daysBetween`, otherwise it compares three days' growth against seventeen
+days' growth.
 
-**`id` migawki nie jest datą.** W przykładzie wyżej `2026-04-17T16-41-43` odpowiada
-`2026-04-17T14:41:43.303Z` — pliki sprzed sierpnia 2026 mają w nazwie czas lokalny, nowsze UTC.
-Na styku formatów wykres dostałby błąd 2 h. Jedynym źródłem czasu jest `startedAt`.
+**A snapshot's `id` is not a date.** In the example above `2026-04-17T16-41-43` corresponds to
+`2026-04-17T14:41:43.303Z` — files from before August 2026 carry local time in the name, newer
+ones UTC. At the seam between the formats the chart would carry a 2 h error. The only source
+of time is `startedAt`.
 
-**Nie każdy świat ma tę samą liczbę punktów.** `brutal` ma 11 migawek (dodatkowy strzał
-2026-08-01), pozostałe 10, `luvia` 1. Widok jednego świata musi znieść serię jednopunktową:
-jeden punkt to poprawny stan, nie błąd — pokazać punkt i komunikat, że na trend za wcześnie.
+**Not every world has the same number of points.** `brutal` has 11 snapshots (an extra shot on
+2026-08-01), the rest have 10, `luvia` has 1. A one-world view has to cope with a
+single-point series: one point is a valid state, not an error — show the point and a message
+saying it is too early for a trend.
 
-**`suspect` musi być widoczny na wykresie.** Dziś takich migawek jest 0, ale strażnik zapisuje
-obciętą rundę zamiast ją odrzucać, a spadek populacji > 5% jest z wykresu nieodróżnialny od
-prawdziwego spadku. Punkt z `suspect` rysować pustym znacznikiem.
+**`suspect` has to be visible on the chart.** There are 0 such snapshots today, but the guard
+writes a truncated round instead of rejecting it, and a population drop of over 5% is
+indistinguishable on a chart from a real drop. A `suspect` point is to be drawn with a hollow
+marker.
 
-**`days === null` to konto nigdy nieużywane, nie nieaktywne.** Osobny koszyk „nigdy”, nigdy
-w mianowniku „aktywnych”. W aetherze rośnie 38 → 140 w 109 dni, więc sam w sobie jest sygnałem
-o nowych rejestracjach.
+**`days === null` is an account never used, not an inactive one.** Its own "never" bucket, and
+never in the denominator of "active". In aether it grows 38 → 140 over 109 days, so it is a
+signal about new registrations in its own right.
 
-**Szew `charId` tego widoku nie dotyczy.** Agregaty liczą populację, nie śledzą osób. Problem
-z audytu #2 („nick nie jest stabilny, `charId` mają dopiero migawki od sierpnia 2026”) obciąża
-pomysł progresji gracza, nie ten spec.
+**The `charId` seam does not concern this view.** Aggregates count a population; they do not
+follow individuals. The problem from audit #2 ("a nickname is not stable, only snapshots from
+August 2026 onwards have `charId`") weighs on the player-progression idea, not on this spec.
 
 ---
 
-## Wady i zalety
+## Pros and cons
 
-**Za:** cała historia w jednym fetchu 9,0 KB, więc przełączanie świata i progu jest natychmiastowe;
-dane już leżą, nic nie trzeba doscrapować; działający dashboard pozostaje nietknięty; `daysBetween`
-dostaje wreszcie konsumenta; format nie zamyka drogi do widoków porównawczych.
+**For:** the whole history in one 9.0 KB fetch, so switching world and threshold is instant;
+the data is already there and nothing has to be re-scraped; the working dashboard stays
+untouched; `daysBetween` finally gets a consumer; the format does not close the road to
+comparative views.
 
-**Przeciw:** nowy artefakt do utrzymania w dwóch miejscach (scrape i rebuild); format zamrożony na
-`schema: 1`, a jego rozszerzenie wymaga regeneracji (tania — 0,9 s); duplikacja CSS między
-`index.html` a `trends.html`; i rzecz najważniejsza — **10-11 punktów na osi czasu to za mało na
-wnioski o sezonowości**. Widok pokaże trend populacji wiarygodnie, a wahania aktywności głównie
-udokumentuje, zamiast je wyjaśnić.
+**Against:** a new artefact to maintain in two places (scrape and rebuild); a format frozen at
+`schema: 1`, whose extension requires regeneration (cheap — 0.9 s); duplicated CSS between
+`index.html` and `trends.html`; and the most important thing — **10-11 points on a time axis
+are too few for conclusions about seasonality**. The view will show a population trend
+credibly, and will mostly document the swings in activity rather than explain them.
 
-## Czego świadomie nie ma w v1
+## What v1 deliberately does not have
 
-**Sum globalnych i zestawiania światów ze sobą.** Nie dlatego, że brakuje danych — `trends.json`
-ma wszystko — tylko dlatego, że oba wymagają decyzji, których ten widok nie potrzebuje.
-Suma globalna wywraca się na zmiennym zestawie światów: `luvia` istnieje tylko w ostatniej rundzie
-i ma 41,3% online (16 134 z 39 087), więc wrzucona do sumy produkuje skok o 16 tys. z niczego —
-trzeba świadomie wybrać przecięcie światów i osobno rysować dołączające. Zestawienie światów
-z kolei wymaga normalizacji, bo gordion (79 528) spłaszcza brutala (7 751) do linii przy zerze.
-Jedno i drugie na osobny obieg, gdy widok jednego świata się obroni.
+**Global totals and comparisons between worlds.** Not for lack of data — `trends.json` has all
+of it — but because both require decisions this view does not need. A global total falls apart
+on a changing set of worlds: `luvia` exists only in the last round and is 41.3% online (16,134
+of 39,087), so dropping it into a total produces a jump of 16 thousand out of nothing — the
+intersection of worlds has to be chosen deliberately, with joiners drawn separately. A
+comparison between worlds, in turn, needs normalisation, because gordion (79,528) flattens
+brutal (7,751) into a line near zero. Both belong to their own round of work, once the
+one-world view has proved itself.
 
-Poza tym: histogram poziomów w czasie (382 KB gzip, plik per świat), progresja pojedynczego gracza
-(`.n.json` + szew `charId`), top-N zmian między migawkami, honor w agregacie.
+Beyond that: a level histogram over time (382 KB gzip, a file per world), a single player's
+progression (`.n.json` + the `charId` seam), the top N changes between snapshots, honor in the
+aggregate.

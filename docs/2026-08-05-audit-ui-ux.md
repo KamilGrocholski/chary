@@ -1,327 +1,329 @@
-# Audyt #4 — interfejs: kontrast, klawiatura, geometria
+# Audit #4 — the interface: contrast, keyboard, geometry
 
-2026-08-05. Pierwszy audyt tego repo, którego przedmiotem jest **warstwa wizualna
-i interakcyjna**, a nie dane. Trzy poprzednie pytały, czy liczby są prawdziwe, czy filtr
-nie gubi progu i czy nie pobieramy 5,7 MB zamiast 1,9 MB. Żaden nie pytał, czy widać pole
-formularza i czy da się z tego widoku korzystać bez myszy.
+2026-08-05. The first audit of this repo whose subject is the **visual and interaction
+layer** rather than the data. The three before it asked whether the numbers were real,
+whether the filter lost the threshold and whether we were fetching 5.7 MB instead of 1.9 MB.
+None asked whether a form field is visible and whether this view can be used without a mouse.
 
-Punkt wyjścia jest taki, że **testy tej warstwy nie dotykają**: `dashboard.test.ts`
-sprawdza literały i liczby, `dom_smoke.ts` buduje atrapę regexem po `id="…"`. Zero CSS-a,
-zero geometrii, zero focusa (`2026-08-04-audit-3.md:213-216`). Wszystko poniżej trzeba
-było zmierzyć w przeglądarce.
-
----
-
-## Metoda
-
-Zgodnie z zasadą #1 („nie ufaj hipotezie — zmierz") nic tu nie jest oceną na oko:
-
-- **Kontrast** — policzony ze wzoru WCAG na relatywną luminancję, dla każdej pary
-  z palety osobno. Ta sama funkcja weryfikowała paletę po zmianie.
-- **Geometria i zachowanie** — Firefox 140 w trybie headless, dashboard w ramce o zadanej
-  szerokości (375, 800, 1440 px), pomiary przez `getBoundingClientRect` i
-  `getComputedStyle` z poziomu strony nadrzędnej, wyniki odsyłane POST-em. Scenariusze
-  odgrywane zdarzeniami, nie klikaniem na ślepo.
-- **Zapadanie się historii** — z dławikiem 900 ms na plik migawki. Na localhoście komplet
-  schodzi szybciej niż debounce 150 ms, więc bez dławika problem jest niewidoczny.
-- **Glify** — wyrenderowane obok znaku spoza fontu (U+E000), żeby odróżnić „nie ma glifu"
-  od „glif jest, tylko znaczy co innego".
-
-Trzy hipotezy postawione przed pomiarem **upadły** — są niżej, w osobnej sekcji.
+The starting point is that **the tests do not touch this layer**: `dashboard.test.ts` checks
+literals and numbers, `dom_smoke.ts` builds a stub with a regex over `id="…"`. No CSS, no
+geometry, no focus (`2026-08-04-audit-3.md:213-216`). Everything below had to be measured in a
+browser.
 
 ---
 
-## Co było zepsute i zostało naprawione
+## Method
 
-### 1. Pole formularza nie odróżniało się od karty niczym
+Per rule #2 ("do not trust a hypothesis — measure"), nothing here is judged by eye:
 
-Zmierzone kontrasty przy palecie sprzed audytu:
+- **Contrast** — computed from the WCAG relative-luminance formula, for each pair from the
+  palette separately. The same function verified the palette after the change.
+- **Geometry and behaviour** — Firefox 140 headless, the dashboard in a frame of a given width
+  (375, 800, 1440 px), measurements through `getBoundingClientRect` and `getComputedStyle` from
+  the parent page, results sent back by POST. Scenarios played out through events, not by
+  clicking blindly.
+- **The history collapsing** — with a 900 ms throttle per snapshot file. On localhost the full
+  set arrives faster than the 150 ms debounce, so without the throttle the problem is invisible.
+- **Glyphs** — rendered next to a character outside the font (U+E000), to tell "there is no
+  glyph" from "there is a glyph, it just means something else".
 
-| para | ratio | próg | |
+Three hypotheses stated before measuring **fell** — they are below, in their own section.
+
+---
+
+## What was broken and got fixed
+
+### 1. A form field was distinguishable from the card by nothing
+
+The contrasts measured with the palette from before the audit:
+
+| pair | ratio | threshold | |
 |---|---|---|---|
-| `--border #35353b` wobec `--panel` (ramka pola i karty) | **1,48:1** | 3:1 (SC 1.4.11) | ✗ |
-| `--surface-2` wobec `--panel` (wypełnienie pola) | **1,09:1** | — | ✗ |
-| `--panel` wobec `--bg` (karta wobec tła) | **1,05:1** | — | ✗ |
+| `--border #35353b` against `--panel` (a field's and a card's border) | **1.48:1** | 3:1 (SC 1.4.11) | ✗ |
+| `--surface-2` against `--panel` (a field's fill) | **1.09:1** | — | ✗ |
+| `--panel` against `--bg` (a card against the background) | **1.05:1** | — | ✗ |
 
-Czyli: pole nie odróżniało się od karty ani ramką, ani wypełnieniem, a karta od tła
-praktycznie wcale — cały podział na powierzchnie trzymał się na obramowaniu o kontraście
-1,48:1. Teksty były przy tym w porządku (16,09:1 i 6,87:1), więc audyt #3 sprawdzający
-`--muted` niczego tu nie mógł zobaczyć: **problemem nie był tekst, tylko granice**.
+In other words: a field was distinguishable from the card neither by its border nor by its
+fill, and a card from the background practically not at all — the entire division into
+surfaces rested on a border with 1.48:1 contrast. The text, meanwhile, was fine (16.09:1 and
+6.87:1), so audit #3 checking `--muted` could see nothing here: **the problem was not the text
+but the borders**.
 
-Naprawa: osobna zmienna `--border-strong: #6a6a73` dla granic kontrolek i kart —
-**3,37:1** wobec karty, **3,10:1** wobec wypełnienia, **3,55:1** wobec tła strony.
-`--border` zostaje do rozdzielaczy w tabeli i nad nagłówkiem sekcji, gdzie próg 3:1
-nie obowiązuje, bo to dekoracja.
+The fix: a separate `--border-strong: #6a6a73` variable for the borders of controls and cards —
+**3.37:1** against a card, **3.10:1** against a fill, **3.55:1** against the page background.
+`--border` stays for dividers in the table and above a section heading, where the 3:1 threshold
+does not apply because they are decoration.
 
-Przy okazji: `#f2f2ef`, `#c98500` i `#e66767` były wpisane literalnie w pięciu miejscach
-obok istniejących zmiennych. Doszły `--warn`, `--danger`, `--ok`.
+While we were at it: `#f2f2ef`, `#c98500` and `#e66767` were written out literally in five
+places next to existing variables. `--warn`, `--danger` and `--ok` were added.
 
-### 2. Kontrolki nie dziedziczyły fontu
+### 2. The controls did not inherit the font
 
-`input, select` nie ustawiały ani `font-family`, ani `font-size`, a te własności nie są
-dziedziczone. Zmierzone na `#worldSelect` — głównym przełączniku całego widoku:
-
-```
-przed:  font-family: sans-serif        font-size: 13.3333px
-po:     font-family: ui-sans-serif…    font-size: 14px
-```
-
-Wszystkie cztery listy i pięć pól liczbowych renderowały się krojem systemowym w rozmiarze
-mniejszym niż cokolwiek innego na stronie.
-
-### 3. Brak `color-scheme: dark`
-
-Bez tej deklaracji przeglądarka rysuje natywne części kontrolek w jasnej skórce: strzałki
-list rozwijanych, przyciski `input[type=number]`, autofill i paski przewijania. Widać to
-na zrzucie sprzed zmiany — pola liczbowe w szufladzie filtrów mają jasnoszare pudełka
-strzałek na ciemnym tle. Jedna linia w `:root`.
-
-### 4. Focus ginął w dwóch miejscach — a to jedyna nawigacja bez myszy
-
-**Escape w szufladzie filtrów.** `setFieldsOpen(false)` chowało szufladę przez
-`display: none`, mając focus w środku. Przeglądarka zrzuca go wtedy na `<body>`, więc
-następny Tab startował od początku dokumentu. Zmierzone po naprawie: focus wraca na
-`#filtersToggle`, `aria-expanded` schodzi na `"false"`.
-
-**Krzyżyk na chipie.** `renderChips` podmienia `innerHTML` przy **każdym** renderze, więc
-naciśnięcie `×` niszczyło element, który miał focus. Skutek: **nie dało się usunąć dwóch
-filtrów pod rząd z klawiatury** — po pierwszym focus lądował na `<body>`. Po naprawie
-przechodzi na następny chip; zmierzona sekwencja: `level → honor → prof`, ani razu `body`.
-
-Atrapa DOM-u tego nie sprawdzi — nie ma drzewa ani `activeElement`, a `querySelectorAll`
-ignoruje selektor i zwraca same `input`y. Rozbudowa atrapy do prawdziwego drzewa jest
-większą robotą niż ten obieg, więc **oba zachowania są zweryfikowane w przeglądarce**,
-nie testem. To świadoma dziura, nie przeoczenie.
-
-### 5. Chipy znikały w całości w paśmie 721-1100 px
-
-Najciekawsze znalezisko, bo niewidoczne z kodu i nieprawdziwe na typowym desktopie.
-Zmierzone przy **800 px**:
+`input, select` set neither `font-family` nor `font-size`, and those properties are not
+inherited. Measured on `#worldSelect` — the main switch of the whole view:
 
 ```
-przed:  .chips  clientWidth 0    scrollWidth 421   (trzy chipy, zero pikseli)
-po:     .chips  clientWidth 188  scrollWidth 420   (przewijalne, wszystkie osiągalne)
+before:  font-family: sans-serif        font-size: 13.3333px
+after:   font-family: ui-sans-serif…    font-size: 14px
 ```
 
-`.chips` ma `flex: 1 1 auto; min-width: 0`, a reszta paska (`select`, licznik, kotwice,
-dwa przyciski) zajmowała dokładnie całą szerokość — więc flexbox ściskał chipy do zera,
-a `overflow: hidden` czynił to bezgłośnym. Użytkownik między 721 a ~1100 px nie widział
-ani jakie filtry są aktywne, ani krzyżyków do ich usunięcia. Poniżej 720 px chipy są
-świadomie `display: none`, powyżej ~1100 mieszczą się — dziura była dokładnie w środku.
+All four lists and five number fields were rendered in the system typeface at a size smaller
+than anything else on the page.
 
-Naprawa dwuczęściowa: `overflow-x: auto` zamiast `hidden` (chip pod focusem sam wjeżdża
-w kadr, więc tabulator działa), plus nowy próg 1100 px, poniżej którego ustępują kotwice
-i doprecyzowanie „w tej migawce" — obie rzeczy są wygodą, a chipy niosą stan filtra.
-Wysokość dokumentu bez zmian (2561 px), więc to nie kosztowało układu nic.
+### 3. No `color-scheme: dark`
 
-Doszedł też `title` na chipie, bo przy przewijaniu widać czasem połowę etykiety.
+Without that declaration the browser draws the native parts of controls in a light skin:
+dropdown arrows, `input[type=number]` buttons, autofill and scrollbars. It is visible in the
+screenshot from before the change — the number fields in the filter drawer have light grey
+arrow boxes on a dark background. One line in `:root`.
 
-### 6. Krzyżyk na chipie był poniżej minimum WCAG 2.2
+### 4. Focus was lost in two places — and that is the only navigation without a mouse
 
-Zmierzone **21×15 px** przy progu 24×24 z SC 2.5.8. Po zmianie: **24×24**, bez zmiany
-wysokości paska (56 px) — powiększenie poszło w sam guzik, nie w chipa.
+**Escape in the filter drawer.** `setFieldsOpen(false)` hid the drawer with `display: none`
+while focus was inside it. The browser then drops focus onto `<body>`, so the next Tab started
+from the top of the document. Measured after the fix: focus returns to `#filtersToggle`, and
+`aria-expanded` goes to `"false"`.
 
-### 7. Tabela przewijana w poziomie była nieosiągalna z klawiatury
+**A chip's close button.** `renderChips` replaces `innerHTML` on **every** render, so pressing
+`×` destroyed the element that held focus. The result: **two filters could not be removed in a
+row from the keyboard** — after the first, focus landed on `<body>`. After the fix it moves to
+the next chip; the measured sequence is `level → honor → prof`, with `body` never in it.
 
-Przy 375 px zmierzone: `clientWidth 333`, `scrollWidth 526` — **193 px treści za krawędzią**,
-w tym kolumny „Zmiana" i „Na dobę". `.tableBox` ma `overflow-x: auto`, ale kontener bez
-`tabindex` nie przyjmuje focusa, więc klawiaturą nie dało się go przewinąć (WCAG 2.1.1).
-Doszedł `tabindex="0"` + `role="region"` + `aria-label`.
+The DOM stub cannot check this — it has no tree and no `activeElement`, and `querySelectorAll`
+ignores its selector and returns only `input`s. Growing the stub into a real tree is more work
+than this whole round, so **both behaviours are verified in a browser**, not by a test. That is
+a deliberate gap, not an oversight.
 
-### 8. Stany błędu zostawiały na ekranie sprzeczne informacje
+### 5. The chips disappeared entirely in the 721-1100 px band
 
-- `catch` w `init()` nie resetował `#summary` → napis „Ładowanie…" zostawał **na zawsze**
-  obok czerwonego komunikatu o błędzie.
-- `catch` w `loadSnapshot` nie resetował `#matchLine` → pasek pokazywał liczby
-  z **poprzedniej** migawki obok informacji, że tej nie udało się pobrać.
-- Treścią komunikatu był surowy wyjątek: `Failed to fetch`, `Unexpected token '<'`,
-  `HTTP 500 dla worlds/gordion/2026-…f.json` — po angielsku, ze ścieżką pliku, bez
-  podpowiedzi co robić.
+The most interesting finding, because it is invisible from the code and untrue on a typical
+desktop. Measured at **800 px**:
 
-Doszła `describeFailure`, która rozróżnia brak połączenia, kod HTTP i zepsuty JSON.
-Ścieżka pliku nie znika z widoku — stoi tam, gdzie stała, czyli w polu „Plik".
+```
+before:  .chips  clientWidth 0    scrollWidth 421   (three chips, zero pixels)
+after:   .chips  clientWidth 188  scrollWidth 420   (scrollable, all reachable)
+```
 
-### 9. Przycisk kopiowania linku — usunięty
+`.chips` has `flex: 1 1 auto; min-width: 0`, and the rest of the bar (`select`, the counter,
+the anchors, two buttons) took up exactly the full width — so flexbox squeezed the chips to
+zero, and `overflow: hidden` made it silent. Between 721 and ~1100 px the user could see
+neither which filters were active nor the close buttons to remove them. Below 720 px the chips
+are deliberately `display: none`, above ~1100 they fit — the hole was exactly in the middle.
 
-Audyt znalazł w nim trzy usterki naraz: `await navigator.clipboard.writeText(…)` bez
-`try/catch` (poza bezpiecznym kontekstem i przy odmowie uprawnień przycisk po prostu nie
-reagował, a wyjątek szedł w konsolę), `aria-label` przykrywający podmienione „✓" — czyli
-brak potwierdzenia dla czytnika ekranu — oraz `setTimeout` bez `clearTimeout`.
+The fix came in two parts: `overflow-x: auto` instead of `hidden` (a focused chip scrolls
+itself into view, so the tab key works), plus a new 1100 px threshold below which the anchors
+and the "w tej migawce" qualifier give way — both are conveniences, while the chips carry the
+filter state. The document height is unchanged (2561 px), so this cost the layout nothing.
 
-Zamiast je naprawiać, przycisk **wypadł z paska**. Cały stan widoku i tak siedzi w adresie
-(`filtersToParams` + `viewToParams`, zapisywane przy każdym renderze), więc przycisk
-duplikował to, co przeglądarka robi lepiej: Ctrl+L, Ctrl+C. Znikł razem z nim komplet
-problemów — kopiowanie, którego nie da się zepsuć, to takie, którego nie ma. Pasek zyskał
-przy okazji ~40 px, czyli miejsce dla chipów, którego brakowało w paśmie 721-1100 px.
+A `title` was added on each chip too, because while scrolling you sometimes see half a label.
 
-Przy okazji upadła hipoteza o glifie `⎘` — patrz sekcja o obalonych hipotezach. Ustalenie
-zostaje w notatce, bo dotyczy każdego przyszłego przycisku ikonowego, nie tego jednego.
+### 6. A chip's close button was below the WCAG 2.2 minimum
 
-### 10. Zero trafień wyglądało jak zepsute dane
+Measured at **21×15 px** against the 24×24 threshold of SC 2.5.8. After the change: **24×24**,
+with no change to the bar's height (56 px) — the extra size went into the button itself, not
+into the chip.
 
-Przy pustym wyniku `#stats` wypisywało `Wojownik: 0 · Mag: 0 · …` i `< 24h: 0 · 1-7 dni: 0 · …`
-— jedenaście zer. To ta sama klasa problemu, którą `visibleActivityBuckets` rozwiązuje dla
-koszyków. Teraz jest jedno zdanie. Dodatkowo `#chartEmpty` dostał przycisk resetu: jedyny
-istniejący „Resetuj filtry" siedzi w **zamkniętej** szufladzie, więc wyjście z pustego
-wyniku wymagało zgadnięcia, gdzie ono jest.
+### 7. The horizontally scrolling table was unreachable from the keyboard
 
-Przy okazji, widoczne dopiero na zrzucie: profesja **odznaczona w filtrze** też dostawała
-badge „0". `profChart` rysuje tylko wybrane serie, `#stats` pokazywał wszystkie sześć.
+At 375 px, measured: `clientWidth 333`, `scrollWidth 526` — **193 px of content past the edge**,
+including the "Zmiana" and "Na dobę" columns. `.tableBox` has `overflow-x: auto`, but a
+container with no `tabindex` does not accept focus, so it could not be scrolled from the
+keyboard (WCAG 2.1.1). `tabindex="0"` + `role="region"` + `aria-label` were added.
 
-### 11. Dwie konwencje liczbowe obok siebie
+### 8. Error states left contradictory information on screen
 
-W dymku histogramu było `12.3%` i `1234`, a 40 px dalej w pasku `12,3%` i `1 234`.
-W kartcie `#stats` — `10403` tuż pod `38 909`. Test pilnuje formatu **tylko dla tabeli**
-(`out.table` musi pasować do `/\d,\d/`), więc dymek i statystyki się wymknęły.
-Wszystko przeszło na `num()`/`dec()`.
+- The `catch` in `init()` did not reset `#summary` → the line "Ładowanie…" stayed **forever**
+  next to a red error message.
+- The `catch` in `loadSnapshot` did not reset `#matchLine` → the bar showed numbers from the
+  **previous** snapshot next to a message saying this one could not be fetched.
+- The message's content was the raw exception: `Failed to fetch`, `Unexpected token '<'`,
+  `HTTP 500 for worlds/gordion/2026-…f.json` — in English, with a file path, and no hint about
+  what to do.
 
-### 12. Adres widoku gubił kotwicę i był przepisywany bez potrzeby
+`describeFailure` was added; it tells a lost connection, an HTTP code and broken JSON apart.
+The file path does not disappear from the view — it stands where it stood, in the "Plik" field.
 
-`writeUrlState` budowało URL jako `pathname + "?" + params` — bez `location.hash`. Klik
-w „Historia", potem dowolna zmiana filtra i kotwica znikała z adresu, więc przeładowanie
-wracało na górę strony.
+### 9. The copy-link button — removed
 
-Osobno: `replaceState` leciało przy **każdym** renderze, w tym raz na każdy pobrany plik
-historii. Safari przerywa po ~100 wywołaniach na 30 s, a niełapany `SecurityError`
-wywaliłby `render()` w połowie — przed `renderChips` i `renderCrossSection`. Teraz zapis
-idzie tylko wtedy, gdy adres faktycznie się zmienił.
+The audit found three faults in it at once: `await navigator.clipboard.writeText(…)` with no
+`try/catch` (outside a secure context, or when permission is refused, the button simply did not
+respond and the exception went to the console), an `aria-label` covering the swapped-in "✓" —
+i.e. no confirmation for a screen reader — and a `setTimeout` with no `clearTimeout`.
 
-Atrapa DOM-u dostała `location.hash` i `replaceState`, które naprawdę aktualizuje
-`location.search`. Bez tego obie strony porównania byłyby `undefined` — czyli zielony test
-dla kodu dopisującego do adresu napis „undefined". To dokładnie ta pułapka, o której mówi
-audyt #3: atrapa łagodniejsza od przeglądarki produkuje zielone testy dla zepsutego kodu.
+Rather than fixing them, the button **left the bar**. The whole view state sits in the address
+anyway (`filtersToParams` + `viewToParams`, written on every render), so the button duplicated
+what the browser does better: Ctrl+L, Ctrl+C. The full set of problems went with it — copying
+that cannot break is copying that does not exist. The bar gained ~40 px in the process, which is
+exactly the room the chips lacked in the 721-1100 px band.
 
-### 13. Braki semantyczne i drobiazgi
+The hypothesis about the `⎘` glyph fell along the way — see the section on disproved hypotheses.
+The finding stays in the note, because it concerns any future icon button, not this one.
 
-- Zero `<main>` i zero skip-linka — cała treść wisiała w bezimiennym `<div class="wrap">`,
-  za paskiem filtrów. Przy 2561 px dokumentu to znaczy, że czytnik ekranu i klawiatura
-  przechodziły przez komplet kontrolek, zanim doszły do danych.
-- `<label>Plik</label>` i `<label>Profesja</label>` nie miały `for` i nie zawijały niczego
-  — etykietowały `<div>`, czyli nic. Zostały `<span class="field-title">`.
-- Sześć checkboxów profesji nie było grupą: `role="group"` + `aria-labelledby`.
-- Chart.js ładował się bez `defer`, blokując parser przed całym `<body>`.
-- Brak `<noscript>` przy widoku renderowanym w 100% z JS-u.
-- Brak `theme-color`, brak stylu dla `<code>` (używanego w notce o `suspect`).
-- `scroll-margin-top: 76px` i `max-height: calc(100vh - 90px)` były liczone dla paska
-  56 px, a na telefonie pasek ma 88 px — kotwica lądowała pod paskiem, szuflada mogła
-  wyjść poniżej ekranu. Doszły wartości dla progu 720 px, a `vh` zmieniło się na `dvh`,
-  bo pasek adresu na telefonie nie mieści się w `100vh`.
-- Wariant domyślnego `button` (biały na akcencie) miał **3,64:1**, czyli poniżej AA — i nie
-  miał ani jednego użytkownika, bo wszystkie przyciski są `.ghost-btn` albo `.reset-btn`.
-  Usunięty; domyślny przycisk wygląda teraz jak `.ghost-btn`, żeby następny dodany nie
-  wrócił po cichu do wariantu, który nie przechodzi kontrastu.
-- Debounce 150 ms obejmował też `change` na listach (`#thresholdSelect`, `#modeSelect`,
-  `#onlinePreset`) i kliknięcie „Resetuj filtry". Debounce istnieje dla pisania w polu;
-  dla wyboru z listy to była wyłącznie zwłoka. Doszło `renderNow()`.
+### 10. Zero matches looked like broken data
+
+With an empty result, `#stats` printed `Wojownik: 0 · Mag: 0 · …` and
+`< 24h: 0 · 1-7 dni: 0 · …` — eleven zeros. It is the same class of problem
+`visibleActivityBuckets` solves for the buckets. Now there is one sentence. On top of that,
+`#chartEmpty` got a reset button: the only existing "Resetuj filtry" sits in a **closed**
+drawer, so getting out of an empty result required guessing where it was.
+
+Incidentally, visible only in the screenshot: a profession **unchecked in the filter** also got
+a "0" badge. `profChart` draws only the chosen series; `#stats` showed all six.
+
+### 11. Two numeric conventions side by side
+
+The histogram tooltip had `12.3%` and `1234`, while 40 px away the bar had `12,3%` and `1 234`.
+In the `#stats` card — `10403` right under `38 909`. The test holds the format **for the table
+only** (`out.table` has to match `/\d,\d/`), so the tooltip and the statistics slipped through.
+Everything moved to `num()`/`dec()`.
+
+### 12. The view's address lost its anchor and was rewritten needlessly
+
+`writeUrlState` built the URL as `pathname + "?" + params` — with no `location.hash`. A click on
+"Historia", then any filter change, and the anchor vanished from the address, so a reload
+returned to the top of the page.
+
+Separately: `replaceState` ran on **every** render, including once per history file fetched.
+Safari cuts in after ~100 calls per 30 s, and an uncaught `SecurityError` would have taken down
+`render()` halfway — before `renderChips` and `renderCrossSection`. The write now happens only
+when the address has actually changed.
+
+The DOM stub gained `location.hash` and a `replaceState` that really updates `location.search`.
+Without that, both sides of the comparison would be `undefined` — a green test for code that
+appends the string "undefined" to the address. That is exactly the trap audit #3 describes: a
+stub gentler than a browser produces green tests for broken code.
+
+### 13. Semantic gaps and small things
+
+- No `<main>` and no skip link — all the content hung in an anonymous `<div class="wrap">`,
+  behind the filter bar. With a 2561 px document that means a screen reader and the keyboard
+  walked through every control before reaching the data.
+- `<label>Plik</label>` and `<label>Profesja</label>` had no `for` and wrapped nothing — they
+  labelled a `<div>`, i.e. nothing. They became `<span class="field-title">`.
+- The six profession checkboxes were not a group: `role="group"` + `aria-labelledby`.
+- Chart.js loaded without `defer`, blocking the parser ahead of the whole `<body>`.
+- No `<noscript>` on a view rendered 100% from JS.
+- No `theme-color`, and no style for `<code>` (used in the note about `suspect`).
+- `scroll-margin-top: 76px` and `max-height: calc(100vh - 90px)` were computed for a 56 px bar,
+  while on a phone the bar is 88 px — an anchor landed under the bar and the drawer could extend
+  below the screen. Values for the 720 px breakpoint were added, and `vh` became `dvh`, because a
+  phone's address bar does not fit inside `100vh`.
+- The default `button` variant (white on the accent) measured **3.64:1**, below AA — and had not
+  one user, because every button is either `.ghost-btn` or `.reset-btn`. Removed; the default
+  button now looks like `.ghost-btn`, so the next one added does not silently fall back to a
+  variant that fails contrast.
+- The 150 ms debounce also covered `change` on the lists (`#thresholdSelect`, `#modeSelect`,
+  `#onlinePreset`) and clicking "Resetuj filtry". The debounce exists for typing into a field;
+  for picking from a list it was nothing but latency. `renderNow()` was added.
 
 ---
 
-## Hipotezy, które upadły w zderzeniu z pomiarem
+## Hypotheses that fell on contact with measurement
 
-**„Glif `⎘` renderuje się jako pusty kwadrat."** Nie. Wyrenderowany obok U+E000 (znaku,
-którego na pewno nie ma w żadnym foncie) widać różnicę: U+E000 to pudełko z kodem
-szesnastkowym, a U+2398 to **prawdziwy glif**. Problem był inny i gorszy, bo nie rzuca
-się w oczy: U+2398 NEXT PAGE przedstawia **kartkę ze strzałką, czyli przewracanie strony**,
-a nie kopiowanie. Sam przycisk ostatecznie zniknął (punkt 9), ale dwa ustalenia z tego
-pomiaru zostają na przyszłość: „glif się rysuje" nie znaczy „glif znaczy to, co trzeba",
-a kodowe punkty **emoji** (🗐, 🔗) odpadają z tego interfejsu z innego powodu —
-przeglądarka rysuje je fontem kolorowym, więc ignorują kolor akcentu. Monochromatyczny
-odpowiednik kopiowania to U+29C9 „⧉".
+**"The `⎘` glyph renders as an empty box."** It does not. Rendered next to U+E000 (a character
+certainly absent from any font) the difference is visible: U+E000 is a box with a hexadecimal
+code, while U+2398 is **a real glyph**. The problem was a different and worse one, because it
+does not catch the eye: U+2398 NEXT PAGE depicts **a page with an arrow, i.e. turning a page**,
+not copying. The button itself disappeared in the end (point 9), but two findings from that
+measurement stay for the future: "the glyph draws" does not mean "the glyph means the right
+thing", and **emoji** code points (🗐, 🔗) are out of this interface for a different reason —
+the browser draws them with a colour font, so they ignore the accent colour. The monochrome
+equivalent of copying is U+29C9 "⧉".
 
-**„Między nagłówkiem HISTORIA a pierwszym wykresem stoi do pięciu kart z notkami."**
-Nie w stanie domyślnym. Zmierzone: **73 px** przy 1440 px (jedna notka, `#onlineNote`)
-i **171 px** przy 375 px, gdzie ta sama notka zawija się na kilka linii. Pięć notek naraz
-jest możliwe, ale nie jest stanem, w którym ktokolwiek zwykle jest.
+**"Between the HISTORIA heading and the first chart stand up to five cards of notes."** Not in
+the default state. Measured: **73 px** at 1440 px (one note, `#onlineNote`) and **171 px** at
+375 px, where the same note wraps onto several lines. Five notes at once is possible, but it is
+not a state anybody is usually in.
 
-**„Po pierwszym znaku w filtrze wykresy historii zapadają się na kilka sekund."**
-Na localhoście **nie da się tego zobaczyć** — komplet 10 migawek aethera schodzi szybciej
-niż debounce 150 ms. Dopiero z dławikiem 900 ms na plik widać, co dzieje się na realnym
-łączu:
+**"After the first character typed into a filter, the history charts collapse for several
+seconds."** On localhost **it cannot be seen** — aether's full set of 10 snapshots arrives
+faster than the 150 ms debounce. Only with a 900 ms throttle per file does what happens on a
+real connection become visible:
 
 ```
-   0 ms   10 punktów   (agregat trends.json)
- 250 ms    1 punkt     ⏳ „Historia dopełnia się w tle” (1 z 10)
-1500 ms    5 punktów   (concurrency 4)
-2250 ms    9 punktów
-3000 ms   10 punktów
+   0 ms   10 points   (the trends.json aggregate)
+ 250 ms    1 point    ⏳ "Historia dopełnia się w tle" (1 of 10)
+1500 ms    5 points   (concurrency 4)
+2250 ms    9 points
+3000 ms   10 points
 ```
 
-Czyli zapadnięcie **jest prawdziwe** — przez ~1,3 s wykres ma jeden punkt zamiast dziesięciu
-— ale hipoteza „kilka sekund pustki bez wyjaśnienia" była fałszywa: stan jest opisany
-notką od pierwszej klatki i odbudowuje się schodkami. Zostawione jako dług (D2 niżej),
-bo alternatywa łamie zasadę „brakującym punktom nie podstawiamy niczego zmyślonego".
+So the collapse **is real** — for ~1.3 s the chart has one point instead of ten — but the
+hypothesis "several seconds of emptiness with no explanation" was false: the state is described
+by a note from the first frame and rebuilds in steps. Left as debt (D2 below), because the
+alternative breaks the rule "we substitute nothing invented for missing points".
 
 ---
 
-## Geometria — liczby przed i po
+## Geometry — the numbers before and after
 
-Pomiary w Firefoksie, ramka o zadanej szerokości, filtr domyślny o ile nie napisano inaczej.
+Measured in Firefox, a frame of a given width, the default filter unless stated otherwise.
 
 | | 1440 px | 800 px | 375 px |
 |---|---|---|---|
-| wysokość dokumentu | 2561 px | 2606 px | 2628 px |
-| wysokość paska filtrów | 56 px | 56 px | 88 px |
-| od filtra do 1. wykresu historii | **973 px** | 1018 px | **1268 px** |
-| notki przed 1. wykresem historii | 73 px | 93 px | 171 px |
-| tabela: treść / kontener | 1350 / 1350 | 738 / 738 | **526 / 333** |
-| chipy: widoczne / potrzebne (3 filtry) | 575 / 575 | **188 / 420** (było 0 / 421) | ukryte |
-| krzyżyk na chipie | 24×24 (było 21×15) | 24×24 | — |
+| document height | 2561 px | 2606 px | 2628 px |
+| filter bar height | 56 px | 56 px | 88 px |
+| from the filter to the 1st history chart | **973 px** | 1018 px | **1268 px** |
+| notes before the 1st history chart | 73 px | 93 px | 171 px |
+| table: content / container | 1350 / 1350 | 738 / 738 | **526 / 333** |
+| chips: visible / needed (3 filters) | 575 / 575 | **188 / 420** (was 0 / 421) | hidden |
+| a chip's close button | 24×24 (was 21×15) | 24×24 | — |
 
-973 px przy ekranie 900 px potwierdza założenie specu paska filtrów: **filtr i pierwszy
-wykres, na który filtr działa, nigdy nie są widoczne naraz.** Na telefonie to 1268 px przy
-812 px ekranu, czyli 1,56 ekranu.
+973 px against a 900 px screen confirms the filter-bar spec's premise: **the filter and the
+first chart the filter acts on are never visible at once.** On a phone it is 1268 px against an
+812 px screen, i.e. 1.56 screens.
 
-Ukrycie `#actChartBox` przy progu „< 24h" przesuwa wszystko poniżej o zmierzone
-**359 px** (wysokość dokumentu 2561 → 2202). Zostawione jako dług.
+Hiding `#actChartBox` under the "< 24h" threshold moves everything below it by a measured
+**359 px** (the document height goes 2561 → 2202). Left as debt.
 
 ---
 
-## Dług — świadomie poza tym obiegiem
+## Debt — deliberately outside this round
 
-| # | Rzecz | Dlaczego nie teraz |
+| # | Thing | Why not now |
 |---|---|---|
-| D1 | **Pasek nie mówi nic o transferze.** Wpisanie jednej cyfry startuje do 8,7 MB surowo / ~1,8 MB gzip dla gordiona. Postęp stoi w `#historyStatus` ~1000 px niżej i liczy migawki, nie bajty. Anulowania nie ma — `AbortController` nie występuje w `public/` ani raz; reset filtrów zeruje licznik, ale pliki lecą do końca. | Pasek ma sztywną wysokość i `nowrap`, a właśnie zabrakło w nim miejsca na chipy. Dołożenie wskaźnika to decyzja, co z paska wypada — czyli spec, nie poprawka. |
-| D2 | **Historia zapada się do jednego punktu na ~1,3 s** po pierwszym znaku (zmierzone wyżej). | Jedyna alternatywa to rysować agregat pod spodem, co łamie zasadę „nie podstawiamy niczego zmyślonego". Wymaga specu. |
-| D3 | **Przycisk Wstecz nie działa** — tylko `replaceState`, zero `pushState`, brak `popstate`. Dług otwarty od audytu #3. | Zmiana zachowania nawigacji z własnym zestawem testów. |
-| D4 | **Na telefonie nadal nie widać, które filtry są aktywne** — chipy są `display: none` poniżej 720 px, zostaje licznik „Filtry (N)". | Naprawa kosztuje wysokość paska, którą spec ograniczył do 13,2% ekranu 667 px. |
-| D5 | Preset aktywności rozjeżdża się z polem liczbowym: wpisanie `5` zostawia listę na „7 dni". | Dług z audytu #3, wciąż otwarty. |
-| D6 | Ukrycie `#actChartBox` przesuwa stronę o **359 px**. | Wymaga decyzji: rezerwować miejsce czy przenieść próg gdzie indziej. |
-| D7 | Pamięć światów jest **FIFO, nie LRU** — `cache.delete(cache.keys().next().value)` usuwa najwcześniej wstawiony, więc sekwencja A→B→A→C wyrzuca właśnie oglądane A i powrót kosztuje 8,7 MB drugi raz. | Jednolinijkowa naprawa, ale bez testu na to nie ma sensu — a test wymaga scenariusza z czterema światami. |
-| D8 | Dymek histogramu działa tylko na `mousemove` — **na telefonie wykres profesji nie ujawnia żadnych liczb**. | Wymaga decyzji o wzorcu dotykowym, nie samego kodu. |
-| D9 | Cała treść informacyjna to 12-13 px; `label` globalnie 12 px w `--muted`. | Podniesienie skali zmienia gęstość całej strony, w tym sztywnej wysokości paska. |
-| D10 | Wykresy nie mają alternatywy tekstowej — `aria-label` opisuje typ wykresu, nie dane. Tabela pokrywa tylko populację. | Osobny temat: co znaczy „dostępna wersja wykresu rozkładu poziomów". |
-| D11 | `minLevel > maxLevel` daje „Brak graczy spełniających filtry" zamiast „zakres jest odwrócony"; tekst w polu `type=number` cicho kasuje filtr; `?prof=99` cicho podstawia wszystkie sześć. | Trzy różne rodzaje cichej degradacji, każdy z własną decyzją, co pokazać. |
-| D12 | `profChart` nie oznacza migawek `suspect`, choć dwa pozostałe to robią. `404.html:26` ma `href="/"`, co na project-Pages wyprowadza poza projekt. | Dwa drobiazgi z audytu #3, wciąż otwarte. |
+| D1 | **The bar says nothing about transfer.** Typing one digit starts up to 8.7 MB raw / ~1.8 MB gzip for gordion. The progress stands in `#historyStatus` ~1000 px lower and counts snapshots, not bytes. There is no cancelling — `AbortController` does not appear in `public/` even once; resetting the filters zeroes the counter, but the files run to completion. | The bar has a fixed height and `nowrap`, and it has just run out of room for the chips. Adding an indicator is a decision about what leaves the bar — a spec, not a patch. |
+| D2 | **The history collapses to one point for ~1.3 s** after the first character (measured above). | The only alternative is drawing the aggregate underneath, which breaks the rule "we substitute nothing invented". Needs a spec. |
+| D3 | **The back button does not work** — only `replaceState`, no `pushState`, no `popstate`. Debt open since audit #3. | A change in navigation behaviour with its own set of tests. |
+| D4 | **On a phone it is still invisible which filters are active** — the chips are `display: none` below 720 px, leaving the "Filtry (N)" counter. | The fix costs bar height, which the spec capped at 13.2% of a 667 px screen. |
+| D5 | The activity preset drifts from the number field: typing `5` leaves the list on "7 dni". | Debt from audit #3, still open. |
+| D6 | Hiding `#actChartBox` moves the page by **359 px**. | Needs a decision: reserve the space, or move the threshold elsewhere. |
+| D7 | The world cache is **FIFO, not LRU** — `cache.delete(cache.keys().next().value)` removes the earliest inserted, so the sequence A→B→A→C evicts the very A being viewed and going back costs 8.7 MB a second time. | A one-line fix, but pointless without a test — and the test needs a four-world scenario. |
+| D8 | The histogram tooltip works only on `mousemove` — **on a phone the profession chart reveals no numbers at all**. | Needs a decision about a touch pattern, not just code. |
+| D9 | All the informational text is 12-13 px; `label` is globally 12 px in `--muted`. | Raising the scale changes the density of the whole page, including the bar's fixed height. |
+| D10 | The charts have no text alternative — `aria-label` describes the chart type, not the data. The table covers population only. | A separate topic: what "an accessible version of the level distribution chart" means. |
+| D11 | `minLevel > maxLevel` gives "Brak graczy spełniających filtry" instead of "the range is inverted"; text in a `type=number` field silently clears the filter; `?prof=99` silently substitutes all six. | Three different kinds of silent degradation, each with its own decision about what to show. |
+| D12 | `profChart` does not mark `suspect` snapshots, though the other two do. `404.html:26` has `href="/"`, which on project Pages leads out of the project. | Two small things from audit #3, still open. |
 
-Nie ruszone świadomie, bo odrzucone w `2026-08-04-spec-filter-bar.md:246-251`: lewy
-pasek boczny, przycisk „Zastosuj", zapisywane zestawy filtrów, nawigacja szersza niż dwie
-kotwice, zmiana wysokości wykresów.
-
----
-
-## Czego ten audyt nie sprawdził
-
-- **Prawdziwego czytnika ekranu.** Sprawdzone są atrybuty i kolejność focusa, nie to, co
-  naprawdę mówi NVDA czy VoiceOver.
-- **Innych przeglądarek.** Wszystko mierzone w Firefoksie 140. `dvh`, `color-scheme`
-  i `scrollbar-width` mają dobre wsparcie, ale nie zostały potwierdzone w Safari, a to
-  właśnie Safari ma limit `replaceState`, przed którym zabezpiecza jedna z poprawek.
-- **Prawdziwego urządzenia dotykowego.** Rozmiary celów są zmierzone, ale trafialność nie.
-- **Wydajności renderu.** `render()` przebudowuje przez `innerHTML` pięć do ośmiu bloków
-  co 150 ms podczas pisania, a `buildFilteredTrend` przelicza całą historię od zera przy
-  każdym renderze. Nie zmierzone, nie zgłoszone jako problem — tylko odnotowane.
+Deliberately untouched because rejected in `2026-08-04-spec-filter-bar.md:246-251`: a left
+sidebar, an "Apply" button, saved filter sets, navigation broader than two anchors, any change
+to the charts' heights.
 
 ---
 
-## Weryfikacja
+## What this audit did not check
 
-- `bun test` — 184 testy zielone (`dom_smoke.ts` zmieniony w dwóch miejscach: `location.hash`
-  i `replaceState`, który naprawdę aktualizuje `location.search`, plus regex chipów
-  przepuszczający atrybut `title`).
-- `bun run typecheck` — czysto.
-- Skrypt kontrastu po zmianie palety: **14 par, wszystkie przechodzą** — teksty ≥ 4,5:1,
-  granice kontrolek ≥ 3:1.
-- Przeglądarka: Escape oddaje focus przyciskowi „Filtry", dwa chipy usuwalne pod rząd
-  z klawiatury, tabela przyjmuje focus, pole ma `ui-sans-serif` 14 px i ramkę
-  `rgb(106,106,115)`, `color-scheme` = `dark`, pusty wynik pokazuje zdanie i działający
-  przycisk resetu.
+- **A real screen reader.** The attributes and the focus order are checked, not what NVDA or
+  VoiceOver actually says.
+- **Other browsers.** Everything was measured in Firefox 140. `dvh`, `color-scheme` and
+  `scrollbar-width` have good support, but were not confirmed in Safari — and Safari is exactly
+  where the `replaceState` limit lives that one of the fixes guards against.
+- **A real touch device.** The target sizes are measured; hit accuracy is not.
+- **Render performance.** `render()` rebuilds five to eight blocks through `innerHTML` every
+  150 ms while typing, and `buildFilteredTrend` recomputes the whole history from scratch on
+  every render. Not measured, not reported as a problem — only noted.
+
+---
+
+## Verification
+
+- `bun test` — 184 tests green (`dom_smoke.ts` changed in two places: `location.hash` and a
+  `replaceState` that really updates `location.search`, plus the chip regex letting a `title`
+  attribute through).
+- `bun run typecheck` — clean.
+- The contrast script after the palette change: **14 pairs, all passing** — text ≥ 4.5:1, the
+  borders of controls ≥ 3:1.
+- In a browser: Escape hands focus back to the "Filtry" button, two chips can be removed in a
+  row from the keyboard, the table accepts focus, a field has `ui-sans-serif` at 14 px and a
+  `rgb(106,106,115)` border, `color-scheme` = `dark`, and an empty result shows a sentence and a
+  working reset button.
