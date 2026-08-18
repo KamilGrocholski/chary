@@ -16,13 +16,13 @@ import {
 } from "../public/filters.js";
 import { activityBucket, daysBetween, formatSnapshotDate, isNeverOnline } from "../public/shared.js";
 
-// Wzorcem odniesienia jest próbka prawdziwego snapshotu w starym schemacie v1
-// (test/fixtures/legacy-snapshot-aether.json — co 12. wiersz oryginału, więc pokrywa
-// cały rozkład: poziomy 1-378, honor 0-744k, konta nigdy nieużywane).
+// The reference is a sample of a real snapshot in the old v1 schema
+// (test/fixtures/legacy-snapshot-aether.json — every 12th row of the original, so it
+// covers the whole distribution: levels 1-378, honor 0-744k, accounts never used).
 //
-// Test przepuszcza ją przez produkcyjną migrację, po czym każdy filtr porównuje
-// z policzonym wprost na oryginalnych wierszach. Dzięki temu sprawdza naraz, czy
-// migracja niczego nie gubi i czy widok liczy dokładnie.
+// The test puts it through the production migration, then compares every filter against
+// a count taken straight from the original rows. That way it checks at once that the
+// migration loses nothing and that the view counts exactly.
 
 const PUBLIC_DIR = path.resolve(import.meta.dir, "../public");
 
@@ -53,8 +53,8 @@ function legacyCount(predicate: (row: any[]) => boolean) {
   return legacy.rows.filter(predicate).length;
 }
 
-describe("migracja do rozdzielonego formatu", () => {
-  test("nie gubi ani nie dokłada wierszy", () => {
+describe("migration to the split format", () => {
+  test("neither loses nor invents rows", () => {
     expect(data.count).toBe(legacy.rows.length);
     expect(names.count).toBe(legacy.rows.length);
     for (const column of [data.level, data.profession, data.honor, data.days]) {
@@ -62,7 +62,7 @@ describe("migracja do rozdzielonego formatu", () => {
     }
   });
 
-  test("każdy wiersz zachowuje wszystkie wartości", () => {
+  test("every row keeps all of its values", () => {
     for (let i = 0; i < legacy.rows.length; i++) {
       const r = legacy.rows[i];
       expect(names.name[i]).toBe(r[1]);
@@ -73,41 +73,41 @@ describe("migracja do rozdzielonego formatu", () => {
     }
   });
 
-  test("konta nigdy nieużywane mają null zamiast daty w 1969 r.", () => {
+  test("accounts never used carry null instead of a date in 1969", () => {
     const never = data.days.filter((d) => d === null).length;
     expect(never).toBeGreaterThan(0);
     expect(never).toBe(legacyCount((r) => Number(String(r[5]).match(/(\d+)/)?.[1]) >= 10_000));
   });
 });
 
-describe("filtrowanie — zawsze dokładne", () => {
-  test("bez filtrów widać całą populację", () => {
+describe("filtering — always exact", () => {
+  test("with no filters the whole population is visible", () => {
     expect(total(countByLevel(data, filters()))).toBe(legacy.rows.length);
   });
 
-  test("rozkład po profesjach", () => {
+  test("the distribution across professions", () => {
     const perProfession = totalsFromCounts(countByLevel(data, filters())).perProfession;
     for (let p = 1; p <= 6; p++) {
       expect(perProfession[p - 1]).toBe(legacyCount((r) => r[3] === p));
     }
   });
 
-  test("zakres poziomów", () => {
+  test("a range of levels", () => {
     const counts = countByLevel(data, filters({ minLevel: 200, maxLevel: 250 }));
     expect(total(counts)).toBe(legacyCount((r) => r[2] >= 200 && r[2] <= 250));
     expect([...counts.keys()].every((l) => l >= 200 && l <= 250)).toBe(true);
   });
 
-  test("zakres honoru — dokładny, bez koszyków", () => {
+  test("a range of honor — exact, no buckets", () => {
     expect(total(countByLevel(data, filters({ minHonor: 100_000 })))).toBe(legacyCount((r) => r[4] >= 100_000));
     expect(total(countByLevel(data, filters({ minHonor: 1, maxHonor: 999 })))).toBe(
       legacyCount((r) => r[4] >= 1 && r[4] <= 999),
     );
-    // wartość, która nie leży na granicy żadnego koszyka
+    // a value that sits on no bucket boundary
     expect(total(countByLevel(data, filters({ minHonor: 4137 })))).toBe(legacyCount((r) => r[4] >= 4137));
   });
 
-  test("próg aktywności — dowolna liczba dni, nie tylko preset", () => {
+  test("the activity threshold — any number of days, not only a preset", () => {
     for (const maxDays of [0, 1, 5, 13, 47, 365]) {
       const expected = legacyCount((r) => {
         const d = legacyDays(r[5]);
@@ -117,7 +117,7 @@ describe("filtrowanie — zawsze dokładne", () => {
     }
   });
 
-  test("filtry składają się ze sobą", () => {
+  test("the filters compose", () => {
     const f = filters({ minLevel: 250, maxLevel: 320, minHonor: 100, maxDays: 30, professions: new Set([1, 4]) });
     const expected = legacyCount((r) => {
       const d = legacyDays(r[5]);
@@ -127,16 +127,16 @@ describe("filtrowanie — zawsze dokładne", () => {
     expect(expected).toBeGreaterThan(0);
   });
 
-  test("filtry wykluczające dają pustkę, nie wysypkę", () => {
+  test("mutually exclusive filters give emptiness, not a crash", () => {
     expect(total(countByLevel(data, filters({ minLevel: 9000 })))).toBe(0);
     expect(total(countByLevel(data, filters({ professions: new Set() })))).toBe(0);
   });
 });
 
-describe("konto nigdy nieużywane wypada z każdego progu", () => {
-  // Najgroźniejsza pułapka tablic typowanych: `null` zapisujemy jako −1, a `−1 > maxDays`
-  // jest fałszem. Filtr, który pyta najpierw o próg, wpuściłby konta nigdy nieużywane
-  // do każdego progu aktywności — odwrotnie, niż wynika z danych.
+describe("an account never used falls out of every threshold", () => {
+  // The nastiest trap of typed arrays: we store `null` as −1, and `−1 > maxDays` is false.
+  // A filter that asks about the threshold first would let accounts never used into every
+  // activity threshold — the opposite of what the data says.
   const withSentinel = {
     count: 4,
     level: Int16Array.from([10, 10, 10, 10]),
@@ -145,7 +145,7 @@ describe("konto nigdy nieużywane wypada z każdego progu", () => {
     days: Int32Array.from([0, 5, 40, -1]),
   };
 
-  test("obie reprezentacje „nigdy” znaczą to samo", () => {
+  test("both representations of \"never\" mean the same thing", () => {
     expect(isNeverOnline(null)).toBe(true);
     expect(isNeverOnline(undefined)).toBe(true);
     expect(isNeverOnline(-1)).toBe(true);
@@ -154,17 +154,17 @@ describe("konto nigdy nieużywane wypada z każdego progu", () => {
     expect(activityBucket(null)).toBe(4);
   });
 
-  test("wartownik −1 nie przechodzi progu, mimo że jest mniejszy od każdego", () => {
+  test("the −1 sentinel does not pass a threshold, even though it is below every one", () => {
     for (const maxDays of [0, 1, 7, 30, 365, 100_000]) {
       expect(total(countByLevel(withSentinel, filters({ maxDays })))).toBe(
         [0, 5, 40].filter((d) => d <= maxDays).length,
       );
     }
-    // bez progu wchodzą wszyscy, łącznie z kontem nigdy nieużywanym
+    // with no threshold everyone gets in, the account never used included
     expect(total(countByLevel(withSentinel, filters()))).toBe(4);
   });
 
-  test("konto nigdy nieużywane siedzi w koszyku „nigdy”, nie wśród > 30 dni", () => {
+  test("an account never used sits in the \"never\" bucket, not among > 30 days", () => {
     const buckets = new Map<number, number>(
       countByActivity(withSentinel, filters()).map(([b, c]: number[]) => [b as number, c as number]),
     );
@@ -173,8 +173,8 @@ describe("konto nigdy nieużywane wypada z każdego progu", () => {
   });
 });
 
-describe("rozkład aktywności", () => {
-  test("zgadza się z surowymi danymi i sumuje do populacji", () => {
+describe("the activity distribution", () => {
+  test("agrees with the raw data and sums to the population", () => {
     const buckets = countByActivity(data, filters());
     expect(buckets.reduce((s, [, c]) => s + c, 0)).toBe(legacy.rows.length);
 
@@ -183,7 +183,7 @@ describe("rozkład aktywności", () => {
     }
   });
 
-  test("jest dokładny również po filtrze poziomu (agregat tego nie potrafił)", () => {
+  test("stays exact under a level filter too (the aggregate could not)", () => {
     const f = filters({ minLevel: 100, maxLevel: 200 });
     const buckets = countByActivity(data, f);
     expect(buckets.reduce((s, [, c]) => s + c, 0)).toBe(legacyCount((r) => r[2] >= 100 && r[2] <= 200));
@@ -203,8 +203,8 @@ describe("rozkład aktywności", () => {
 
 const manifest = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, "manifest.json")).text());
 
-describe("opublikowane dane", () => {
-  test("każdy wpis manifestu wskazuje istniejący plik filtrów", async () => {
+describe("the published data", () => {
+  test("every manifest entry points at a filter file that exists", async () => {
     expect(manifest.worlds.length).toBeGreaterThan(0);
     for (const world of manifest.worlds) {
       expect(world.files.length).toBeGreaterThan(0);
@@ -215,7 +215,7 @@ describe("opublikowane dane", () => {
     }
   });
 
-  test("najnowszy snapshot każdego świata jest spójny", async () => {
+  test("each world's newest snapshot is internally consistent", async () => {
     for (const world of manifest.worlds) {
       const entry = world.files.at(-1);
       const f = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.filters)).text());
@@ -228,7 +228,7 @@ describe("opublikowane dane", () => {
       expect(f.days).toHaveLength(f.count);
       expect(f.level.every((l: number) => Number.isInteger(l) && l > 0)).toBe(true);
       expect(f.profession.every((p: number) => p >= 1 && p <= 6)).toBe(true);
-      // honor bywa ujemny — potwierdzone na żywym rankingu (zorza, „lape”, PH -20)
+      // honor can be negative — confirmed against the live ranking (zorza, "lape", PH -20)
       expect(f.honor.every((h: number) => Number.isInteger(h))).toBe(true);
       expect(f.days.every((d: number | null) => d === null || (Number.isInteger(d) && d >= 0))).toBe(true);
 
@@ -247,8 +247,8 @@ const filtersJs = await Bun.file(path.join(PUBLIC_DIR, "filters.js")).text();
 const historyJs = await Bun.file(path.join(PUBLIC_DIR, "history.js")).text();
 const trendsHtml = await Bun.file(path.join(PUBLIC_DIR, "trends.html")).text();
 
-describe("spójność app.js z index.html", () => {
-  test("każdy element pobierany przez el() istnieje w markupie", () => {
+describe("app.js agrees with index.html", () => {
+  test("every element fetched through el() exists in the markup", () => {
     const ids = [...js.matchAll(/\bel\("([^"]+)"\)/g)].map((m) => m[1]);
     expect(ids.length).toBeGreaterThan(10);
     for (const id of new Set(ids)) {
@@ -256,12 +256,12 @@ describe("spójność app.js z index.html", () => {
     }
   });
 
-  test("strona ładuje moduł i lokalny Chart.js zamiast CDN-u", () => {
+  test("the page loads the module and a local Chart.js instead of a CDN", () => {
     expect(html).toContain('<script type="module" src="app.js">');
     expect(html).toContain('src="vendor/chart.umd.min.js"');
 
-    // Chodzi o brak zewnętrznych zasobów, nie o brak samego słowa „cdn” —
-    // adres CDN-u wolno wymienić w komentarzu z instrukcją aktualizacji.
+    // What matters is the absence of external resources, not the absence of the word
+    // "cdn" — a CDN address may appear in a comment explaining how to update.
     for (const markup of [html, trendsHtml]) {
       const external = [...markup.matchAll(/<(?:script|link)[^>]*\s(?:src|href)="([^"]+)"/g)]
         .map((m) => m[1]!)
@@ -270,32 +270,32 @@ describe("spójność app.js z index.html", () => {
     }
   });
 
-  test("widok nie sięga po nicki", () => {
-    // `.n.json` nie ma dziś konsumenta i dopóki nie powstanie wyszukiwarka gracza,
-    // pobieranie go byłoby dwiema trzecimi transferu na darmo.
+  test("the view does not reach for the nicknames", () => {
+    // `.n.json` has no consumer today, and until a player search exists, fetching it
+    // would be two thirds of the transfer for nothing.
     expect(js).toContain("entry.filters");
     expect(js).not.toContain("entry.names");
   });
 
-  test("pobiera agregat i migawki, i nic spoza katalogu", () => {
-    // Historia z surowych `.f.json` jest tu nowa i celowa, ale lista adresów ma
-    // zostać zamknięta: żadnych zewnętrznych zależności, żadnego drugiego agregatu.
+  test("fetches the aggregate and the snapshots, and nothing from outside the directory", () => {
+    // History from raw `.f.json` is new here and deliberate, but the list of URLs is to
+    // stay closed: no external dependencies, no second aggregate.
     const literals = [...js.matchAll(/fetch\(\s*["'`]([^"'`]+)/g)].map((m) => m[1]);
     expect(literals.sort()).toEqual(["manifest.json", "trends.json"]);
-    // pozostałe adresy biorą się z manifestu, nie z kodu
+    // the remaining URLs come from the manifest, not from the code
     expect(historyJs).toContain("fetch(entry.filters)");
     expect(js).toContain("fetch(entry.filters)");
   });
 });
 
-describe("moduły czyste nie mogą niczego uruchamiać", () => {
-  // Komentarze wycinamy, bo test ma pilnować kodu, a nie prozy: akapit tłumaczący,
-  // dlaczego moduł nie sięga po `document`, sam zawiera to słowo.
+describe("the pure modules must not run anything", () => {
+  // Comments are stripped, because the test is to hold the code and not the prose: the
+  // paragraph explaining why a module does not reach for `document` contains that word.
   const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
 
-  test("logika liczenia nie dotyka DOM-u", () => {
-    // app.js startuje widok od razu po załadowaniu, więc gdyby moduł czysty
-    // importował z niego cokolwiek, testów nie dałoby się odpalić poza przeglądarką.
+  test("the counting logic does not touch the DOM", () => {
+    // app.js starts the view as soon as it loads, so if a pure module imported anything
+    // from it, the tests could not be run outside a browser.
     for (const module of [sharedJs, filtersJs, historyJs]) {
       expect(code(module)).not.toMatch(/\bdocument\b|\bwindow\b/);
       expect(module).not.toContain('from "./app.js"');
@@ -306,46 +306,47 @@ describe("moduły czyste nie mogą niczego uruchamiać", () => {
   });
 });
 
-describe("czas migawki", () => {
-  // Identyfikator migawki nie jest datą: do lipca 2026 powstawał z czasu lokalnego
-  // scrapera, później z UTC. Ta sama godzina w nazwie znaczy co innego po obu stronach.
-  const stary = { id: "2026-07-21T22-19-42", startedAt: "2026-07-21T20:19:42.806Z" };
-  const nowy = { id: "2026-08-01T07-48-26", startedAt: "2026-08-01T07:48:26.850Z" };
+describe("snapshot time", () => {
+  // A snapshot's identifier is not a date: until July 2026 it came from the scraper's
+  // local time, afterwards from UTC. The same hour in the name means different things on
+  // either side of that seam.
+  const old = { id: "2026-07-21T22-19-42", startedAt: "2026-07-21T20:19:42.806Z" };
+  const recent = { id: "2026-08-01T07-48-26", startedAt: "2026-08-01T07:48:26.850Z" };
 
-  test("data liczy się ze startedAt, nie z nazwy pliku", () => {
-    // 20:19 UTC to 22:19 w Warszawie — dla starej migawki nazwa i data zbiegają się
-    // tylko przypadkiem, dla nowej rozjeżdżają o 2 h.
+  test("the date comes from startedAt, not from the filename", () => {
+    // 20:19 UTC is 22:19 in Warsaw — for the old snapshot the name and the date coincide
+    // only by accident, for the new one they diverge by 2 h.
     const asDate = (e: { startedAt: string }) => new Date(e.startedAt);
-    expect(formatSnapshotDate(stary)).toBe(
-      `21.07.2026 ${String(asDate(stary).getHours()).padStart(2, "0")}:19`,
+    expect(formatSnapshotDate(old)).toBe(
+      `21.07.2026 ${String(asDate(old).getHours()).padStart(2, "0")}:19`,
     );
-    expect(formatSnapshotDate(nowy)).toBe(
-      `01.08.2026 ${String(asDate(nowy).getHours()).padStart(2, "0")}:48`,
+    expect(formatSnapshotDate(recent)).toBe(
+      `01.08.2026 ${String(asDate(recent).getHours()).padStart(2, "0")}:48`,
     );
   });
 
-  test("odstęp między migawkami liczony z nazw plików mijałby się z prawdą", () => {
-    const realny = daysBetween(stary, nowy)!;
-    expect(realny).toBeCloseTo(10.48, 2);
+  test("an interval measured from the filenames would miss the truth", () => {
+    const actual = daysBetween(old, recent)!;
+    expect(actual).toBeCloseTo(10.48, 2);
 
-    const zNazw =
+    const fromFilenames =
       (new Date("2026-08-01T07:48:26Z").getTime() - new Date("2026-07-21T22:19:42Z").getTime()) / 86_400_000;
-    expect(Math.abs(realny - zNazw)).toBeCloseTo(2 / 24, 3); // dokładnie strefa czasowa
+    expect(Math.abs(actual - fromFilenames)).toBeCloseTo(2 / 24, 3); // exactly the timezone
   });
 
-  test("bez startedAt data jest oznaczona jako przybliżona", () => {
+  test("without startedAt the date is marked as approximate", () => {
     expect(formatSnapshotDate({ id: "2026-04-17T15-24-07" })).toBe("17.04.2026 15:24 (?)");
-    expect(formatSnapshotDate({ id: "bez-sensu" })).toBe("bez-sensu");
-    expect(daysBetween({ id: "a" }, nowy)).toBeNull();
+    expect(formatSnapshotDate({ id: "nonsense" })).toBe("nonsense");
+    expect(daysBetween({ id: "a" }, recent)).toBeNull();
   });
 });
 
-describe("stan filtrów w URL-u", () => {
-  test("domyślny widok nie zaśmieca linku", () => {
+describe("the filter state in the URL", () => {
+  test("the default view puts nothing in the link", () => {
     expect(filtersToParams(emptyFilters()).toString()).toBe("");
   });
 
-  test("komplet filtrów przechodzi tam i z powrotem", () => {
+  test("a full set of filters survives the round trip", () => {
     const f = {
       minLevel: 250,
       maxLevel: 320,
@@ -358,16 +359,16 @@ describe("stan filtrów w URL-u", () => {
     expect(restored).toEqual(f);
   });
 
-  test("pusty URL daje filtry domyślne", () => {
+  test("an empty URL gives the default filters", () => {
     expect(filtersFromParams(new URLSearchParams())).toEqual(emptyFilters());
   });
 
-  test("śmieci w URL-u nie wywalają widoku", () => {
+  test("junk in the URL does not break the view", () => {
     const f = filtersFromParams(new URLSearchParams("minLevel=abc&maxDays=-5&prof=9,x"));
     expect(f).toEqual(emptyFilters());
   });
 
-  test("filtry z URL-a dają ten sam wynik co ustawione ręcznie", () => {
+  test("filters from the URL give the same result as filters set by hand", () => {
     const f = filtersFromParams(new URLSearchParams("minLevel=200&maxLevel=250&prof=1,4"));
     const expected = legacyCount(
       (r) => r[2] >= 200 && r[2] <= 250 && (r[3] === 1 || r[3] === 4),
@@ -376,9 +377,9 @@ describe("stan filtrów w URL-u", () => {
     expect(expected).toBeGreaterThan(0);
   });
 
-  test("„filtr domyślny” rozpoznaje dokładnie te filtry, które niczego nie odrzucają", () => {
-    // Na tym wisi cała leniwa ścieżka: przy filtrze domyślnym historia idzie
-    // z 9 KB agregatu, a nie z megabajtów surowych migawek.
+  test("\"the default filter\" recognises exactly the filters that reject nothing", () => {
+    // The whole lazy path hangs on this: under the default filter the history comes from
+    // a 9 KB aggregate rather than from megabytes of raw snapshots.
     expect(isDefaultFilters(emptyFilters())).toBe(true);
     expect(isDefaultFilters(filtersFromParams(new URLSearchParams()))).toBe(true);
     expect(isDefaultFilters(filtersFromParams(new URLSearchParams("prof=1,2,3,4,5,6")))).toBe(true);
@@ -390,41 +391,41 @@ describe("stan filtrów w URL-u", () => {
   });
 });
 
-describe("opis aktywnych filtrów", () => {
-  // Separator tysięcy w pl-PL to spacja nierozdzielająca — porównujemy bez białych znaków.
+describe("describing the active filters", () => {
+  // The pl-PL thousands separator is a non-breaking space — we compare without whitespace.
   const flat = (s: string) => s.replace(/\s/g, "");
   const labels = (overrides: Record<string, unknown>) => describeFilters(filters(overrides)).map((c) => flat(c.label));
   const keys = (overrides: Record<string, unknown>) => describeFilters(filters(overrides)).map((c) => c.key);
 
-  test("filtr domyślny nie ma czego opisać", () => {
+  test("the default filter has nothing to describe", () => {
     expect(describeFilters(emptyFilters())).toEqual([]);
   });
 
-  test("zakresy otwarte i domknięte czyta się inaczej", () => {
+  test("open and closed ranges read differently", () => {
     expect(labels({ minLevel: 250 })).toEqual(["Poziom≥250"]);
     expect(labels({ maxLevel: 400 })).toEqual(["Poziom≤400"]);
     expect(labels({ minLevel: 250, maxLevel: 400 })).toEqual(["Poziom250-400"]);
     expect(labels({ maxHonor: 50_000 })).toEqual(["Honor≤50000"]);
-    // honor bywa ujemny — etykieta nie może tego gubić
+    // honor can be negative — the label must not lose that
     expect(labels({ minHonor: -35 })).toEqual(["Honor≥-35"]);
   });
 
-  test("próg aktywności odmienia się i zna „< 24h”", () => {
+  test("the activity threshold inflects and knows \"< 24h\"", () => {
     expect(labels({ maxDays: 0 })).toEqual(["Online<24h"]);
     expect(labels({ maxDays: 1 })).toEqual(["Online≤1dzień"]);
     expect(labels({ maxDays: 14 })).toEqual(["Online≤14dni"]);
   });
 
-  test("profesje: nazwy do dwóch, potem sama liczba", () => {
+  test("professions: names up to two, then just the count", () => {
     expect(labels({ professions: new Set([2, 3]) })).toEqual(["Mag,Paladyn"]);
     expect(labels({ professions: new Set([1, 2, 3, 4]) })).toEqual(["4z6profesji"]);
     expect(labels({ professions: new Set() })).toEqual(["Żadnaprofesja"]);
-    // komplet profesji to brak filtra, nie chip „6 z 6”
+    // all six professions is no filter at all, not a "6 of 6" chip
     expect(labels({ professions: new Set([1, 2, 3, 4, 5, 6]) })).toEqual([]);
   });
 
-  test("klucz chipa wskazuje grupę pól, nie pojedyncze pole", () => {
-    // „Poziom 250-400” to jeden byt dla czytającego, choć dwa <input> dla kodu.
+  test("a chip's key names a group of fields, not a single field", () => {
+    // "Poziom 250-400" is one thing to the reader, though two <input>s to the code.
     expect(keys({ minLevel: 250, maxLevel: 400 })).toEqual(["level"]);
     expect(keys({ minHonor: 1, maxHonor: 2, maxDays: 7, professions: new Set([1]) })).toEqual([
       "honor",
@@ -433,8 +434,8 @@ describe("opis aktywnych filtrów", () => {
     ]);
   });
 
-  test("liczba chipów zgadza się z tym, co odróżnia filtr od domyślnego", () => {
-    // Na tej równoważności stoi licznik „Filtry (N)” w pasku.
+  test("the number of chips agrees with what makes a filter non-default", () => {
+    // The "Filtry (N)" counter in the bar rests on this equivalence.
     const f = filters({ minLevel: 250, maxHonor: 50_000, maxDays: 14, professions: new Set([2, 3]) });
     expect(describeFilters(f)).toHaveLength(4);
     expect(isDefaultFilters(f)).toBe(false);
@@ -442,9 +443,9 @@ describe("opis aktywnych filtrów", () => {
   });
 });
 
-describe("etykiety rozkładu aktywności", () => {
-  test("bez filtru opisują rozłączne zakresy, a nie sumy narastające", () => {
-    // „≤ 7 dni” przy koszyku 1-7 sugerowało, że to wszyscy z ostatniego tygodnia.
+describe("the activity distribution labels", () => {
+  test("with no filter they describe disjoint ranges, not running totals", () => {
+    // "≤ 7 dni" over the 1-7 bucket suggested it was everyone from the last week.
     expect(visibleActivityBuckets(Infinity).map((b) => activityLabel(b))).toEqual([
       "< 24h",
       "1-7 dni",
@@ -454,7 +455,7 @@ describe("etykiety rozkładu aktywności", () => {
     ]);
   });
 
-  test("próg przycina etykietę koszyka, w którym leży", () => {
+  test("the threshold trims the label of the bucket it falls in", () => {
     expect(visibleActivityBuckets(14).map((b) => activityLabel(b, 14))).toEqual(["< 24h", "1-7 dni", "8-14 dni"]);
     expect(visibleActivityBuckets(3).map((b) => activityLabel(b, 3))).toEqual(["< 24h", "1-3 dni"]);
     expect(visibleActivityBuckets(60).map((b) => activityLabel(b, 60))).toEqual([
@@ -465,15 +466,15 @@ describe("etykiety rozkładu aktywności", () => {
     ]);
   });
 
-  test("przy progu nie pokazujemy koszyków, które z definicji są puste", () => {
-    // „> 30 dni: 0 · nigdy: 0” wyglądało jak zepsute dane
+  test("under a threshold we hide the buckets that are empty by definition", () => {
+    // "> 30 dni: 0 · nigdy: 0" looked like broken data
     expect(visibleActivityBuckets(0)).toEqual([0]);
     expect(visibleActivityBuckets(14)).not.toContain(3);
     expect(visibleActivityBuckets(14)).not.toContain(4);
     expect(visibleActivityBuckets(60)).not.toContain(4);
   });
 
-  test("liczby pod etykietami zgadzają się z zakresem, który opisują", () => {
+  test("the numbers under the labels match the range those labels describe", () => {
     const f = filters({ maxDays: 14 });
     const buckets = new Map<number, number>(
       countByActivity(data, f).map(([bucket, count]: number[]) => [bucket as number, count as number]),
@@ -492,16 +493,17 @@ describe("etykiety rozkładu aktywności", () => {
     expect(visible).toHaveLength(3);
   });
 
-  test("1 dzień odmienia się poprawnie", () => {
+  test("\"1 dzień\" inflects correctly", () => {
     expect(activityLabel(1, 1)).toBe("1 dzień");
   });
 });
 
-// ── Widok w całości ─────────────────────────────────────────────────────────
+// ── The view as a whole ─────────────────────────────────────────────────────
 //
-// Warstwa DOM-u przepuszczona przez atrapę w osobnym procesie (test/dom_smoke.ts).
-// Dwa scenariusze, bo widok ma dwie ścieżki danych i tylko razem pokrywają obie:
-// filtr domyślny (historia z trends.json) i filtr ustawiony (historia z `.f.json`).
+// The DOM layer put through a stub in a separate process (test/dom_smoke.ts).
+// Two scenarios, because the view has two data paths and only together do they cover
+// both: the default filter (history from trends.json) and a filter set (history from
+// `.f.json`).
 
 const repo = path.resolve(import.meta.dir, "..");
 const smoke = (scenario: string) => {
@@ -512,44 +514,44 @@ const smoke = (scenario: string) => {
   };
 };
 
-describe("widok składa się w całość — filtr domyślny", () => {
+describe("the view comes together — the default filter", () => {
   const { proc, out } = smoke("default");
 
-  test("render przechodzi bez wyjątku", () => {
+  test("the render goes through without an exception", () => {
     expect(proc.stderr.toString()).toBe("");
     expect(proc.exitCode).toBe(0);
     expect(out.error).toBe("");
     expect(out.professionCheckboxes).toBe(6);
   });
 
-  test("przekrój pokazuje całą migawkę, bo filtr niczego nie odrzuca", () => {
+  test("the snapshot view shows the whole snapshot, because the filter rejects nothing", () => {
     expect(out.matched).toBeGreaterThan(0);
     expect(out.levels).toBeGreaterThan(0);
     expect(out.matchLine).toMatch(/\(100,0%\)/);
     expect(out.suspectHidden).toBe(true);
   });
 
-  test("historia idzie z agregatu i nie dociąga migawek", () => {
-    // Ścieżka, za którą nikt niefiltrujący nie płaci: 9 KB zamiast 1,9 MB.
+  test("the history comes from the aggregate and fetches no snapshot", () => {
+    // The path nobody who does not filter pays for: 9 KB instead of 1.9 MB.
     expect(out.charts.popChart.title).toBe("Populacja świata w czasie");
     expect(out.charts.popChart.label).toBe("Populacja");
     expect(out.partialNoteHidden).toBe(true);
     expect(out.historyStatus).toMatch(/^\d+ migawek$/);
   });
 
-  test("każdy wykres dostaje punkty ustawione w czasie, nie w kolejności migawek", () => {
+  test("every chart gets points placed in time, not in snapshot order", () => {
     for (const [id, expectedSeries] of [["popChart", 1], ["actChart", 1], ["profChart", 6]] as const) {
       expect(out.charts[id].series).toBe(expectedSeries);
       expect(out.charts[id].points).toBe(out.charts.popChart.points);
     }
-    // Oś X w milisekundach epoki — inaczej odstępy 3-17 dni wyglądałyby na równe.
+    // The X axis in epoch milliseconds — otherwise 3-17 day intervals would look equal.
     expect(out.charts.popChart.firstX).toBeGreaterThan(0);
   });
 
-  test("podsumowanie i tabela pokazują realne liczby", () => {
-    // Zmiana liczona z opublikowanego agregatu, nie zaszyta literałem: „−5,3%” było
-    // policzone z dzisiejszych danych fobosa i pierwszy `bun run scrape` robił z tego
-    // czerwone CI na commicie z danymi.
+  test("the summary and the table show real numbers", () => {
+    // The change is computed from the published aggregate rather than hard-coded: "−5,3%"
+    // was taken from today's fobos data, and the first `bun run scrape` turned that into
+    // red CI on a data commit.
     const fobos = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.fobos;
     const percent = ((fobos.total.at(-1) - fobos.total[0]) / fobos.total[0]) * 100;
     const sign = percent > 0 ? "+" : percent < 0 ? "−" : "";
@@ -559,54 +561,55 @@ describe("widok składa się w całość — filtr domyślny", () => {
     });
 
     expect(out.summary).toContain(`${sign}${formatted}%`);
-    expect(percent).toBeLessThan(0); // fobos wyludnia się najszybciej ze wszystkich
-    expect(out.tableRows).toBe(out.charts.popChart.points); // nagłówek + n-1 wierszy zmian
-    expect(out.tableHidden).toBe(false); // ukrywana jest tylko wtedy, gdy nie ma wierszy
+    expect(percent).toBeLessThan(0); // fobos empties fastest of them all
+    expect(out.tableRows).toBe(out.charts.popChart.points); // the header + n-1 change rows
+    expect(out.tableHidden).toBe(false); // it is hidden only when there are no rows
     expect(out.singlePointHidden).toBe(true);
     expect(out.suspectNoteHidden).toBe(true);
   });
 
-  test("liczby są po polsku, bez mieszania przecinka z kropką", () => {
-    // Daty mają kropki z definicji — sprawdzamy ułamki, nie 04.08.2026.
+  test("the numbers are Polish, with no mixing of comma and full stop", () => {
+    // Dates carry full stops by definition — we check fractions, not 04.08.2026.
     const fractions = (s: string) => s.replace(/\d{2}\.\d{2}\.\d{4}/g, "");
     expect(fractions(out.summary)).not.toMatch(/\d\.\d/);
     expect(fractions(out.table)).not.toMatch(/\d\.\d/);
     expect(out.table).toMatch(/\d,\d/);
   });
 
-  test("przełączenie progu i skali przelicza wykres, a nie tworzy nowego", () => {
+  test("switching the threshold and the scale recomputes the chart rather than making a new one", () => {
     expect(out.afterToggle.title).toBe("Udział aktywnych < 24h w populacji");
     expect(out.afterToggle.updates).toBe(1);
     expect(out.afterToggle.values.every((v: number) => v > 0 && v < 100)).toBe(true);
   });
 
-  test("udział populacji w populacji to nie jest metryka", () => {
-    // Bez filtra „udział” dla wykresu populacji dałby płaską linię 100% — wykres
-    // zostaje wtedy w liczbach zamiast udawać, że coś pokazuje.
+  test("the population's share of the population is not a metric", () => {
+    // With no filter, "share" for the population chart would give a flat 100% line — so
+    // the chart stays in counts instead of pretending to show something.
     expect(out.afterToggle.popTitle).toBe("Populacja świata w czasie");
   });
 
-  test("świat z jedną migawką pokazuje punkt i notkę zamiast pustego wykresu", () => {
+  test("a world with one snapshot shows a point and a note instead of an empty chart", () => {
     expect(out.singleSnapshotWorld.points).toBe(1);
     expect(out.singleSnapshotWorld.noticeHidden).toBe(false);
     expect(out.singleSnapshotWorld.table).toBe("");
-    // Sama pusta treść nie wystarcza: `.card` ma ramkę i padding, a `tabindex="0"`
-    // z `role="region"` zostawiały puste pudełko łapiące tabulator i ogłaszane jako
-    // region bez zawartości. Notka `#singlePoint` niesie już ten komunikat.
+    // Empty content alone is not enough: `.card` has a border and padding, and
+    // `tabindex="0"` with `role="region"` left an empty box that caught the tab key and
+    // was announced as a region with no content. The `#singlePoint` note already carries
+    // that message.
     expect(out.singleSnapshotWorld.tableHidden).toBe(true);
   });
 });
 
-describe("widok składa się w całość — filtr ustawiony", () => {
+describe("the view comes together — a filter set", () => {
   const { proc, out } = smoke("filtered");
 
-  test("render przechodzi bez wyjątku", () => {
+  test("the render goes through without an exception", () => {
     expect(proc.stderr.toString()).toBe("");
     expect(proc.exitCode).toBe(0);
     expect(out.error).toBe("");
   });
 
-  test("filtry z URL-a dają na histogramie to, co siedzi w migawce", async () => {
+  test("filters from the URL put on the histogram what actually sits in the snapshot", async () => {
     const latest = manifest.worlds.find((w: { name: string }) => w.name === "aether").files.at(-1);
     expect(out.source).toBe(latest.filters);
 
@@ -623,106 +626,108 @@ describe("widok składa się w całość — filtr ustawiony", () => {
     expect(out.matchLine).toContain(`Pasuje: ${expected.toLocaleString("pl-PL")}`);
   });
 
-  test("link z filtrami dociąga historię bez czekania na ruch myszą", () => {
+  test("a link carrying filters fetches the history without waiting for a mouse move", () => {
     expect(out.charts.popChart.title).toBe("Pasujących filtrowi w czasie");
     expect(out.charts.popChart.points).toBeGreaterThan(1);
-    expect(out.partialNoteHidden).toBe(true); // komplet zdążył dojść
+    expect(out.partialNoteHidden).toBe(true); // the full set arrived in time
     expect(out.historyStatus).toMatch(/^\d+ migawek$/);
   });
 
-  test("ostatni punkt historii to ta sama liczba, co przekrój tej samej migawki", () => {
-    // Dwie niezależne drogi do jednej liczby: histogram sumowany po seriach
-    // i agregat policzony przez summarizeFiltered. Rozjazd znaczyłby, że któraś
-    // z nich filtruje inaczej.
+  test("the last history point is the same number as the snapshot view of that snapshot", () => {
+    // Two independent routes to one number: the histogram summed across its series, and
+    // the aggregate computed by summarizeFiltered. Drift would mean one of them filters
+    // differently.
     expect(out.charts.popChart.lastY).toBe(out.matched);
   });
 
-  test("wykres profesji pokazuje tylko profesje z filtra", () => {
+  test("the profession chart shows only the professions in the filter", () => {
     expect(out.charts.profChart.series).toBe(2);
   });
 
-  test("pasek streszcza filtr, który przewinął się poza ekran", () => {
-    // Od filtra do pierwszego wykresu historii jest 961 px — więcej niż ekran. Pasek
-    // jest jedynym miejscem, w którym widać naraz, co jest ustawione i na co działa.
+  test("the bar summarises a filter that has scrolled off the screen", () => {
+    // It is 961 px from the filter to the first history chart — more than a screen. The bar
+    // is the only place where what is set and what it acts on are visible at once.
     expect(out.bar.chips).toEqual(["Poziom 200-250", "Wojownik, Tropiciel"]);
     expect(out.bar.toggle).toBe("Filtry (2)");
   });
 
-  test("szuflada startuje zamknięta i nic jej nie przełącza po dojściu danych", () => {
-    // Panel przełączany z JS-a dopiero po `fetch`ach przesuwał stronę o własną wysokość
-    // w trakcie ładowania — a przy przeładowaniu przywrócona pozycja scrolla lądowała
-    // gdzie indziej. Stan początkowy jest teraz wyłącznie w markupie.
+  test("the drawer starts closed and nothing toggles it once the data arrives", () => {
+    // A panel toggled from JS only after the `fetch`es moved the page by its own height
+    // mid-load — and on a reload the restored scroll position landed somewhere else. The
+    // initial state now lives in the markup alone.
     expect(out.bar.fieldsHidden).toBe(true);
     expect(out.afterOpen.fieldsHidden).toBe(false);
     expect(out.afterOpen.expanded).toBe("true");
     expect(out.afterClose.fieldsHidden).toBe(true);
     expect(out.afterClose.expanded).toBe("false");
-    // otwieranie i zamykanie nie rusza filtrów
+    // opening and closing does not touch the filters
     expect(out.afterOpen.chips).toEqual(out.bar.chips);
   });
 
-  test("krzyżyk na chipie kasuje całą grupę pól, nie jedno", () => {
-    // „Poziom 200-250” to jeden byt dla czytającego, a dwa `<input>` dla kodu.
+  test("the close button on a chip clears the whole group of fields, not one", () => {
+    // "Poziom 200-250" is one thing to the reader and two `<input>`s to the code.
     expect(out.afterChipClear.minLevel).toBe("");
     expect(out.afterChipClear.maxLevel).toBe("");
     expect(out.afterChipClear.chips).toEqual(["Wojownik, Tropiciel"]);
     expect(out.afterChipClear.toggle).toBe("Filtry (1)");
   });
 
-  test("każda migawka jest pobierana dokładnie raz, mimo serii zdarzeń filtra", () => {
-    // Historia gordiona to 1,9 MB. Wywoływanie pobierania wprost z handlera `input`
-    // startowało własny przelot na każdy wciśnięty klawisz, bo lista brakujących
-    // migawek jest liczona w momencie startu — a to zamienia „kupujesz 1,9 MB
-    // świadomie” w kilkukrotność tej liczby bez wiedzy użytkownika.
+  test("each snapshot is fetched exactly once, despite a burst of filter events", () => {
+    // Gordion's history is 1.9 MB. Calling the fetch straight from the `input` handler
+    // started its own pass per keystroke, because the list of missing snapshots is computed
+    // at start — turning "you buy 1.9 MB knowingly" into a multiple of that figure without
+    // the user knowing.
     expect(out.fetches.duplicated).toEqual([]);
     expect(out.fetches.maxPerFile).toBe(1);
-    expect(out.fetches.files).toBeGreaterThan(15); // aether + brutal, dwa światy
+    expect(out.fetches.files).toBeGreaterThan(15); // aether + brutal, two worlds
   });
 
-  test("przełączenie świata gasi wykresy poprzedniego, zamiast trzymać je na ekranie", () => {
-    // Pierwszy render nowego świata przychodzi dopiero po pobraniu migawki. Bez
-    // synchronicznego wyczyszczenia pod nowym nagłówkiem stały przez kilkaset
-    // milisekund serie poprzedniego świata — łącznie z dymkami z tamtymi datami.
+  test("switching worlds clears the previous one's charts instead of leaving them up", () => {
+    // The first render of a new world arrives only after a snapshot is fetched. Without
+    // clearing synchronously, the previous world's series stood under the new heading for a
+    // few hundred milliseconds — tooltips with those dates included.
     expect(out.afterWorldSwitch).toEqual({ popSeries: 0, profSeries: 0, tableRows: 0 });
   });
 
-  test("niepełna historia mówi o sobie, i przestaje, gdy przestaje być niepełna", () => {
-    // Liczba migawek świata "brutal" rośnie z każdym scrapem — liczona z trends.json,
-    // nie zaszyta literałem, inaczej kolejny `bun run scrape` daje czerwone CI.
-    // dom_smoke.ts psuje pobranie dokładnie jednej migawki tego świata.
+  test("an incomplete history says so, and stops once it stops being incomplete", () => {
+    // The snapshot count of world "brutal" grows with every scrape — taken from trends.json
+    // rather than hard-coded, otherwise the next `bun run scrape` gives red CI.
+    // dom_smoke.ts breaks the fetch of exactly one snapshot of that world.
     const total = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.brutal
       .total.length;
 
-    // Migawka, która nie doszła, nie ma punktu — i widok ma to powiedzieć w sekcji
-    // HISTORIA, a nie w pasku błędu 1500 px wyżej, dotyczącym migawki przekroju.
+    // A snapshot that did not arrive gets no point — and the view is to say so in the
+    // HISTORIA section, not in the error bar 1500 px higher, which is about the snapshot
+    // being cross-sectioned.
     expect(out.partialHistory.status).toBe(`${total - 1} z ${total} migawek · 1 nie wczytano`);
     expect(out.partialHistory.noteHidden).toBe(false);
     expect(out.partialHistory.note).toContain("Historia jest niepełna");
     expect(out.partialHistory.error).toBe("");
 
-    // Po powrocie do filtra domyślnego historia idzie z kompletnego agregatu.
-    // Licznik porażek z poprzedniego filtra nie ma prawa jej dalej opisywać.
+    // Back at the default filter, the history comes from the complete aggregate. The
+    // failure counter from the previous filter has no business still describing it.
     expect(out.afterReset).toEqual({ status: `${total} migawek`, noteHidden: true, points: total });
   });
 
-  test("wybrany próg przeżywa przebudowę listy opcji", () => {
-    // Podmiana `innerHTML` na `<select>` zeruje wartość, więc odczytanie jej PO
-    // podmianie cofa użytkownika na pierwszą opcję. Efekt: ktoś, kto wybrał
-    // „≤ 30 dni”, ląduje na „< 24h” — serii wahającej się o 14,7% przy populacji
-    // stabilnej na 0,6% — i dostaje to jeszcze utrwalone w skopiowanym linku.
+  test("the chosen threshold survives a rebuild of the option list", () => {
+    // Replacing the `innerHTML` of a `<select>` clears its value, so reading it AFTER the
+    // replacement drops the user back to the first option. The effect: somebody who chose
+    // "≤ 30 dni" lands on "< 24h" — a series swinging by 14.7% while the population is
+    // steady at 0.6% — and gets it frozen into the link they copy.
     expect(out.thresholdSurvival.picked).toEqual({ value: "30d", options: 3 });
 
-    // przy „≤ 14 dni” próg 30d jest nieosiągalny, ale schodzimy na najszerszy
-    // sensowny (7d), nie na najwęższy z listy
+    // at "≤ 14 dni" the 30d threshold is unreachable, but we fall to the widest one that
+    // still means something (7d), not to the narrowest on the list
     expect(out.thresholdSurvival.narrowed).toEqual({ value: "7d", options: 2 });
 
-    // lista wraca do trzech opcji — wybór ma zostać, a nie skoczyć na pierwszą
+    // the list is back to three options — the choice is to stay, not jump to the first
     expect(out.thresholdSurvival.widened).toEqual({ value: "7d", options: 3 });
   });
 
-  test("filtr aktywności zabiera progi, które pod nim nic już nie mówią", () => {
-    // Przy „≤ 3 dni” próg „≤ 7 dni” liczyłby dokładnie tych samych graczy, co wykres
-    // pasujących — trzy linie jedna na drugiej wyglądają jak potwierdzenie czegoś.
+  test("the activity filter removes the thresholds that say nothing under it", () => {
+    // At "≤ 3 dni" the "≤ 7 dni" threshold would count exactly the same players as the
+    // matches chart — three lines on top of each other look like confirmation of
+    // something.
     expect(out.afterActivityFilter.thresholdOptions).toBe(1);
     expect(out.afterActivityFilter.noteHidden).toBe(false);
     expect(out.afterActivityFilter.note).toContain("≤ 3 dni");
@@ -730,20 +735,20 @@ describe("widok składa się w całość — filtr ustawiony", () => {
   });
 });
 
-describe("ostrzeżenie o podejrzanej migawce", () => {
-  test("widok czyta flagę ze snapshotu i ma gdzie ją pokazać", () => {
-    // Bez tego scraper zapisywałby `suspect` dla nikogo — dokładnie ten wzorzec,
-    // za który audyt skasował moduł agregatów.
+describe("the suspect-snapshot warning", () => {
+  test("the view reads the flag from the snapshot and has somewhere to show it", () => {
+    // Without this the scraper would write `suspect` for nobody — exactly the pattern the
+    // audit deleted the aggregate module for.
     expect(js).toContain("showSuspect(json.suspect)");
     expect(js).toContain("Ta migawka może być niekompletna");
     expect(html).toContain('id="suspect"');
   });
 
-  test("ostrzeżenie znika przy przełączeniu na inną migawkę", () => {
+  test("the warning disappears when switching to another snapshot", () => {
     const load = js.slice(js.indexOf("async function loadSnapshot"));
     const reset = load.indexOf("showSuspect(null)");
     const set = load.indexOf("showSuspect(json.suspect)");
     expect(reset).toBeGreaterThan(-1);
-    expect(reset).toBeLessThan(set); // czyszczone zanim dojdą nowe dane
+    expect(reset).toBeLessThan(set); // cleared before the new data arrives
   });
 });

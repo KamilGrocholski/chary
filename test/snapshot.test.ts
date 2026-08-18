@@ -23,10 +23,10 @@ const rows: PlayerRow[] = [
   [3, "Widmo", 5, 100, 1, 0, null],
 ];
 
-describe("rozdzielanie snapshotu", () => {
+describe("splitting a snapshot", () => {
   const { filters, names } = splitSnapshot(rows, META);
 
-  test("plik filtrów ma kolumny, których potrzebuje filtrowanie", () => {
+  test("the filter file holds the columns filtering needs", () => {
     expect(filters.schema).toBe(SNAPSHOT_SCHEMA);
     expect(filters.count).toBe(3);
     expect(filters.level).toEqual([378, 359, 100]);
@@ -35,19 +35,19 @@ describe("rozdzielanie snapshotu", () => {
     expect(filters.days).toEqual([0, 12, null]);
   });
 
-  test("plik nicków trzyma nick i charId w tej samej kolejności", () => {
+  test("the names file keeps nickname and charId in the same order", () => {
     expect(names.name).toEqual(["essobe", "kamillek kox", "Widmo"]);
     expect(names.charId).toEqual([729, 32789, 5]);
   });
 
-  test("w pliku filtrów nie ma nicków — to 2/3 objętości snapshotu", () => {
+  test("the filter file carries no nicknames — those are 2/3 of a snapshot", () => {
     expect(JSON.stringify(filters)).not.toContain("essobe");
   });
 
-  test("oba pliki razem odtwarzają wiersze 1:1", () => {
+  test("the two files together reconstruct the rows 1:1", () => {
     for (let i = 0; i < rows.length; i++) {
       expect([
-        i + 1, // ranga z kolejności
+        i + 1, // the rank comes from the order
         names.name[i],
         names.charId![i],
         filters.level[i],
@@ -59,8 +59,8 @@ describe("rozdzielanie snapshotu", () => {
   });
 });
 
-describe("migracja starych snapshotów", () => {
-  test("v1 — dni wyliczane z tekstu, ISO odrzucane, brak charId", () => {
+describe("migrating old snapshots", () => {
+  test("v1 — days derived from the text, the ISO dropped, no charId", () => {
     const v1 = {
       world: "aether",
       rows: [
@@ -76,12 +76,12 @@ describe("migracja starych snapshotów", () => {
     const { filters, names } = splitNormalized(normalized, META);
     expect(filters.level).toEqual([378, 300, 12]);
     expect(filters.honor).toEqual([8749, 10, 0]);
-    // brak charId w danych → brak pustej kolumny w pliku
+    // no charId in the data → no empty column in the file
     expect(names.charId).toBeUndefined();
     expect(JSON.stringify(names)).not.toContain("charId");
   });
 
-  test("v2 — czytane wprost, z zachowaniem charId", () => {
+  test("v2 — read as-is, keeping the charId", () => {
     const v2 = { schema: 2, world: "aether", rows: rows as unknown[][] };
     const normalized = normalizeLegacyRows(v2);
     expect(normalized.map((r) => r.charId)).toEqual([729, 32789, 5]);
@@ -90,7 +90,7 @@ describe("migracja starych snapshotów", () => {
   });
 });
 
-describe("rozpoznawanie plików", () => {
+describe("recognising files", () => {
   test.each([
     ["2026-07-21T22-04-12.json", true],
     ["2026-07-21T22-04-12.f.json", false],
@@ -108,18 +108,18 @@ describe("rozpoznawanie plików", () => {
   });
 });
 
-describe("strażnik przed obciętym scrapem", () => {
-  // Ranking podczas awarii potrafi oddać mniej stron. Taka migawka jest formalnie
-  // poprawna — zdradza ją dopiero nagły spadek populacji, bo normalnie zmienia się
-  // ona o ułamki procenta na rundę.
+describe("the guard against a truncated scrape", () => {
+  // During an outage the ranking can return fewer pages. Such a snapshot is formally
+  // valid — the only thing that gives it away is a sudden population drop, because
+  // normally the population moves by fractions of a percent per round.
 
-  test("normalny odpływ graczy przechodzi bez flagi", () => {
-    expect(checkPopulationDrop(39037, 39287)).toBeNull(); // realny spadek aethera: 0,6%
-    expect(checkPopulationDrop(9600, 10_000)).toBeNull(); // dokładnie 4%
-    expect(checkPopulationDrop(9500, 10_000)).toBeNull(); // dokładnie próg 5%
+  test("the normal drift of players passes unflagged", () => {
+    expect(checkPopulationDrop(39037, 39287)).toBeNull(); // aether's real drop: 0.6%
+    expect(checkPopulationDrop(9600, 10_000)).toBeNull(); // exactly 4%
+    expect(checkPopulationDrop(9500, 10_000)).toBeNull(); // exactly the 5% threshold
   });
 
-  test("spadek powyżej progu ustawia flagę z liczbami", () => {
+  test("a drop past the threshold sets the flag, with the numbers", () => {
     const suspect = checkPopulationDrop(9400, 10_000);
     expect(suspect).not.toBeNull();
     expect(suspect!.previousCount).toBe(10_000);
@@ -128,38 +128,38 @@ describe("strażnik przed obciętym scrapem", () => {
     expect(suspect!.reason).toContain("6.0%");
   });
 
-  test("obcięty scrape — połowa stron nie doszła", () => {
+  test("a truncated scrape — half the pages never arrived", () => {
     expect(checkPopulationDrop(4000, 8000)!.drop).toBe(0.5);
   });
 
-  test("wzrost populacji nigdy nie jest podejrzany", () => {
+  test("population growth is never suspect", () => {
     expect(checkPopulationDrop(12_000, 10_000)).toBeNull();
     expect(checkPopulationDrop(10_000, 10_000)).toBeNull();
   });
 
-  test("nowy świat bez poprzedniej migawki nie jest podejrzany", () => {
+  test("a new world with no previous snapshot is not suspect", () => {
     expect(checkPopulationDrop(5000, null)).toBeNull();
     expect(checkPopulationDrop(5000, 0)).toBeNull();
   });
 
-  test("próg da się przestawić", () => {
-    expect(checkPopulationDrop(9900, 10_000, 0.005)).not.toBeNull(); // czulszy: 1% > 0,5%
-    expect(checkPopulationDrop(5000, 10_000, 0.9)).toBeNull(); // luźniejszy: 50% < 90%
+  test("the threshold can be moved", () => {
+    expect(checkPopulationDrop(9900, 10_000, 0.005)).not.toBeNull(); // stricter: 1% > 0.5%
+    expect(checkPopulationDrop(5000, 10_000, 0.9)).toBeNull(); // looser: 50% < 90%
   });
 
-  test("flaga trafia do pliku filtrów, nie do pliku nicków", () => {
+  test("the flag lands in the filter file, not in the names file", () => {
     const suspect = checkPopulationDrop(4000, 8000)!;
     const { filters, names } = splitSnapshot(rows, { ...META, suspect });
     expect(filters.suspect).toEqual(suspect);
     expect(JSON.stringify(names)).not.toContain("suspect");
   });
 
-  test("zdrowa migawka nie niesie pola suspect", () => {
+  test("a healthy snapshot carries no suspect field", () => {
     expect(JSON.stringify(splitSnapshot(rows, META).filters)).not.toContain("suspect");
   });
 });
 
-describe("odczyt poprzedniej migawki", () => {
+describe("reading the previous snapshot", () => {
   const tmp = path.join(import.meta.dir, "..", "node_modules", ".tmp-snapshot-test");
 
   async function world(name: string, files: Record<string, unknown>) {
@@ -175,8 +175,8 @@ describe("odczyt poprzedniej migawki", () => {
     await rm(tmp, { recursive: true, force: true });
   });
 
-  test("bierze count z najnowszej migawki, nie z pierwszej lepszej", async () => {
-    const dir = await world("kolejnosc", {
+  test("takes count from the newest snapshot, not from whichever comes first", async () => {
+    const dir = await world("ordering", {
       "2026-06-01T00-00-00.f.json": { count: 100 },
       "2026-08-01T00-00-00.f.json": { count: 300 },
       "2026-07-01T00-00-00.f.json": { count: 200 },
@@ -184,26 +184,26 @@ describe("odczyt poprzedniej migawki", () => {
     expect(await latestSnapshotCount(dir)).toBe(300);
   });
 
-  test("pomija pliki nicków", async () => {
-    const dir = await world("nicki", {
+  test("skips the names files", async () => {
+    const dir = await world("names", {
       "2026-08-01T00-00-00.f.json": { count: 42 },
       "2026-09-01T00-00-00.n.json": { count: 999 },
     });
     expect(await latestSnapshotCount(dir)).toBe(42);
   });
 
-  test("nowy świat, uszkodzony plik i brak katalogu dają null zamiast wyjątku", async () => {
-    expect(await latestSnapshotCount(path.join(tmp, "nie-ma-takiego"))).toBeNull();
-    expect(await latestSnapshotCount(await world("pusty", {}))).toBeNull();
+  test("a new world, a corrupted file and a missing directory give null, not an exception", async () => {
+    expect(await latestSnapshotCount(path.join(tmp, "no-such-world"))).toBeNull();
+    expect(await latestSnapshotCount(await world("empty", {}))).toBeNull();
 
-    const uszkodzony = path.join(tmp, "uszkodzony");
-    await mkdir(uszkodzony, { recursive: true });
-    await Bun.write(path.join(uszkodzony, "2026-08-01T00-00-00.f.json"), "{ to nie jest json");
-    expect(await latestSnapshotCount(uszkodzony)).toBeNull();
+    const corrupted = path.join(tmp, "corrupted");
+    await mkdir(corrupted, { recursive: true });
+    await Bun.write(path.join(corrupted, "2026-08-01T00-00-00.f.json"), "{ this is not json");
+    expect(await latestSnapshotCount(corrupted)).toBeNull();
   });
 
-  test("razem ze strażnikiem: obcięta migawka zostaje oflagowana", async () => {
-    const dir = await world("obciety", { "2026-07-01T00-00-00.f.json": { count: 7754 } });
+  test("together with the guard: a truncated snapshot gets flagged", async () => {
+    const dir = await world("truncated", { "2026-07-01T00-00-00.f.json": { count: 7754 } });
     const suspect = checkPopulationDrop(3900, await latestSnapshotCount(dir));
 
     expect(suspect).not.toBeNull();
@@ -211,61 +211,61 @@ describe("odczyt poprzedniej migawki", () => {
     expect(suspect!.reason).toContain("7754 → 3900");
   });
 
-  describe("zapis albo w całości, albo wcale", () => {
-    // `Bun.write` to obcięcie + zapis: przerwanie zostawiało obcięty `.f.json`,
-    // przez który `JSON.parse` wywalał i ogon rundy, i `bun run rebuild`.
-    test("podmienia zawartość i nie zostawia pliku tymczasowego", async () => {
-      const dir = await world("atomowy", { "plik.json": { stary: true } });
-      const file = path.join(dir, "plik.json");
+  describe("a write that is all or nothing", () => {
+    // `Bun.write` is truncate + write: an interruption left a truncated `.f.json`, and
+    // `JSON.parse` then took down both the tail of a round and `bun run rebuild`.
+    test("replaces the contents and leaves no temp file behind", async () => {
+      const dir = await world("atomic", { "file.json": { old: true } });
+      const file = path.join(dir, "file.json");
 
-      await writeAtomic(file, JSON.stringify({ nowy: true }));
-      expect(await Bun.file(file).json()).toEqual({ nowy: true });
+      await writeAtomic(file, JSON.stringify({ fresh: true }));
+      expect(await Bun.file(file).json()).toEqual({ fresh: true });
       expect(await Bun.file(`${file}.tmp`).exists()).toBe(false);
     });
 
-    test("nieudany zapis nie rusza poprzedniej zawartości ani nie zostawia śmiecia", async () => {
-      const dir = await world("atomowy-blad", { "plik.json": { stary: true } });
-      const file = path.join(dir, "plik.json");
+    test("a failed write neither touches the previous contents nor leaves litter", async () => {
+      const dir = await world("atomic-failure", { "file.json": { old: true } });
+      const file = path.join(dir, "file.json");
 
-      // Katalog w miejscu pliku tymczasowego — `Bun.write` nie ma gdzie zapisać.
+      // A directory where the temp file goes — `Bun.write` has nowhere to write.
       await mkdir(`${file}.tmp`, { recursive: true });
-      await expect(writeAtomic(file, JSON.stringify({ nowy: true }))).rejects.toThrow();
+      await expect(writeAtomic(file, JSON.stringify({ fresh: true }))).rejects.toThrow();
 
-      // Stara zawartość ma przeżyć: to jest cały sens tej funkcji.
-      expect(await Bun.file(file).json()).toEqual({ stary: true });
+      // The old contents must survive: that is the entire point of this function.
+      expect(await Bun.file(file).json()).toEqual({ old: true });
       await rm(`${file}.tmp`, { recursive: true, force: true });
     });
   });
 });
 
-describe("polityka ponawiania", () => {
-  test("`Retry-After: 0` nie kasuje pauzy", () => {
-    // `0 ?? x` to `0`, nie `x` — przez tę jedną gwiazdkę cztery żądania szły pod
-    // rząd bez pauzy, wprost przeciw zasadzie „szanuj serwis”.
+describe("the retry policy", () => {
+  test("`Retry-After: 0` does not wipe out the pause", () => {
+    // `0 ?? x` is `0`, not `x` — that one operator sent four requests back to back with
+    // no pause at all, straight against "respect the service".
     expect(parseRetryAfter("0")).toBe(0);
     expect(backoffFor(1, parseRetryAfter("0"))).toBe(BACKOFF_BASE_MS);
     expect(backoffFor(1, 0)).toBeGreaterThanOrEqual(BACKOFF_BASE_MS);
   });
 
-  test("bez podpowiedzi backoff rośnie wykładniczo i ma sufit", () => {
+  test("with no hint the backoff grows exponentially and has a ceiling", () => {
     expect(backoffFor(1)).toBe(BACKOFF_BASE_MS);
     expect(backoffFor(2)).toBe(BACKOFF_BASE_MS * 2);
     expect(backoffFor(3)).toBe(BACKOFF_BASE_MS * 4);
     expect(backoffFor(99)).toBe(MAX_BACKOFF_MS);
   });
 
-  test("podpowiedź serwera może pauzę wydłużyć, ale nie skrócić", () => {
-    expect(backoffFor(1, 60_000)).toBe(60_000); // dłuższa niż nasza — honorujemy
-    expect(backoffFor(3, 1_000)).toBe(BACKOFF_BASE_MS * 4); // krótsza — ignorujemy
-    expect(backoffFor(1, 999_999)).toBe(MAX_BACKOFF_MS); // absurdalna — sufit
+  test("the server's hint may lengthen the pause but not shorten it", () => {
+    expect(backoffFor(1, 60_000)).toBe(60_000); // longer than ours — honoured
+    expect(backoffFor(3, 1_000)).toBe(BACKOFF_BASE_MS * 4); // shorter — ignored
+    expect(backoffFor(1, 999_999)).toBe(MAX_BACKOFF_MS); // absurd — the ceiling
   });
 
-  test("nagłówek bywa datą, a śmieci nie mogą wywalać scrapera", () => {
+  test("the header is sometimes a date, and junk must not take down the scraper", () => {
     const now = Date.parse("2026-08-04T12:00:00Z");
     expect(parseRetryAfter("Tue, 04 Aug 2026 12:00:30 GMT", now)).toBe(30_000);
     expect(parseRetryAfter(null)).toBeUndefined();
-    expect(parseRetryAfter("bez sensu")).toBeUndefined();
-    // data w przeszłości nie może dać ujemnej pauzy
+    expect(parseRetryAfter("nonsense")).toBeUndefined();
+    // a date in the past must not produce a negative pause
     expect(parseRetryAfter("Tue, 04 Aug 2026 11:00:00 GMT", now)).toBe(0);
   });
 });
