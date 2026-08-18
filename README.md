@@ -191,7 +191,9 @@ test/
   snapshot.test.ts   # the snapshot format and migration from the old schemas
   dashboard.test.ts  # the cross-section: filters compared against pre-migration data
   trends.test.ts     # the history: the aggregate against .f.json, the client computing what the server does
+  language.test.ts   # the language boundary: English everywhere except what a player reads
   dom_smoke.ts       # a DOM stub, two scenarios (run from the tests in a subprocess)
+  source-text.ts     # splitting a source into comments, code and string literals
 public/              # what lands on GitHub Pages
   index.html         # the whole world view (markup + styles)
   app.js             # the only module that touches the DOM

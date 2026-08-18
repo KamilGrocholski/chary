@@ -15,6 +15,7 @@ import {
   visibleActivityBuckets,
 } from "../public/filters.js";
 import { activityBucket, daysBetween, formatSnapshotDate, isNeverOnline } from "../public/shared.js";
+import { stripComments } from "./source-text.ts";
 
 // The reference is a sample of a real snapshot in the old v1 schema
 // (test/fixtures/legacy-snapshot-aether.json — every 12th row of the original, so it
@@ -291,7 +292,7 @@ describe("app.js agrees with index.html", () => {
 describe("the pure modules must not run anything", () => {
   // Comments are stripped, because the test is to hold the code and not the prose: the
   // paragraph explaining why a module does not reach for `document` contains that word.
-  const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+  const code = stripComments;
 
   test("the counting logic does not touch the DOM", () => {
     // app.js starts the view as soon as it loads, so if a pure module imported anything

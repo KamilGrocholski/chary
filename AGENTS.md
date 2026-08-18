@@ -37,7 +37,7 @@ line between them is what somebody is reading:
 **Identifiers around a Polish string stay English**, and a Polish sentence never carries
 our vocabulary: a player is told what the data cannot show, not why our reader could not
 read it. Everything else — every comment, every test name, every line the terminal prints,
-every word in `docs/` — is English.
+every word in `docs/` — is English. Guarded by `test/language.test.ts`.
 
 The Polish query parameters `prog` and `udzial`, and the `liczba`/`udzial` option values
 behind them, are a deliberate exception on a different axis: they are the contract of links
@@ -76,7 +76,9 @@ test/
   snapshot.test.ts   snapshot format, migration, the population guard
   dashboard.test.ts  the snapshot view: filters, the −1 sentinel, snapshot time, agreement with index.html, smoke
   trends.test.ts     history: the server aggregate, trends.json, history.js, client == server
+  language.test.ts   the language boundary above, over comments and string literals
   dom_smoke.ts       a DOM stub — two scenarios, run from the tests in a subprocess
+  source-text.ts     splitting a source into comments, code and string literals
   fixtures/          a capture of a ranking page + a sample snapshot in the old schema
 docs/                audits and notes
 .github/workflows/   deploy.yml (check + publish), ci.yml (pull requests)
@@ -103,7 +105,7 @@ bun run scrape aether  # a single world
 bun run scrape aether,tempest 2000   # chosen worlds, custom interval in ms (min. 250)
 
 bun run serve          # http://localhost:3000 — the dashboard locally
-bun test               # 184 tests
+bun test               # 188 tests
 bun run typecheck
 bun run rebuild        # data maintenance: migrate old schemas + manifest + trends
 ```
@@ -274,8 +276,9 @@ Full reasoning and history: the audits below.
 ## How we work in this repo
 
 1. **English everywhere except what a player reads.** The rule and its exceptions are in
-   "Language" above. Commit messages are English too — Conventional Commits,
-   `type(scope): effect`, and the header names the effect rather than the activity.
+   "Language" above; `test/language.test.ts` holds it. Commit messages are English too —
+   Conventional Commits, `type(scope): effect`, and the header names the effect rather than
+   the activity.
 2. **Do not trust a hypothesis — measure.** During audit #2, "the chart is unreadable
    because of level 1" turned out to be false after a single command. The data is on disk;
    checking costs seconds.

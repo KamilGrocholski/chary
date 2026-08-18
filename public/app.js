@@ -604,7 +604,7 @@ function setupView() {
   }
 
   function renderTable(trend) {
-    const rows = changeRows(trend).reverse(); // najnowsze na górze
+    const rows = changeRows(trend).reverse(); // the newest at the top
     // A world with one snapshot has nothing to compare against anything. Clearing the
     // content alone left the `.card` with its border and padding — an empty box that still
     // caught the tab key (`tabindex="0"`) and was still announced as the region "Zmiany
@@ -907,7 +907,7 @@ function setupView() {
 
     if (token !== worldToken) return;
     // Failed snapshots are described by `#partialNote` in the HISTORIA section, not by
-    // `#error` above PRZEKRÓJ: that bar is about the snapshot being cross-sectioned and
+    // `#error` above "PRZEKRÓJ": that bar is about the snapshot being cross-sectioned and
     // stands 1500 px away from the data in question.
     progress = { loaded: loadedCount(store, entries), expected: entries.length, failed: failed.length, running: false };
     render();
@@ -923,7 +923,7 @@ function setupView() {
   }
 
   function fillSnapshotSelect(selected) {
-    const files = [...currentWorldEntries()].reverse(); // najnowsze na górze
+    const files = [...currentWorldEntries()].reverse(); // the newest at the top
     el("snapshotSelect").innerHTML = files
       .map((f) => `<option value="${f.id}">${formatSnapshotDate(f)}</option>`)
       .join("");
@@ -969,7 +969,7 @@ function setupView() {
   // ── Events ────────────────────────────────────────────────────────────────
 
   el("worldSelect").addEventListener("change", async () => {
-    worldToken += 1; // porzuca historię poprzedniego świata
+    worldToken += 1; // abandons the previous world's history
     progress = { loaded: 0, expected: 0, failed: 0, running: false };
     // The charts are cleared at once, synchronously. The first render of a new world comes
     // only after a snapshot is fetched, so without this the previous world's series stand
