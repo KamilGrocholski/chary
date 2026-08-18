@@ -1,7 +1,7 @@
 name: CI
 
-# Push na `main` jest sprawdzany w deploy.yml, który bez zielonych testów nie publikuje —
-# tutaj zostają pull requesty, żeby nie mielić tego samego dwa razy.
+# A push to `main` is checked by deploy.yml, which does not publish without green tests —
+# so pull requests are what is left here, to avoid grinding the same thing twice.
 on:
   pull_request:
 
@@ -18,5 +18,5 @@ jobs:
       - name: Typecheck
         run: bunx tsc --noEmit
 
-      - name: Testy
+      - name: Tests
         run: bun test
