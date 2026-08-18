@@ -7,29 +7,29 @@
   <meta name="description" content="Statystyki graczy Margonem — rozkład poziomów i profesji w rankingach światów oraz historia populacji, aktywności i profesji w czasie." />
   <meta name="theme-color" content="#101013" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2316161a'/><rect x='6' y='17' width='4' height='9' fill='%233987e5'/><rect x='12' y='12' width='4' height='14' fill='%23199e70'/><rect x='18' y='7' width='4' height='19' fill='%23c98500'/><rect x='24' y='14' width='4' height='12' fill='%23d55181'/></svg>" />
-  <!-- Chart.js 4.4.7, lokalnie zamiast z CDN-u. Aktualizacja:
-       curl -sL https://cdn.jsdelivr.net/npm/chart.js@<wersja>/dist/chart.umd.min.js -o public/vendor/chart.umd.min.js -->
+  <!-- Chart.js 4.4.7, local instead of from a CDN. To update:
+       curl -sL https://cdn.jsdelivr.net/npm/chart.js@<version>/dist/chart.umd.min.js -o public/vendor/chart.umd.min.js -->
   <script defer src="vendor/chart.umd.min.js"></script>
   <style>
     :root {
-      /* Motyw margometera: ciepły, ciemny */
+      /* margometer's theme: warm, dark */
       --bg: #101013;
       --panel: #16161a;
       --surface-2: #1e1e22;
       --text: #f2f2ef;
       --muted: #a0a09a;
       --accent: #3987e5;
-      /* Rozdzielacze wewnątrz karty — dekoracja, więc bez progu kontrastu. */
+      /* Dividers inside a card — decoration, so no contrast threshold applies. */
       --border: #35353b;
-      /* Granice kontrolek i kart. WCAG 2.2 SC 1.4.11 wymaga 3:1: #35353b dawało
-         1,48:1 wobec karty i 1,09:1 wobec wypełnienia pola, czyli pole formularza
-         nie odróżniało się od tła niczym. #6a6a73 daje 3,37:1 i 3,10:1. */
+      /* The borders of controls and cards. WCAG 2.2 SC 1.4.11 requires 3:1: #35353b gave
+         1.48:1 against the card and 1.09:1 against a field's fill, i.e. a form field was
+         distinguishable from the background by nothing. #6a6a73 gives 3.37:1 and 3.10:1. */
       --border-strong: #6a6a73;
       --warn: #c98500;
       --danger: #e66767;
       --ok: #199e70;
-      /* Bez tego natywne listy rozwijane, strzałki pól liczbowych i paski
-         przewijania rysują się jasną skórką systemu na ciemnym interfejsie. */
+      /* Without this, native dropdowns, number-field arrows and scrollbars are drawn in
+         the system's light skin on top of a dark interface. */
       color-scheme: dark;
     }
     * { box-sizing: border-box; }
@@ -52,9 +52,9 @@
       color: var(--muted);
       margin-bottom: 6px;
     }
-    /* Kontrolki nie dziedziczą fontu z `body` same z siebie: bez tego przeglądarka
-       rysowała wszystkie pola i listy krojem systemowym w 13,33 px, czyli innym
-       niż reszta strony i poniżej 14 px. */
+    /* Controls do not inherit the font from `body` by themselves: without this the browser
+       drew every field and list in the system typeface at 13.33 px — a different face from
+       the rest of the page, and below 14 px. */
     input, select, button {
       font-family: inherit;
       font-size: 14px;
@@ -67,10 +67,10 @@
       background: var(--surface-2);
       color: var(--text);
     }
-    /* Wariant „biały na akcencie” miał 3,64:1, czyli poniżej AA — i nie miał ani
-       jednego użytkownika, bo wszystkie przyciski są `.ghost-btn` albo `.reset-btn`.
-       Domyślny przycisk wygląda więc jak `.ghost-btn`, żeby następny dodany nie
-       wracał po cichu do wariantu, który nie przechodzi kontrastu. */
+    /* The "white on accent" variant measured 3.64:1, below AA — and had not one user,
+       because every button is either `.ghost-btn` or `.reset-btn`. So the default button
+       looks like `.ghost-btn`, to stop the next one added from silently falling back to a
+       variant that fails contrast. */
     button {
       width: 100%;
       padding: 10px 12px;
@@ -90,8 +90,8 @@
       background: var(--surface-2);
       border: 1px solid var(--border);
     }
-    /* Skip-link: cała treść wisi za paskiem filtrów, więc bez niego czytnik ekranu
-       i klawiatura przechodzą przez komplet kontrolek, zanim dojdą do danych. */
+    /* The skip link: all the content sits behind the filter bar, so without it a screen
+       reader and the keyboard walk through every control before reaching the data. */
     .skip {
       position: fixed;
       left: -9999px;
@@ -114,23 +114,23 @@
       color: var(--accent);
     }
 
-    /* Pasek filtrów — jedyny egzemplarz wyboru świata i licznika trafień, przyklejony
-       do góry. Filtr steruje dwiema sekcjami, a od niego do pierwszego wykresu historii
-       jest 961 px, czyli więcej niż ekran: bez tego paska nie da się zobaczyć naraz
-       tego, co się ustawia, i tego, na co to działa.
-       Budżet wysokości: ≤ 64 px, czyli ≤ 7% ekranu 900 px (próg NN/g to 10%). */
+    /* The filter bar — the only copy of the world picker and the match counter, pinned to
+       the top. The filter drives two sections, and it is 961 px from it to the first history
+       chart, i.e. more than a screen: without this bar there is no way to see what is being
+       set and what it acts on at the same time.
+       Height budget: ≤ 64 px, i.e. ≤ 7% of a 900 px screen (NN/g's threshold is 10%). */
     .filterbar {
       position: sticky;
       top: 0;
-      /* nad #profTooltip, który jest fixed z z-index 999 (public/app.js) */
+      /* above #profTooltip, which is fixed with z-index 999 (public/app.js) */
       z-index: 1000;
       display: flex;
       flex-wrap: nowrap;
       align-items: center;
       gap: 8px 14px;
-      /* Stała wysokość, zawsze jeden rząd. Pasek, który rośnie po dojściu danych,
-         przesuwa całą stronę pod kursorem — a przy przeładowaniu przywrócona pozycja
-         scrolla ląda gdzie indziej. Dlatego nic tutaj nie zawija się do drugiej linii. */
+      /* A fixed height, always one row. A bar that grows once the data arrives moves the
+         whole page under the cursor — and on a reload the restored scroll position lands
+         somewhere else. That is why nothing here wraps to a second line. */
       height: 56px;
       padding: 0 16px;
       margin-bottom: 16px;
@@ -145,20 +145,20 @@
       padding: 6px 10px;
     }
 
-    /* Szuflada filtrów wypada SPOD paska, nie z góry dokumentu. Dzięki temu „Filtry”
-       otwiera pola tam, gdzie właśnie jesteś — wcześniej panel siedział na górze
-       strony i po przewinięciu przycisk nie pokazywał niczego widocznego.
-       Pozycjonowanie bezwzględne oznacza też, że otwarcie i zamknięcie NIE rusza
-       układu strony ani o piksel. */
+    /* The filter drawer falls out FROM UNDER the bar, not from the top of the document.
+       That is what makes "Filtry" open the fields where you actually are — the panel used to
+       sit at the top of the page, so after scrolling the button showed nothing visible.
+       Absolute positioning also means opening and closing does NOT move the page layout by
+       a single pixel. */
     #filterFields {
       position: absolute;
       top: calc(100% + 6px);
       left: 0;
       right: 0;
       z-index: 1001;
-      /* `dvh`, nie `vh`: na telefonie pasek adresu zjada część okna, a `100vh`
-         go ignoruje, więc szuflada wychodziła poniżej realnego ekranu.
-         Odejmujemy wysokość paska (56 px) plus zapas na cień. */
+      /* `dvh`, not `vh`: on a phone the address bar eats part of the window and `100vh`
+         ignores it, so the drawer extended below the real screen.
+         We subtract the bar's height (56 px) plus room for the shadow. */
       max-height: calc(100dvh - 90px);
       overflow-y: auto;
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
@@ -192,13 +192,12 @@
       border: 1px solid var(--border-strong);
     }
 
-    /* Chipy dostają całą resztę linii i nie zawijają paska.
-       `overflow: hidden` sprawiało jednak, że przy 800 px zostawało im zmierzone
-       **0 px** — trzy chipy o łącznej szerokości 421 px były wtedy niewidoczne
-       w całości, razem ze swoimi krzyżykami. Przewijanie zamiast przycinania
-       zostawia je osiągalne: kółkiem, dotykiem i tabulatorem (przeglądarka sama
-       przewija do elementu, który dostał focus). Pasek suwaka byłby wyższy niż
-       chip, więc go chowamy — nie odbierając samego przewijania. */
+    /* The chips take the rest of the line and do not wrap the bar.
+       `overflow: hidden`, though, left them a measured **0 px** at 800 px — three chips
+       421 px wide in total were then entirely invisible, their close buttons with them.
+       Scrolling instead of clipping keeps them reachable: by wheel, by touch and by tab
+       (the browser scrolls to whatever receives focus). The scrollbar would be taller than
+       a chip, so we hide it — without taking away the scrolling itself. */
     .chips {
       display: flex;
       flex-wrap: nowrap;
@@ -221,8 +220,8 @@
       font-size: 12px;
       white-space: nowrap;
     }
-    /* Krzyżyk miał zmierzone 21×15 px, czyli poniżej minimum 24×24 z WCAG 2.2
-       SC 2.5.8. Powiększenie idzie w samego guzika, nie w wysokość paska. */
+    /* The close button measured 21×15 px, below the 24×24 minimum of WCAG 2.2 SC 2.5.8.
+       The extra size goes into the button itself, not into the bar's height. */
     .chip button {
       width: auto;
       min-width: 24px;
@@ -276,9 +275,9 @@
       accent-color: var(--accent);
     }
 
-    /* Licznik trafień — jedyna liczba, która odpowiada na „ile ich w ogóle jest”.
-       Mieszka w pasku, więc jest widoczny przez całe 2806 px strony, a nie przez
-       pierwsze 390. */
+    /* The match counter — the only number that answers "how many are there in total".
+       It lives in the bar, so it is visible across all 2806 px of the page rather than the
+       first 390. */
     .match {
       margin: 0;
       font-size: 13px;
@@ -292,7 +291,7 @@
     .match b { color: var(--text); font-size: 16px; }
 
     .section-head {
-      /* kotwice z paska nie mogą wjeżdżać pod pasek */
+      /* anchors from the bar must not slide underneath the bar */
       scroll-margin-top: 76px;
       display: flex;
       flex-wrap: wrap;
@@ -384,11 +383,10 @@
     tbody tr:last-child td { border-bottom: none; }
     [hidden] { display: none !important; }
 
-    /* Poniżej ~1100 px pasek nie mieści naraz świata, licznika, chipów, kotwic
-       i dwóch przycisków — a shrinkowanie odbierało miejsce wyłącznie chipom,
-       aż do zera. Kotwice i doprecyzowanie „w tej migawce” ustępują pierwsze:
-       obie rzeczy są wygodą, a chipy niosą stan filtra i jedyny sposób usunięcia
-       pojedynczego z nich. */
+    /* Below ~1100 px the bar cannot hold the world, the counter, the chips, the anchors and
+       two buttons at once — and shrinking took space from the chips alone, down to zero. The
+       anchors and the "w tej migawce" qualifier give way first: both are conveniences, while
+       the chips carry the filter state and the only way to remove one of them. */
     @media (max-width: 1100px) {
       .filterbar-nav { display: none; }
       .wide-only { display: none; }
@@ -401,17 +399,17 @@
       .chartBox { height: 320px; }
       .chartBox.short { height: 260px; }
 
-      /* Bez tego siatka schodzi do jednej kolumny, a `.col-2` wymusza drugą —
-         panel wychodził poza kartę poniżej ~352 px szerokości. */
+      /* Without this the grid drops to one column while `.col-2` forces a second — the
+         panel extended past the card below ~352 px of width. */
       .toolbar-row2 { grid-template-columns: repeat(2, 1fr); }
       .col-2 { grid-column: 1 / -1; }
-      /* Na telefonie zostaje jeden rząd o tej samej wysokości co na desktopie:
-         świat, licznik i przycisk filtrów. Kotwice i chipy nie mieszczą się w linii,
-         a rozpychanie paska do dwóch rzędów kosztowało 22% ekranu 667 px. */
-      /* Przy 375 px na jeden rząd nie ma miejsca: świat, licznik i dwa przyciski nie
-         mieszczą się razem, a przycinanie kończyło się „Pasuje: 79” zamiast 79 528 —
-         ucięta liczba czyta się jako inna liczba. Stąd dwa rzędy, ale o **stałej**
-         wysokości, więc pasek nadal nie przesuwa strony. 88 px to 13% ekranu 667 px. */
+      /* On a phone one row is left, the same height as on desktop: the world, the counter
+         and the filters button. The anchors and the chips do not fit on the line, and
+         pushing the bar to two rows cost 22% of a 667 px screen. */
+      /* At 375 px there is no room for one row: the world, the counter and two buttons do
+         not fit together, and clipping ended in "Pasuje: 79" instead of 79 528 — a truncated
+         number reads as a different number. Hence two rows, but of a **fixed** height, so the
+         bar still does not move the page. 88 px is 13% of a 667 px screen. */
       .filterbar {
         height: 88px;
         gap: 4px 8px;
@@ -419,23 +417,23 @@
         flex-wrap: wrap;
         align-content: center;
       }
-      /* Rząd 1: świat i przyciski. Rząd 2: licznik na pełnej szerokości. */
+      /* Row 1: the world and the buttons. Row 2: the counter at full width. */
       .filterbar > select { order: 1; flex: 1 1 auto; min-width: 0; }
       .filterbar-actions { order: 2; flex: 0 0 auto; }
       .filterbar .match { order: 3; font-size: 12px; flex: 1 1 100%; flex-wrap: nowrap; }
       .filterbar-nav, .chips { display: none; }
-      /* Pasek ma tu 88 px, nie 56 — obie liczby liczone od jego wysokości muszą
-         to uwzględnić, inaczej kotwica ląduje pod paskiem, a szuflada poniżej ekranu. */
+      /* The bar is 88 px here, not 56 — both figures derived from its height have to allow
+         for that, otherwise an anchor lands under the bar and the drawer below the screen. */
       .section-head { scroll-margin-top: 108px; }
       #filterFields { max-height: calc(100dvh - 122px); }
-      /* „w tej migawce” to doprecyzowanie, bez którego liczba nadal się broni */
+      /* "w tej migawce" is a qualifier the number still stands without */
       .wide-only { display: none; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <a class="skip" href="#tresc">Przejdź do treści</a>
+    <a class="skip" href="#content">Przejdź do treści</a>
     <noscript>
       <p class="error">Ten widok liczy wszystko w przeglądarce, więc bez JavaScriptu nie pokaże
       żadnych danych. Dane źródłowe leżą jako pliki JSON w katalogu <code>worlds/</code>.</p>
@@ -450,8 +448,8 @@
       <div id="matchLine" class="match" role="status">Ładowanie…</div>
       <div id="filterChips" class="chips"></div>
       <nav class="filterbar-nav" aria-label="Sekcje">
-        <a href="#przekroj">Przekrój</a>
-        <a href="#historia">Historia</a>
+        <a href="#snapshot">Przekrój</a>
+        <a href="#history">Historia</a>
       </nav>
       <div class="filterbar-actions">
         <button id="filtersToggle" class="ghost-btn" aria-expanded="false" aria-controls="filterFields">Filtry</button>
@@ -464,8 +462,8 @@
           <select id="snapshotSelect"></select>
         </div>
         <div>
-          <!-- To nie jest etykieta kontrolki, tylko podpis nad tekstem — `<label>`
-               bez `for` niczego nie etykietuje i myli czytnik ekranu. -->
+          <!-- This is not a control's label but a caption over text — a `<label>` with no
+               `for` labels nothing and confuses a screen reader. -->
           <span class="field-title">Plik</span>
           <div id="sourceInfo" class="source">—</div>
         </div>
@@ -504,10 +502,10 @@
           </div>
         </div>
         <div class="col-full">
-          <!-- Sześć checkboxów to jedna grupa: bez `role="group"` czytnik ekranu
-               ogłasza je jako sześć niezależnych pól, bez słowa „Profesja”.
-               Kontener musi zostać pusty — `buildProfCheckboxes` dokłada do niego
-               bez czyszczenia, więc statyczne pola dałyby dwanaście zamiast sześciu. -->
+          <!-- The six checkboxes are one group: without `role="group"` a screen reader
+               announces them as six independent fields, with no mention of "Profesja".
+               The container has to stay empty — `buildProfCheckboxes` appends to it without
+               clearing, so static fields would give twelve instead of six. -->
           <span class="field-title" id="profLabel">Profesja</span>
           <div class="prof-checkboxes" id="profCheckboxes" role="group" aria-labelledby="profLabel"></div>
         </div>
@@ -518,10 +516,10 @@
       </div>
     </div>
 
-    <main id="tresc">
+    <main id="content">
     <div id="error" class="error" role="alert"></div>
 
-    <div class="section-head" id="przekroj">
+    <div class="section-head" id="snapshot">
       <h2>Przekrój</h2>
       <span id="snapshotMeta" class="meta">—</span>
     </div>
@@ -531,9 +529,8 @@
     <div class="stats card" id="stats">Ładowanie…</div>
 
     <div class="card chartBox">
-      <!-- Pusty stan musi mieć wyjście: „Resetuj filtry” siedzi w zamkniętej
-           szufladzie, więc bez tego jedyną drogą powrotu było zgadnięcie, że
-           trzeba otworzyć „Filtry”. -->
+      <!-- The empty state has to have a way out: "Resetuj filtry" sits in a closed drawer,
+           so without this the only way back was guessing that "Filtry" had to be opened. -->
       <div id="chartEmpty" class="empty" hidden>
         <span>Brak graczy spełniających filtry.</span>
         <button id="emptyResetBtn" class="reset-btn" type="button">Resetuj filtry</button>
@@ -541,7 +538,7 @@
       <canvas id="professionChart" role="img" aria-label="Rozkład poziomów według profesji w wybranej migawce."></canvas>
     </div>
 
-    <div class="section-head" id="historia">
+    <div class="section-head" id="history">
       <h2>Historia</h2>
       <span id="historyStatus" class="meta">—</span>
       <div class="history-controls">
@@ -594,9 +591,9 @@
       <canvas id="profChart" role="img" aria-label="Liczba graczy każdej profesji w kolejnych migawkach."></canvas>
     </div>
 
-    <!-- Kontener przewija się w poziomie (zmierzone: 526 px treści w 333 px przy
-         375 px szerokości), więc bez `tabindex` prawe kolumny są nieosiągalne
-         z klawiatury — WCAG 2.1.1. -->
+    <!-- The container scrolls horizontally (measured: 526 px of content in 333 px at a
+         width of 375 px), so without `tabindex` the right-hand columns are unreachable from
+         the keyboard — WCAG 2.1.1. -->
     <div class="card tableBox" id="changeTable" tabindex="0" role="region"
          aria-label="Zmiany populacji między migawkami"></div>
     </main>
