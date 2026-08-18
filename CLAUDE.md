@@ -1,5 +1,6 @@
 # CLAUDE.md
 
-Instrukcje dla agentów pracujących w tym repo są w jednym miejscu — nie duplikuj ich tutaj.
+The instructions for agents working in this repo live in one place — do not duplicate them
+here.
 
 @AGENTS.md

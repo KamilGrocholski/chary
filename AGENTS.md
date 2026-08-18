@@ -1,99 +1,125 @@
-# AGENTS.md — punkt wejścia dla agenta AI
+# AGENTS.md — the entry point for an AI agent
 
-Przeczytaj to najpierw. Jeśli po tym pliku dalej nie wiesz, gdzie czegoś szukać, to jest
-błąd tego dokumentu — dopisz brakującą rzecz, zamiast zostawiać następnego z tym samym
-pytaniem.
+Read this first. If you still do not know where to look for something after finishing this
+file, that is a bug in this document — add what is missing instead of leaving the next
+person with the same question.
 
 ---
 
-## Co to jest
+## What this is
 
-Scraper rankingów [Margonem](https://www.margonem.pl) + statyczny dashboard na GitHub Pages.
-Cyklicznie pobiera rankingi graczy ze wszystkich śledzonych światów, zapisuje migawki do
-statycznych plików JSON i pozwala je przeglądać oraz filtrować bez żadnego backendu.
+A ranking scraper for [Margonem](https://www.margonem.pl) plus a static dashboard on
+GitHub Pages. It periodically fetches the player rankings of every tracked world, writes
+snapshots to static JSON files, and lets you browse and filter them with no backend at all.
 
 - **Live:** https://kamilgrocholski.github.io/chary/
-- **Repo:** `git@github.com:KamilGrocholski/chary.git` — uwaga, repozytorium nazywa się
-  `chary`, mimo że pakiet i projekt to `margostat`. To nie pomyłka.
-- **Źródło danych:** `https://www.margonem.pl/ladder/<świat>/players?page=N`
-- **Stan:** 202 migawki z 21 światów, 11 rund od 2026-04-17, ~586 tys. graczy w rundzie,
-  `public/` 137 MB.
+- **Repo:** `git@github.com:KamilGrocholski/chary.git` — note that the repository is called
+  `chary` even though the package and the project are `margostat`. That is not a mistake.
+- **Data source:** `https://www.margonem.pl/ladder/<world>/players?page=N`
+- **State:** 202 snapshots from 21 worlds, 11 rounds since 2026-04-17, ~586k players per
+  round, `public/` 137 MB.
 
 ---
 
-## Gdzie co leży
+## Language
+
+**Write English** — code, comments, tests, docs, commit messages. Two exceptions, and the
+line between them is what somebody is reading:
+
+| Stays Polish | Where |
+|---|---|
+| The text a player reads | `public/index.html` body copy, `aria-label`s, placeholders, `<title>`, `<meta description>`, `lang="pl"`, `trends.html`, `404.html` |
+| UI strings built in JS | chart titles, chips, table headings, status and error copy in `app.js`; `PROF` in `shared.js`; `activityLabel`/`filterChips` in `filters.js`; `ACTIVITY_THRESHOLDS[].label` in `history.js`; `toLocaleString("pl-PL")` |
+| Keys that match scraped material | `PROFESSION_BY_NAME`, `PROFESSION_BY_LETTER` and the `ł → l` folding in `parser.ts`; the captured page in `test/fixtures/` |
+| `suspect.reason` | written by `snapshot.ts` into every flagged `.f.json` and rendered verbatim by the dashboard — server-side code producing a sentence for a player |
+| The assertions that pin all of the above | the Polish expected values in `test/dashboard.test.ts` |
+
+**Identifiers around a Polish string stay English**, and a Polish sentence never carries
+our vocabulary: a player is told what the data cannot show, not why our reader could not
+read it. Everything else — every comment, every test name, every line the terminal prints,
+every word in `docs/` — is English.
+
+The Polish query parameters `prog` and `udzial`, and the `liczba`/`udzial` option values
+behind them, are a deliberate exception on a different axis: they are the contract of links
+people have already shared, which is the entire reason `trends.html` still exists. A URL is
+not code style. Do not rename them.
+
+---
+
+## Where things live
 
 ```
 src/
-  world_scraper.ts   CLI scrapera: pobieranie, retry, strażnik, zapis, podsumowanie
-  parser.ts          parsowanie HTML-a rankingu — czyste funkcje, zero I/O
-  snapshot.ts        format migawki: podział .f/.n, migracja starych, strażnik populacji
-  manifest.ts        budowa public/manifest.json
-  atomic.ts          zapis przez plik tymczasowy + rename — albo w całości, albo wcale
-  retry.ts           backoff i Retry-After — czyste, bo world_scraper.ts odpala się przy imporcie
-  trends.ts          agregat historii świata → public/trends.json
-  rebuild_data.ts    CLI utrzymania danych (migracja + manifest + trendy)
-  worlds.ts          lista śledzonych światów — edytowana ręcznie
-  server.ts          lokalny serwer statyczny do podglądu
-public/              dokładnie to, co ląduje na GitHub Pages
-  index.html         markup i style: przyklejony pasek filtrów + przekrój + historia
-  app.js             jedyny moduł dotykający DOM-u — orkiestracja i rysowanie
-  filters.js         filtr i zliczanie: matches, countByLevel, summarizeFiltered, stan w URL-u
-  history.js         historia świata: progi, serie, tablice typowane, pobieranie migawek
-  shared.js          stałe, czas, koszykowanie aktywności — wspólne słownictwo
-  vendor/            Chart.js 4.4.7 lokalnie, bez CDN-u + LICENSE.chartjs
-  trends.html        przekierowanie na index.html z zachowaniem query stringa
-  manifest.json      indeks migawek
-  trends.json        zwinięta historia wszystkich światów (24 KB, 9 KB po gzipie)
-  worlds/<świat>/    <id>.f.json + <id>.n.json
+  world_scraper.ts   scraper CLI: fetching, retry, the guard, writing, the summary
+  parser.ts          parsing the ranking HTML — pure functions, zero I/O
+  snapshot.ts        snapshot format: the .f/.n split, migrating old ones, the population guard
+  manifest.ts        building public/manifest.json
+  atomic.ts          write to a temp file + rename — all of it or none of it
+  retry.ts           backoff and Retry-After — pure, because world_scraper.ts runs on import
+  trends.ts          per-world history aggregate → public/trends.json
+  rebuild_data.ts    data maintenance CLI (migration + manifest + trends)
+  worlds.ts          the list of tracked worlds — edited by hand
+  server.ts          local static server for previewing
+public/              exactly what lands on GitHub Pages
+  index.html         markup and styles: sticky filter bar + snapshot + history
+  app.js             the only module that touches the DOM — orchestration and drawing
+  filters.js         filtering and counting: matches, countByLevel, summarizeFiltered, URL state
+  history.js         world history: thresholds, series, typed arrays, fetching snapshots
+  shared.js          constants, time, activity bucketing — the shared vocabulary
+  vendor/            Chart.js 4.4.7 locally, no CDN + LICENSE.chartjs
+  trends.html        redirect to index.html, preserving the query string
+  manifest.json      the snapshot index
+  trends.json        the folded history of every world (24 KB, 9 KB gzipped)
+  worlds/<world>/    <id>.f.json + <id>.n.json
 test/
-  parser.test.ts     parser na zrzucie prawdziwej strony rankingu
-  snapshot.test.ts   format migawki, migracja, strażnik populacji
-  dashboard.test.ts  przekrój: filtry, wartownik −1, czas migawki, spójność z index.html, smoke
-  trends.test.ts     historia: agregat serwerowy, trends.json, history.js, klient == serwer
-  dom_smoke.ts       atrapa DOM-u — dwa scenariusze, odpalane z testów w podprocesie
-  fixtures/          zrzut strony rankingu + próbka snapshotu w starym schemacie
-docs/                audyty i notatki
-.github/workflows/   deploy.yml (check + publikacja), ci.yml (pull requesty)
-AGENTS.md            ten plik — instrukcje dla agenta
-CLAUDE.md            wskaźnik na AGENTS.md (Claude Code)
-LICENSE              MIT — obejmuje TYLKO kod, nie dane
-DATA-NOTICE.md       dane rankingu: czyje, czego nie licencjonujemy, RODO, usuwanie
-THIRD-PARTY-NOTICES.md  Chart.js, cheerio, drzewo zależności (wszystko permisywne)
+  parser.test.ts     the parser against a capture of a real ranking page
+  snapshot.test.ts   snapshot format, migration, the population guard
+  dashboard.test.ts  the snapshot view: filters, the −1 sentinel, snapshot time, agreement with index.html, smoke
+  trends.test.ts     history: the server aggregate, trends.json, history.js, client == server
+  dom_smoke.ts       a DOM stub — two scenarios, run from the tests in a subprocess
+  fixtures/          a capture of a ranking page + a sample snapshot in the old schema
+docs/                audits and notes
+.github/workflows/   deploy.yml (check + publish), ci.yml (pull requests)
+AGENTS.md            this file — the instructions for an agent
+CLAUDE.md            a pointer to AGENTS.md (Claude Code)
+LICENSE              MIT — covers the code ONLY, not the data
+DATA-NOTICE.md       the ranking data: whose it is, what we do not license, GDPR, removal
+THIRD-PARTY-NOTICES.md  Chart.js, cheerio, the dependency tree (all permissive)
 ```
 
-Kod ma ~4,4 tys. linii łącznie z testami. Da się go przeczytać w całości i **warto** to
-zrobić przed większą zmianą — to szybsze niż zgadywanie.
+The code is ~4.4k lines including the tests. You can read all of it, and it is **worth**
+doing before a larger change — faster than guessing.
 
 ---
 
-## Jak używać
+## How to use it
 
 ```bash
 bun install
 
-bun run scrape:check   # ZAWSZE przed pełnym scrapem — sprawdza parser na stronie 1 każdego świata
-bun run scrape         # wszystkie światy z src/worlds.ts (~1,6 h przy 1 req/s)
-bun run scrape aether  # jeden świat
-bun run scrape aether,tempest 2000   # wybrane światy, własny interwał w ms (min. 250)
+bun run scrape:check   # ALWAYS before a full scrape — checks the parser on page 1 of every world
+bun run scrape         # every world from src/worlds.ts (~1.6 h at 1 req/s)
+bun run scrape aether  # a single world
+bun run scrape aether,tempest 2000   # chosen worlds, custom interval in ms (min. 250)
 
-bun run serve          # http://localhost:3000 — dashboard lokalnie
-bun test               # 184 testy
+bun run serve          # http://localhost:3000 — the dashboard locally
+bun test               # 184 tests
 bun run typecheck
-bun run rebuild        # utrzymanie danych: migracja starych schematów + manifest + trendy
+bun run rebuild        # data maintenance: migrate old schemas + manifest + trends
 ```
 
-Deploy dzieje się sam po pushu na `main`, ale dopiero gdy przejdą typecheck i testy.
+Deploying happens by itself after a push to `main`, but only once typecheck and the tests
+pass.
 
 ---
 
-## Format danych — to musisz zrozumieć
+## The data format — you have to understand this
 
-Jedna migawka to **dwa pliki o tej samej kolejności wierszy**. Wiersz *i* odpowiada randze
-*i+1*, więc ranga nie jest nigdzie zapisana, a oba pliki razem odtwarzają migawkę 1:1
-bez dublowania czegokolwiek.
+One snapshot is **two files with the same row order**. Row *i* corresponds to rank *i+1*,
+so the rank is never stored anywhere, and the two files together reconstruct the snapshot
+1:1 without duplicating anything.
 
-`public/worlds/<świat>/<id>.f.json` — wszystko, czego potrzebuje filtrowanie:
+`public/worlds/<world>/<id>.f.json` — everything filtering needs:
 
 ```json
 { "schema": 3, "kind": "filter", "world": "aether", "count": 39037,
@@ -102,185 +128,198 @@ bez dublowania czegokolwiek.
   "honor": [8749, 4715, ...], "days": [0, 0, 30, null, ...] }
 ```
 
-`public/worlds/<świat>/<id>.n.json` — tożsamość gracza:
+`public/worlds/<world>/<id>.n.json` — player identity:
 
 ```json
 { "schema": 3, "kind": "names", "count": 39037,
   "name": ["essobe", ...], "charId": [729, ...] }
 ```
 
-**Pułapki, na które musisz uważać:**
+**The traps you have to watch for:**
 
-- `days`: `0` = „Mniej niż 24h temu”, `N` = „N dni temu”, **`null` = konto nigdy nieużywane**
-  (ranking pokazuje wtedy ~20655 dni, czyli datę z 1969 r.). Konta z `null` wypadają
-  z każdego progu aktywności.
-- `honor` **bywa ujemny** (najniżej zaobserwowane −35). Żadnych `Math.max(0, …)`.
-- **`id` migawki (trzon nazwy pliku) NIE jest datą.** Pliki sprzed sierpnia 2026 mają
-  w nazwie czas lokalny, nowsze UTC. Do wyświetlania i liczenia odstępów służy wyłącznie
-  `startedAt` z manifestu albo z pliku. To samo dotyczy pola `timestamp` **wewnątrz**
-  plików danych — to identyfikator, nie znacznik czasu.
-- `charId` mają tylko migawki od sierpnia 2026. Starsze łączy się po nicku, a nick **nie
-  jest stabilny** — patrz „szew charId” w audycie #2.
-- `suspect` w `.f.json` oznacza migawkę, której populacja spadła > 5% względem poprzedniej.
-  Dane są zapisane, ale mogą być obcięte.
-- Profesje: 1 Wojownik, 2 Mag, 3 Paladyn, 4 Tropiciel, 5 Tancerz ostrzy, 6 Łowca.
+- `days`: `0` = "less than 24 h ago", `N` = "N days ago", **`null` = an account never
+  used** (the ranking then shows ~20655 days, a date in 1969). Accounts with `null` fall
+  out of every activity threshold.
+- `honor` **can be negative** (the lowest observed is −35). No `Math.max(0, …)`.
+- **A snapshot's `id` (the stem of the filename) is NOT a date.** Files from before August
+  2026 carry local time in the name, newer ones UTC. Displaying a date and measuring the
+  interval between snapshots use `startedAt` from the manifest or the file, and nothing
+  else. The same goes for the `timestamp` field **inside** the data files — that is an
+  identifier, not a timestamp.
+- `charId` exists only in snapshots from August 2026 onwards. Older ones are joined by
+  nickname, and a nickname **is not stable** — see "the charId seam" in audit #2.
+- `suspect` in `.f.json` marks a snapshot whose population dropped by more than 5% against
+  the previous one. The data is written, but it may be truncated.
+- Professions: 1 Wojownik, 2 Mag, 3 Paladyn, 4 Tropiciel, 5 Tancerz ostrzy, 6 Łowca.
 
-Filtry poziomu, profesji, honoru i aktywności liczą się **dokładnie**, zawsze, z jednego
-pliku `.f.json` (20-180 KB po gzipie). Nicki nie są pobierane wcale, dopóki nie powstanie
-wyszukiwarka graczy.
+The level, profession, honor and activity filters are computed **exactly**, always, from
+a single `.f.json` (20-180 KB gzipped). Nicknames are not fetched at all until a player
+search exists.
 
-### `public/trends.json` — historia, nie migawka
+### `public/trends.json` — history, not a snapshot
 
-Zwinięta historia wszystkich światów, po jednej liczbie na migawkę zamiast setek tysięcy
-wierszy: 24 KB surowo, **9 KB po gzipie na komplet 202 migawek**. To **domyślna** ścieżka
-historii — dopóki filtr jest domyślny, widok rysuje wykresy wyłącznie z tego pliku i nie
-pobiera ani jednej migawki.
+The folded history of every world, one number per snapshot instead of hundreds of thousands
+of rows: 24 KB raw, **9 KB gzipped for all 202 snapshots**. This is the **default** history
+path — as long as the filter is at its defaults, the view draws its charts from this file
+alone and fetches no snapshot at all.
 
 ```json
 { "schema": 1, "builtAt": "...", "worlds": { "aether": {
   "id": [...], "startedAt": [...], "total": [39849, ...],
-  "act": [[<24h], [1-7 dni], [8-30 dni], [>30 dni], [nigdy]],
+  "act": [[<24h], [1-7 days], [8-30 days], [>30 days], [never]],
   "byProf": [[wojownik], ..., [łowca]], "suspect": [0, ...] } } }
 ```
 
-Kolumnowo, wiersz *i* każdej kolumny to ta sama migawka — ta sama konwencja, co para
-`.f.json`/`.n.json`. **Koszyki `act` są rozłączne**, więc „aktywni ≤7 dni” to suma dwóch
-pierwszych; `ACTIVITY_THRESHOLDS` w `history.js` robi to sumowanie i jest jedynym miejscem,
-gdzie wolno mieszać te dwie skale. Przebudowywany w całości przez `bun run rebuild` i na
-końcu każdej rundy scrapa; migawka bez `startedAt` wypada z niego, bo nie ma jej gdzie
-postawić na osi czasu.
+Columnar: row *i* of every column is the same snapshot — the same convention as the
+`.f.json`/`.n.json` pair. **The `act` buckets are disjoint**, so "active ≤7 days" is the
+sum of the first two; `ACTIVITY_THRESHOLDS` in `history.js` does that summing and is the
+only place allowed to mix the two scales. Rebuilt in full by `bun run rebuild` and at the
+end of every scrape round; a snapshot without `startedAt` drops out of it, because there is
+nowhere to put it on the time axis.
 
-Pełne uzasadnienie kształtu i pułapki metryki „ostatnio online”:
+The full reasoning behind its shape and the traps in the "last online" metric:
 [`docs/2026-08-04-spec-trends.md`](docs/2026-08-04-spec-trends.md).
 
-### Historia pod filtrem — druga ścieżka tych samych wykresów
+### History under a filter — the second path to the same charts
 
-Gdy filtr przestaje być domyślny, agregat przestaje wystarczać: `trends.json` zna tylko sumy
-globalne. Widok dociąga wtedy `.f.json` **tego jednego świata** (0,2-1,9 MB po gzipie),
-konwertuje je do tablic typowanych i liczy historię sam — dokładnie, bez koszykowania.
+Once the filter stops being the default one, the aggregate is no longer enough:
+`trends.json` knows only global totals. The view then fetches the `.f.json` files of
+**that one world** (0.2-1.9 MB gzipped), converts them to typed arrays and computes the
+history itself — exactly, with no bucketing.
 
-Sercem jest `summarizeFiltered` z `filters.js`: zwraca `{ total, act[5], byProf[6] }`, czyli
-**dokładnie kształt wiersza `trends.json`**. Dlatego `activeCounts`, `changeRows`, `summarize`
-i całe rysowanie nie odróżniają obu ścieżek i nie mają dla nich osobnego kodu. Przy filtrze
-domyślnym obie muszą dać co do liczby to samo, co `summarizeSnapshot` z `src/trends.ts` —
-sprawdza to test na wszystkich 202 migawkach (~0,9 s).
+The heart of it is `summarizeFiltered` from `filters.js`: it returns
+`{ total, act[5], byProf[6] }`, which is **exactly the shape of a `trends.json` row**. That
+is why `activeCounts`, `changeRows`, `summarize` and all the drawing cannot tell the two
+paths apart and have no separate code for them. Under the default filter both must produce
+number-for-number what `summarizeSnapshot` from `src/trends.ts` produces — a test checks
+that across all 202 snapshots (~0.9 s).
 
-Pułapki tej ścieżki:
+The traps on this path:
 
-- **`null` w `days` staje się `−1`** — tablice typowane nie umieją `null`-a. `−1 > maxDays`
-  jest **fałszem**, więc sprawdzenie `isNeverOnline` musi iść **przed** progiem, inaczej
-  konta nigdy nieużywane wpadną do każdego progu aktywności. Jedno miejsce: `shared.js`.
-- **Niewczytana migawka nie dostaje punktu.** Żadnej interpolacji, żadnego podstawiania
-  niefiltrowanej liczby z agregatu — dziura robi dłuższy odstęp, a `perDay` dzieli przez
-  realny czas, więc pozostaje uczciwy.
-- **Mianownikiem „udziału” jest populacja niefiltrowana**, nie przefiltrowany zbiór (ten
-  sumowałby się do 100%).
-- **Filtr aktywności zjada progi szersze od siebie** — przy „≤ 3 dni” próg „≤ 7 dni” liczy
-  tych samych graczy, co wykres pasujących. `usableThresholds` je usuwa.
-- Pamięć trzyma najwyżej **dwa światy**, a `HISTORY_WINDOW` (12) ogranicza liczbę migawek.
-  Dziś okno niczego nie ucina — najdłuższa historia ma 11 migawek.
-- **Pobieranie startuje wyłącznie zza debounce'a, i tylko raz na świat.** `loadHistory`
-  trzyma mapę `świat → Promise`; wywoływanie go z handlera `input` ciągnęło ten sam
-  komplet plików raz na każdy wciśnięty klawisz. Test liczy pobrania per adres.
-- **Podmiana `innerHTML` na `<select>` zeruje wybór** — przeglądarka ustawia pierwszą
-  opcję, nawet gdy poprzednia wartość nadal jest na liście. Wartość trzeba odczytać
-  **przed** podmianą. Atrapa DOM-u robi teraz to samo; wcześniej była łagodniejsza
-  i przez to ukrywała ten błąd.
+- **`null` in `days` becomes `−1`** — typed arrays cannot hold `null`. `−1 > maxDays` is
+  **false**, so the `isNeverOnline` check has to come **before** the threshold, otherwise
+  never-used accounts fall into every activity threshold. One place: `shared.js`.
+- **A snapshot that did not load gets no point.** No interpolation, no substituting the
+  unfiltered number from the aggregate — a hole makes a longer interval, and `perDay`
+  divides by real elapsed time, so it stays honest.
+- **The denominator of "share" is the unfiltered population**, not the filtered set (that
+  one would sum to 100%).
+- **The activity filter eats thresholds wider than itself** — at "≤ 3 days" the "≤ 7 days"
+  threshold counts the same players as the matches chart. `usableThresholds` removes them.
+- Memory holds at most **two worlds**, and `HISTORY_WINDOW` (12) caps the number of
+  snapshots. Today the window cuts nothing — the longest history has 11 snapshots.
+- **Fetching starts only from behind the debounce, and only once per world.**
+  `loadHistory` holds a `world → Promise` map; calling it from the `input` handler pulled
+  the same set of files once per keystroke. A test counts fetches per URL.
+- **Replacing the `innerHTML` of a `<select>` clears the selection** — the browser picks
+  the first option even when the previous value is still on the list. The value has to be
+  read **before** the replacement. The DOM stub now does the same; it used to be gentler
+  and that is what hid this bug.
 
-Pomiary, budżet transferu i uzasadnienie scalenia widoków:
+Measurements, the transfer budget and why the views were merged:
 [`docs/2026-08-04-spec-world-view.md`](docs/2026-08-04-spec-world-view.md).
-Osiem błędów, których nie łapało 165 testów: [`docs/2026-08-04-audit-3.md`](docs/2026-08-04-audit-3.md).
+Eight bugs that 165 tests did not catch:
+[`docs/2026-08-04-audit-3.md`](docs/2026-08-04-audit-3.md).
 
 ---
 
-## Dlaczego tak, a nie inaczej
+## Why this way and not another
 
-Decyzje, które wyglądają dziwnie, dopóki nie znasz powodu:
+Decisions that look odd until you know the reason:
 
-| Decyzja | Powód |
+| Decision | Reason |
 |---|---|
-| Migawka w dwóch plikach | Nicki to ~2/3 objętości, a filtrowaniu są zbędne. Podział ściął `public/` z 620 MB do 118 MB. |
-| `trends.json` liczy tylko to, co rysuje widok | Poprzedni moduł agregatów skasowano za pola bez konsumenta. Ten ma populację, aktywność i profesje — bez rozkładu poziomów (43× większy plik) i bez honoru, których widok historii nie czyta. |
-| Trendy w osobnym pliku, nie w manifeście | Manifest jest pobierany przy każdym wejściu, a historii bez filtra można nie rysować wcale. 9 KB dokładane wszystkim to koszt bez pokrycia. |
-| Jeden widok zamiast dwóch stron | Przekrój i historia pod tym samym filtrem to jedyne pytanie, na które nie dało się odpowiedzieć wcześniej. Przy okazji znikła duplikacja CSS i drugi stan URL. `trends.html` został przekierowaniem, żeby rozesłane linki działały. |
-| Wybór świata i licznik trafień w przyklejonym pasku | Od filtra do pierwszego wykresu historii było 961 px — więcej niż ekran, więc kontrolka i to, czym steruje, nigdy nie były widoczne naraz. Pasek trzyma **jedyny egzemplarz** obu, więc nie ma czego synchronizować. |
-| Pola filtrów jako szuflada `position: absolute` w pasku | Otwiera się tam, gdzie użytkownik patrzy — panel na górze dokumentu był po przewinięciu niewidoczny, więc przycisk „Filtry” nic nie dawał. Nie zajmuje miejsca w układzie, więc otwieranie i zamykanie **nie przesuwa strony**, a stan początkowy siedzi w markupie (`hidden`), nie w JS-ie po `fetch`ach. |
-| Dwie zmienne na obramowania: `--border` i `--border-strong` | Granice kontrolek i kart potrzebują 3:1 (WCAG 2.2 SC 1.4.11), rozdzielacze w tabeli nie. Jedna wspólna wartość dawała 1,48:1 i pole formularza nie odróżniało się od karty niczym. |
-| Chipy przewijane, nie przycinane | `overflow: hidden` przy 800 px zostawiało im zmierzone **0 px** — trzy chipy niewidoczne w całości, razem z krzyżykami. Przewijanie zostawia je osiągalne także tabulatorem. |
-| Historia dociągana leniwie, dopiero po ruchu filtrem | Filtr domyślny obsługuje `trends.json` za 9 KB. Kto nie filtruje, nie płaci za 1,9 MB gordiona. |
-| Filtrowanie u klienta zamiast prekompilowanego cube'a | Przelot po 813 tys. wierszy to 2,8-7 ms — koszykowanie kosztowałoby dokładność i nie objęłoby honoru (−35 .. 1,2 mln). |
-| Logika w `filters.js`/`history.js`, nie w `app.js` | `app.js` startuje widok od razu po imporcie, więc modułu z nim zszytego nie da się przetestować poza przeglądarką. Pilnuje tego test. |
-| Chart.js wendorowany | CDN bez SRI to zależność, której nikt nie kontroluje; lokalnie działa też offline. |
-| Retry per strona | Wcześniej cofał cały świat do strony 1 — dla gordiona (797 stron) do 4× po ~13 min. |
-| Wadliwe wiersze pomijane | Jeden dziwny wiersz nie może wywalać całego świata; przerywamy dopiero powyżej 1% na stronę. |
-| Strażnik zapisuje, nie odrzuca | Utrata całego runu boli bardziej niż migawka z ostrzeżeniem. |
-| `noUnusedLocals` włączone | Martwy kod przeżył tu już dwie przebudowy. |
-| Licencja rozdzielona: MIT na kod, osobna nota na dane | Licencji udziela się do tego, do czego ma się prawa. Baza rankingu jest Margonem, a nicki to dane osobowe — objęcie `public/worlds/` MIT-em byłoby oświadczeniem praw, których nie mamy, i zaproszeniem innych do tego, czego zakazuje `VII.2.k)`. |
-| Pełny tekst licencji Chart.js obok pliku, mimo banera w minifikacie | MIT wymaga noty w każdej kopii, a banery giną przy dalszej minifikacji. |
-| `LICENSE` to czysty MIT bez ani jednego dopisku o danych | GitHub rozpoznaje licencję przez podobieństwo do wzorca (próg ~98%) — dopisek o zakresie zmieniłby wykrytą licencję na „Other". Zakres jest w `DATA-NOTICE.md` i `README.md`. |
+| A snapshot in two files | Nicknames are ~2/3 of the volume and filtering has no use for them. The split cut `public/` from 620 MB to 118 MB. |
+| `trends.json` computes only what the view draws | The previous aggregate module was deleted for having fields with no consumer. This one has population, activity and professions — no level distribution (a 43× larger file) and no honor, neither of which the history view reads. |
+| Trends in their own file, not in the manifest | The manifest is fetched on every visit, and the history may never be drawn without a filter. 9 KB added for everyone is a cost with nothing behind it. |
+| One view instead of two pages | A snapshot and its history under the same filter is the one question that could not be answered before. The duplicated CSS and the second URL state went away with it. `trends.html` became a redirect so shared links keep working. |
+| World picker and match counter in the sticky bar | It was 961 px from the filter to the first history chart — more than a screen, so a control and the thing it controls were never visible at once. The bar holds the **only copy** of both, so there is nothing to keep in sync. |
+| The filter fields as a `position: absolute` drawer in the bar | It opens where the user is looking — a panel at the top of the document was off-screen after scrolling, so the "Filtry" button did nothing. It takes no space in the layout, so opening and closing **does not move the page**, and the initial state lives in the markup (`hidden`), not in JS after some `fetch`es. |
+| Two border variables: `--border` and `--border-strong` | The borders of controls and cards need 3:1 (WCAG 2.2 SC 1.4.11); dividers inside a table do not. One shared value gave 1.48:1 and a form field was indistinguishable from the card behind it. |
+| Chips scroll rather than get clipped | `overflow: hidden` at 800 px left them a measured **0 px** — three chips entirely invisible, their close buttons with them. Scrolling keeps them reachable by keyboard too. |
+| History fetched lazily, only after the filter moves | The default filter is served by `trends.json` for 9 KB. Whoever does not filter does not pay for gordion's 1.9 MB. |
+| Filtering on the client instead of a precomputed cube | A pass over 813k rows is 2.8-7 ms — bucketing would cost accuracy and would not cover honor at all (−35 .. 1.2M). |
+| The logic in `filters.js`/`history.js`, not in `app.js` | `app.js` starts the view immediately on import, so a module sewn to it cannot be tested outside a browser. A test holds this. |
+| Chart.js vendored | A CDN without SRI is a dependency nobody controls; locally it also works offline. |
+| Retry per page | It used to rewind the whole world to page 1 — for gordion (797 pages) up to 4× after ~13 min. |
+| Faulty rows skipped | One strange row must not take down an entire world; we abort only above 1% of a page. |
+| The guard writes rather than rejects | Losing a whole run hurts more than a snapshot with a warning. |
+| `noUnusedLocals` on | Dead code has already survived two rebuilds here. |
+| The licence split: MIT for the code, a separate notice for the data | You can only license what you have rights to. The ranking database is Margonem's and nicknames are personal data — putting `public/worlds/` under MIT would be claiming rights we do not have, and inviting others to do what `VII.2.k)` forbids. |
+| The full Chart.js licence text next to the file, despite the banner in the minified build | MIT requires the notice in every copy, and banners are lost on further minification. |
+| `LICENSE` is plain MIT with not a word about the data | GitHub detects a licence by similarity to a template (~98% threshold) — a note about scope would change the detected licence to "Other". The scope lives in `DATA-NOTICE.md` and `README.md`. |
 
-Pełne uzasadnienia i historia: audyty niżej.
+Full reasoning and history: the audits below.
 
 ---
 
-## Co czytać dalej
+## What to read next
 
-| Plik | Po co |
+| File | What for |
 |---|---|
-| [`docs/2026-08-01-audit.md`](docs/2026-08-01-audit.md) | Audyt #1: czy dane są prawdziwe (są — zweryfikowane wobec żywego rankingu), co było zepsute, co usunięte, czego brakuje. |
-| [`docs/2026-08-01-audit-2.md`](docs/2026-08-01-audit-2.md) | Audyt #2 po naprawach: co się obroniło, co poprawione, **dług na przyszłość i lista pomysłów**. |
-| [`docs/2026-08-01-size-budget.md`](docs/2026-08-01-size-budget.md) | Ile rund scrapa zostało do limitu 1 GB na Pages (~65 ≈ 2 lata) i co zrobić, gdy się skończy. |
-| [`docs/2026-08-04-spec-trends.md`](docs/2026-08-04-spec-trends.md) | Spec widoku trendów jednego świata w czasie: co pokazać, `trends.json` (**9,0 KB gzip na całą historię**), pułapki metryki „ostatnio online”. |
-| [`docs/2026-08-04-spec-world-view.md`](docs/2026-08-04-spec-world-view.md) | Spec scalenia `index.html` i `trends.html` w jeden widok per świat, z filtrowaniem **całej historii** u klienta: pomiary (**7 ms na 813 tys. wierszy**), leniwe pobieranie, pułapki i próg okna migawek. |
-| [`docs/2026-08-04-audit-3.md`](docs/2026-08-04-audit-3.md) | Audyt #3: **osiem błędów, których nie łapało 165 testów**, atrapa DOM-u łagodniejsza od przeglądarki, `Retry-After: 0`, nieatomowy zapis, walidacja CLI — plus dług i pomysły. |
-| [`docs/2026-08-04-spec-filter-bar.md`](docs/2026-08-04-spec-filter-bar.md) | Spec przypiętego paska filtrów: geometria strony (**2806 px**, filtr 961 px od pierwszego wykresu historii, **87% ekranu na telefonie**), warianty, badania i pułapki `position: sticky` w tym markupie. |
-| [`docs/2026-08-05-audit-ui-ux.md`](docs/2026-08-05-audit-ui-ux.md) | Audyt #4, pierwszy o **interfejsie**: kontrasty granic (było **1,48:1** przy progu 3:1), chipy ściskane do **0 px** między 721 a 1100 px, focus ginący przy Escape i przy krzyżyku, geometria zmierzona w przeglądarce. Metoda pomiaru, dług i trzy hipotezy obalone. |
-| [`DATA-NOTICE.md`](DATA-NOTICE.md) | **Czyje są dane i czego nie licencjonujemy.** Granica kod/dane, klauzule regulaminu Margonem (`XIX.2`, `XIX.4`, `VII.2.m)`, `VII.2.k)`), prawo sui generis do bazy, dane osobowe w `.n.json`, procedura usunięcia, zachowanie scrapera. |
-| [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) | Chart.js (rozpowszechniany — wymaga noty) vs zależności buildu; całe drzewo permisywne, bez copyleftu. |
-| [`README.md`](README.md) | Instrukcja obsługi dla człowieka. |
+| [`docs/2026-08-01-audit.md`](docs/2026-08-01-audit.md) | Audit #1: is the data real (it is — verified against the live ranking), what was broken, what was deleted, what is missing. |
+| [`docs/2026-08-01-audit-2.md`](docs/2026-08-01-audit-2.md) | Audit #2 after the fixes: what held up, what was corrected, **the debt ahead and a list of ideas**. |
+| [`docs/2026-08-01-size-budget.md`](docs/2026-08-01-size-budget.md) | How many scrape rounds are left before the 1 GB Pages limit (~65 ≈ 2 years) and what to do when they run out. |
+| [`docs/2026-08-04-spec-trends.md`](docs/2026-08-04-spec-trends.md) | The spec for one world's trends over time: what to show, `trends.json` (**9.0 KB gzip for the whole history**), the traps in the "last online" metric. |
+| [`docs/2026-08-04-spec-world-view.md`](docs/2026-08-04-spec-world-view.md) | The spec for merging `index.html` and `trends.html` into one view per world, filtering **the whole history** on the client: measurements (**7 ms over 813k rows**), lazy fetching, the traps and the snapshot-window threshold. |
+| [`docs/2026-08-04-audit-3.md`](docs/2026-08-04-audit-3.md) | Audit #3: **eight bugs that 165 tests did not catch**, a DOM stub gentler than a browser, `Retry-After: 0`, a non-atomic write, CLI validation — plus debt and ideas. |
+| [`docs/2026-08-04-spec-filter-bar.md`](docs/2026-08-04-spec-filter-bar.md) | The spec for the pinned filter bar: page geometry (**2806 px**, the filter 961 px from the first history chart, **87% of the screen on a phone**), the variants, the research and the traps of `position: sticky` in this markup. |
+| [`docs/2026-08-05-audit-ui-ux.md`](docs/2026-08-05-audit-ui-ux.md) | Audit #4, the first one about the **interface**: border contrast (it was **1.48:1** against a 3:1 threshold), chips squeezed to **0 px** between 721 and 1100 px, focus lost on Escape and on the close button, geometry measured in a browser. The measuring method, the debt and three hypotheses disproved. |
+| [`DATA-NOTICE.md`](DATA-NOTICE.md) | **Whose the data is and what we do not license.** The code/data boundary, the Margonem terms-of-service clauses (`XIX.2`, `XIX.4`, `VII.2.m)`, `VII.2.k)`), the sui generis database right, the personal data in `.n.json`, the removal procedure, how the scraper behaves. |
+| [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) | Chart.js (redistributed — needs a notice) vs the build dependencies; the whole tree is permissive, no copyleft. |
+| [`README.md`](README.md) | The manual, for a human. |
 
 ---
 
-## Zasady pracy w tym repo
+## How we work in this repo
 
-1. **Nie ufaj hipotezie — zmierz.** Przy audycie #2 „wykres jest nieczytelny przez poziom 1"
-   okazało się nieprawdą po jednym poleceniu. Dane leżą na dysku, sprawdzenie kosztuje sekundy.
-2. **Przed pełnym scrapem uruchom `bun run scrape:check`.** Margonem już raz zmienił układ
-   tabeli i scraper padał na wszystkich 20 światach, kończąc się kodem 0.
-3. **Nie pisz kodu na zapas.** Ten projekt skasował już stałą i cały moduł, które istniały
-   „na przyszłość”. Jeśli coś nie ma dziś konsumenta, opisz pomysł w `docs/` i nie commituj kodu.
-4. **Szanuj serwis.** 1 req/s to domyślny interwał; przy 400 ms ranking odpowiada `429`.
-   `robots.txt` nie zabrania `/ladder` (a `sitemap.xml` Margonem sam te ścieżki wypisuje),
-   ale to nie jest zaproszenie do dobijania. Nie podszywaj UA pod przeglądarkę —
-   `Mozilla/5.0 (margostat scraper)` mówi wprost, kto puka.
-5. **Dane w `public/worlds/` są nieodtwarzalne.** Ranking nie ma historii — czego nie
-   zescrapowaliśmy wtedy, tego nie da się dziś odzyskać. Migracje formatu rób bezstratnie
-   i weryfikuj wiersz po wierszu wobec oryginałów z gita.
-6. **Testy porównują z prawdą, nie z samymi sobą.** Parser jest sprawdzany na zrzucie
-   prawdziwej strony, filtry na próbce prawdziwej migawki w starym schemacie. Utrzymaj ten
-   układ — test, który sprawdza reimplementację samego siebie, niczego nie pilnuje.
-7. **Notatki i audyty trafiają do `docs/`**, wg schematu `RRRR-MM-DD-<temat>.md`, i są
-   dopisywane do tabeli w [`docs/README.md`](docs/README.md) oraz do „Co czytać dalej” wyżej.
-8. **Kod jest nasz, dane nie.** MIT z `LICENSE` obejmuje wyłącznie kod. Baza rankingu
-   należy do wydawcy Margonem (regulamin `XIX.2`/`VII.2.m)` + prawo sui generis do bazy
-   danych), a `.n.json` zawiera nicki, czyli dane osobowe. Nigdy nie obejmuj `public/worlds/`
-   ani `test/fixtures/` licencją open source, nie dopisuj im `CC-BY`/`ODbL` i nie zapraszaj
-   w README do komercyjnego użytku — to byłoby oświadczanie praw, których nie mamy.
-   Wszystko rozliczone w [`DATA-NOTICE.md`](DATA-NOTICE.md); zmieniasz zakres publikowanych
-   pól — zaktualizuj tam tabelę danych osobowych.
+1. **English everywhere except what a player reads.** The rule and its exceptions are in
+   "Language" above. Commit messages are English too — Conventional Commits,
+   `type(scope): effect`, and the header names the effect rather than the activity.
+2. **Do not trust a hypothesis — measure.** During audit #2, "the chart is unreadable
+   because of level 1" turned out to be false after a single command. The data is on disk;
+   checking costs seconds.
+3. **Run `bun run scrape:check` before a full scrape.** Margonem has already changed the
+   table layout once, and the scraper fell over on all 20 worlds while exiting with code 0.
+4. **Do not write code on spec.** This project has already deleted a constant and an entire
+   module that existed "for later". If something has no consumer today, describe the idea
+   in `docs/` and do not commit the code.
+5. **Respect the service.** 1 req/s is the default interval; at 400 ms the ranking answers
+   `429`. `robots.txt` does not forbid `/ladder` (and Margonem's own `sitemap.xml` lists
+   those paths), but that is not an invitation to hammer it. Do not disguise the UA as a
+   browser — `Mozilla/5.0 (margostat scraper)` says plainly who is knocking.
+6. **The data in `public/worlds/` cannot be reproduced.** The ranking has no history —
+   whatever we did not scrape back then cannot be recovered today. Make format migrations
+   lossless and verify them row by row against the originals in git.
+7. **Tests compare against the truth, not against themselves.** The parser is checked
+   against a capture of a real page, the filters against a sample of a real snapshot in the
+   old schema. Keep that arrangement — a test that checks a reimplementation of itself
+   holds nothing.
+8. **Notes and audits go to `docs/`**, named `YYYY-MM-DD-<topic>.md`, and are added to the
+   table in [`docs/README.md`](docs/README.md) as well as to "What to read next" above.
+9. **The code is ours, the data is not.** The MIT licence in `LICENSE` covers the code
+   only. The ranking database belongs to the publisher of Margonem (terms `XIX.2`/`VII.2.m)`
+   plus the sui generis database right), and `.n.json` contains nicknames, which are
+   personal data. Never put `public/worlds/` or `test/fixtures/` under an open-source
+   licence, never label them `CC-BY`/`ODbL`, and never invite commercial use in the README
+   — that would be claiming rights we do not have. It is all worked through in
+   [`DATA-NOTICE.md`](DATA-NOTICE.md); if you change which fields get published, update the
+   personal-data table there.
 
 ---
 
-## Czego tu nie ma (świadomie)
+## What is deliberately not here
 
-- **Wyszukiwarki gracza i progresji pojedynczej postaci** — mimo że dane leżą gotowe:
-  `.n.json` towarzyszy każdej migawce i nikt go dziś nie czyta. Uwaga: tę analizę przecina
-  „szew `charId`” z audytu #2 — trendy populacji nie, bo liczą ludzi, nie śledzą osób.
-- **Sum globalnych i zestawiania światów ze sobą** — `trends.json` ma na to komplet danych,
-  ale suma wywraca się na zmiennym zestawie światów (`luvia` istnieje tylko w ostatniej
-  rundzie i ma 41,3% online), a zestawienie wymaga normalizacji, bo gordion spłaszcza
-  brutala. Świadomie odłożone — patrz spec trendów.
-- **Automatycznego scrapa (cron)** — odpalany ręcznie, stąd nierówne odstępy 3-17 dni.
-- **37 światów legacy/prywatnych** — ranking wystawia ich łącznie ~57, śledzimy 21.
-- **Sprawdzania typów w `public/*.js`** — `checkJs` daje dziesiątki błędów typowania DOM-u,
-  nie realnych bugów; wymaga adnotacji JSDoc. Powód zapisany w `tsconfig.json`.
+- **A player search and single-character progression** — even though the data is sitting
+  ready: an `.n.json` accompanies every snapshot and nobody reads it today. Note that this
+  analysis is cut across by "the `charId` seam" from audit #2 — population trends are not,
+  because they count people rather than following individuals.
+- **Global totals and comparisons between worlds** — `trends.json` has all the data for it,
+  but a total falls apart on a changing set of worlds (`luvia` exists only in the last
+  round and is 41.3% online), and a comparison needs normalisation, because gordion
+  flattens brutal. Deliberately deferred — see the trends spec.
+- **An automated scrape (cron)** — it is run by hand, hence the uneven 3-17 day intervals.
+- **37 legacy/private worlds** — the ranking exposes ~57 in total; we track 21.
+- **Typechecking `public/*.js`** — `checkJs` produces dozens of DOM typing errors rather
+  than real bugs, and would need JSDoc annotations. The reason is recorded in
+  `tsconfig.json`.
