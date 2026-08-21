@@ -212,7 +212,6 @@ docs/                # audits and notes
 AGENTS.md            # the entry point for an AI agent
 CLAUDE.md            # a pointer to AGENTS.md
 LICENSE              # MIT — the code only
-THIRD-PARTY-NOTICES.md  # Chart.js, cheerio and the dependency tree
 ```
 
 ## Stack
@@ -228,7 +227,7 @@ what you have rights to, and the ranking database belongs to the publisher of Ma
 |---|---|
 | `src/`, `test/*.ts`, `public/*.html`, `public/*.js`, `docs/` | MIT — [`LICENSE`](LICENSE) |
 | `public/worlds/`, `manifest.json`, `trends.json`, `test/fixtures/` | **not open source** |
-| `public/vendor/` (Chart.js 4.4.7) | MIT — [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) |
+| `public/vendor/` (Chart.js 4.4.7) | MIT — [`public/vendor/LICENSE.chartjs`](public/vendor/LICENSE.chartjs) |
 
 Forking gets you the code. **The right to redistribute the data does not travel with the
 fork** — the ranking data is subject to Margonem's terms of service (`XIX.2` limits use to

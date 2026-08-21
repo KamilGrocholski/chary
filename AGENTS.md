@@ -85,7 +85,6 @@ docs/                audits and notes
 AGENTS.md            this file — the instructions for an agent
 CLAUDE.md            a pointer to AGENTS.md (Claude Code)
 LICENSE              MIT — covers the code ONLY, not the data
-THIRD-PARTY-NOTICES.md  Chart.js, cheerio, the dependency tree (all permissive)
 ```
 
 The code is ~4.4k lines including the tests. You can read all of it, and it is **worth**
@@ -266,7 +265,6 @@ Full reasoning and history: the audits below.
 | [`docs/2026-08-04-audit-3.md`](docs/2026-08-04-audit-3.md) | Audit #3: **eight bugs that 165 tests did not catch**, a DOM stub gentler than a browser, `Retry-After: 0`, a non-atomic write, CLI validation — plus debt and ideas. |
 | [`docs/2026-08-04-spec-filter-bar.md`](docs/2026-08-04-spec-filter-bar.md) | The spec for the pinned filter bar: page geometry (**2806 px**, the filter 961 px from the first history chart, **87% of the screen on a phone**), the variants, the research and the traps of `position: sticky` in this markup. |
 | [`docs/2026-08-05-audit-ui-ux.md`](docs/2026-08-05-audit-ui-ux.md) | Audit #4, the first one about the **interface**: border contrast (it was **1.48:1** against a 3:1 threshold), chips squeezed to **0 px** between 721 and 1100 px, focus lost on Escape and on the close button, geometry measured in a browser. The measuring method, the debt and three hypotheses disproved. |
-| [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) | Chart.js (redistributed — needs a notice) vs the build dependencies; the whole tree is permissive, no copyleft. |
 | [`README.md`](README.md) | The manual, for a human. |
 
 ---
