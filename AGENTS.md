@@ -85,7 +85,6 @@ docs/                audits and notes
 AGENTS.md            this file — the instructions for an agent
 CLAUDE.md            a pointer to AGENTS.md (Claude Code)
 LICENSE              MIT — covers the code ONLY, not the data
-DATA-NOTICE.md       the ranking data: whose it is, what we do not license, GDPR, removal
 THIRD-PARTY-NOTICES.md  Chart.js, cheerio, the dependency tree (all permissive)
 ```
 
@@ -249,7 +248,7 @@ Decisions that look odd until you know the reason:
 | `noUnusedLocals` on | Dead code has already survived two rebuilds here. |
 | The licence split: MIT for the code, a separate notice for the data | You can only license what you have rights to. The ranking database is Margonem's and nicknames are personal data — putting `public/worlds/` under MIT would be claiming rights we do not have, and inviting others to do what `VII.2.k)` forbids. |
 | The full Chart.js licence text next to the file, despite the banner in the minified build | MIT requires the notice in every copy, and banners are lost on further minification. |
-| `LICENSE` is plain MIT with not a word about the data | GitHub detects a licence by similarity to a template (~98% threshold) — a note about scope would change the detected licence to "Other". The scope lives in `DATA-NOTICE.md` and `README.md`. |
+| `LICENSE` is plain MIT with not a word about the data | GitHub detects a licence by similarity to a template (~98% threshold) — a note about scope would change the detected licence to "Other". The scope lives in `README.md`. |
 
 Full reasoning and history: the audits below.
 
@@ -267,7 +266,6 @@ Full reasoning and history: the audits below.
 | [`docs/2026-08-04-audit-3.md`](docs/2026-08-04-audit-3.md) | Audit #3: **eight bugs that 165 tests did not catch**, a DOM stub gentler than a browser, `Retry-After: 0`, a non-atomic write, CLI validation — plus debt and ideas. |
 | [`docs/2026-08-04-spec-filter-bar.md`](docs/2026-08-04-spec-filter-bar.md) | The spec for the pinned filter bar: page geometry (**2806 px**, the filter 961 px from the first history chart, **87% of the screen on a phone**), the variants, the research and the traps of `position: sticky` in this markup. |
 | [`docs/2026-08-05-audit-ui-ux.md`](docs/2026-08-05-audit-ui-ux.md) | Audit #4, the first one about the **interface**: border contrast (it was **1.48:1** against a 3:1 threshold), chips squeezed to **0 px** between 721 and 1100 px, focus lost on Escape and on the close button, geometry measured in a browser. The measuring method, the debt and three hypotheses disproved. |
-| [`DATA-NOTICE.md`](DATA-NOTICE.md) | **Whose the data is and what we do not license.** The code/data boundary, the Margonem terms-of-service clauses (`XIX.2`, `XIX.4`, `VII.2.m)`, `VII.2.k)`), the sui generis database right, the personal data in `.n.json`, the removal procedure, how the scraper behaves. |
 | [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) | Chart.js (redistributed — needs a notice) vs the build dependencies; the whole tree is permissive, no copyleft. |
 | [`README.md`](README.md) | The manual, for a human. |
 
@@ -305,9 +303,8 @@ Full reasoning and history: the audits below.
    plus the sui generis database right), and `.n.json` contains nicknames, which are
    personal data. Never put `public/worlds/` or `test/fixtures/` under an open-source
    licence, never label them `CC-BY`/`ODbL`, and never invite commercial use in the README
-   — that would be claiming rights we do not have. It is all worked through in
-   [`DATA-NOTICE.md`](DATA-NOTICE.md); if you change which fields get published, update the
-   personal-data table there.
+   — that would be claiming rights we do not have. If you change which fields get
+   published, weigh what personal data goes with them.
 
 ---
 

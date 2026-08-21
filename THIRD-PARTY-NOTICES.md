@@ -53,5 +53,6 @@ done | sed 's/.*: *"//;s/".*//' | sort -u
 ## The ranking data — this is not third-party code
 
 The contents of `public/worlds/`, `public/manifest.json`, `public/trends.json` and
-`test/fixtures/` come from margonem.pl and **are not** open-source software. They are
-governed by a separate document: [`DATA-NOTICE.md`](DATA-NOTICE.md).
+`test/fixtures/` come from margonem.pl and **are not** open-source software. The MIT licence
+in `LICENSE` does not cover them, and the right to redistribute them does not travel with a
+fork.

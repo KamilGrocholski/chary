@@ -212,7 +212,6 @@ docs/                # audits and notes
 AGENTS.md            # the entry point for an AI agent
 CLAUDE.md            # a pointer to AGENTS.md
 LICENSE              # MIT — the code only
-DATA-NOTICE.md       # the ranking data: whose it is, what I do not license, GDPR
 THIRD-PARTY-NOTICES.md  # Chart.js, cheerio and the dependency tree
 ```
 
@@ -228,15 +227,14 @@ what you have rights to, and the ranking database belongs to the publisher of Ma
 | What | On what terms |
 |---|---|
 | `src/`, `test/*.ts`, `public/*.html`, `public/*.js`, `docs/` | MIT — [`LICENSE`](LICENSE) |
-| `public/worlds/`, `manifest.json`, `trends.json`, `test/fixtures/` | **not open source** — [`DATA-NOTICE.md`](DATA-NOTICE.md) |
+| `public/worlds/`, `manifest.json`, `trends.json`, `test/fixtures/` | **not open source** |
 | `public/vendor/` (Chart.js 4.4.7) | MIT — [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) |
 
 Forking gets you the code. **The right to redistribute the data does not travel with the
 fork** — the ranking data is subject to Margonem's terms of service (`XIX.2` limits use to
 personal purposes, `VII.2.k)` forbids commercial use) and to the sui generis database right.
 The scraper honours `robots.txt`, 1 req/s and a self-identifying User-Agent; the `/ladder`
-paths are listed in Margonem's own `sitemap.xml`. The full account — what this is and what it
-is not, along with the personal data and **the procedure for removing a nickname on request** —
-is in [`DATA-NOTICE.md`](DATA-NOTICE.md).
+paths are listed in Margonem's own `sitemap.xml`. Nicknames are personal data — **to have
+one removed from the snapshots, write to mikololo26@gmail.com.**
 
 This project is not affiliated with or authorised by the publisher of Margonem.
