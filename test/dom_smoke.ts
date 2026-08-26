@@ -87,6 +87,12 @@ const failUrls = new Set<string>();
 // rather than taken from real data — in live data such a world exists only until the second
 // scrape (`luvia` had 1 snapshot, today it has 2), so a test tied to a particular world name
 // breaks on every `bun run scrape`.
+// Brutal is the cheapest world there is (20 KB a snapshot), so nothing in real data makes
+// the transfer budget cut inside a test. The stub overstates its price instead: at 300 KB a
+// snapshot exactly 6 of the 13 fit into HISTORY_BUDGET_BYTES, which exercises the cut
+// without pulling gordion's 900 KB files into the suite.
+const BRUTAL_BYTES = 300_000;
+
 const SMOKE_WORLD = "smoke-single";
 const SMOKE_ENTRY = {
   id: "smoke-only",
@@ -168,6 +174,7 @@ Object.assign(globalThis, {
     }
     if (url === "trends.json") {
       const trends = JSON.parse(await Bun.file(`public/${url}`).text());
+      trends.worlds.brutal.bytes = BRUTAL_BYTES;
       trends.worlds[SMOKE_WORLD] = {
         id: [SMOKE_ENTRY.id],
         startedAt: [SMOKE_ENTRY.startedAt],
@@ -175,6 +182,7 @@ Object.assign(globalThis, {
         act: [[1], [1], [0], [0], [1]],
         byProf: [[2], [1], [0], [0], [0], [0]],
         suspect: [0],
+        bytes: 1_000,
       };
       return { ok: true, status: 200, json: async () => trends };
     }
@@ -206,6 +214,12 @@ await waitFor(() => (charts.popChart?.data.datasets[0]?.data.length ?? 0) >= exp
 await new Promise((resolve) => setTimeout(resolve, 300));
 
 const text = (id: string) => nodes[id]!.innerHTML.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+// The ends of the time axis. They must not depend on how much of the history was fetched —
+// otherwise typing a level moves the left edge of the chart under the reader.
+const axis = (id: string) => ({
+  min: charts[id]?.options.scales.x.min ?? null,
+  max: charts[id]?.options.scales.x.max ?? null,
+});
 const chartShape = (id: string) => ({
   series: charts[id]?.data.datasets.length ?? 0,
   points: charts[id]?.data.datasets[0]?.data.length ?? 0,
@@ -353,8 +367,14 @@ if (scenario === "default") {
   // Switching worlds and an immediate burst of filter events — the worst realistic case:
   // the user picks a world and types a level threshold straight away. Each of those events
   // wants the history, and none of them may start a second fetch.
-  // One snapshot cannot be fetched — the incomplete-history path.
-  failUrls.add("worlds/brutal/2026-05-09T17-24-18.f.json");
+  // One snapshot cannot be fetched — the incomplete-history path. The second newest, by
+  // position rather than by name: a hard-coded date drifts out of the transfer budget with
+  // every scrape round, and the fetch that never happens cannot fail.
+  result.budgetInput = { bytesPerSnapshot: BRUTAL_BYTES };
+  const brutalFiles = JSON.parse(await Bun.file("public/manifest.json").text()).worlds.find(
+    (w: { name: string }) => w.name === "brutal",
+  ).files as { filters: string }[];
+  failUrls.add(brutalFiles.at(-2)!.filters);
 
   nodes.worldSelect!.value = "brutal";
   const switching = nodes.worldSelect!.handlers[0]!();
@@ -382,9 +402,24 @@ if (scenario === "default") {
     status: nodes.historyStatus!.textContent,
     noteHidden: nodes.partialNote!.hidden,
     note: text("partialNote"),
-    windowNoteHidden: nodes.windowNote!.hidden,
-    windowNote: text("windowNote"),
+    budgetNoteHidden: nodes.budgetNote!.hidden,
+    budgetNote: text("budgetNoteText"),
+    loadRestLabel: nodes.loadRestBtn!.textContent,
+    points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
+    axis: axis("popChart"),
     error: nodes.error!.textContent,
+  };
+
+  // Buying the rest by hand: the budget is lifted for this world and the snapshots it kept
+  // out are fetched. The one that answers 503 still cannot arrive.
+  nodes.loadRestBtn!.handlers[0]!();
+  await waitFor(() => !nodes.historyStatus!.textContent!.startsWith("wczytywanie"));
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  result.afterLoadRest = {
+    status: nodes.historyStatus!.textContent,
+    budgetNoteHidden: nodes.budgetNote!.hidden,
+    points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
+    axis: axis("popChart"),
   };
 
   // Back to the default filter: the history comes from the complete aggregate again, so the
@@ -394,8 +429,9 @@ if (scenario === "default") {
   result.afterReset = {
     status: nodes.historyStatus!.textContent,
     noteHidden: nodes.partialNote!.hidden,
-    windowNoteHidden: nodes.windowNote!.hidden,
+    budgetNoteHidden: nodes.budgetNote!.hidden,
     points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
+    axis: axis("popChart"),
   };
 
   // A snapshot that failed does not enter memory, so the next filter change retries it on

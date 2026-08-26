@@ -142,20 +142,47 @@ export function viewFromParams(params) {
 // ── Raw snapshots: conversion, memory, fetching ─────────────────────────────
 
 /**
- * How many of a world's snapshots we load by default.
+ * What one filtered world may cost over the wire, in gzipped bytes.
  *
- * The history grows by ~180 KB gzip per snapshot of the largest world, so without a ceiling
- * this view gets more expensive every round and nobody notices. Since the round of
- * 2026-08-26 the window does cut: brutal has 13 snapshots. What it cuts is said out loud —
- * `renderHistoryStatus` counts against every dated snapshot, not against the window, and
- * `#windowNote` names the ceiling. A trimmed chart is indistinguishable from a short
- * history, so silence here would be a lie.
+ * 2 MB is the worst case the world-view spec already weighed and accepted (gordion, 1.86 MB
+ * at the time). The history grows every round, so the ceiling has to be in the currency that
+ * grows with it — **bytes, not snapshots**. A count treats gordion (180 KB a snapshot) and
+ * brutal (19 KB) as the same purchase, which is how brutal came to be the one world trimmed:
+ * it had one extra snapshot from a single-world scrape, and trimming it saved 19 KB while
+ * gordion, the reason the ceiling exists at all, was untouched.
+ *
+ * Binary megabytes, because that is the unit the sizes next to it are quoted in.
+ */
+export const HISTORY_BUDGET_BYTES = 2 * 1024 * 1024;
+
+/**
+ * The fallback ceiling, used only when a world's snapshot size is unknown.
+ *
+ * `trends.json` and this script are separate files on Pages with separate cache lifetimes,
+ * so a fresh script meeting an aggregate built before `bytes` existed is a real state, not a
+ * hypothetical one. Falling back to "everything" there would hand somebody gordion's whole
+ * history without asking.
  */
 export const HISTORY_WINDOW = 12;
 
 /** The last `HISTORY_WINDOW` snapshots — the entries arrive sorted by `startedAt`. */
 export function windowedEntries(entries, size = HISTORY_WINDOW) {
   return entries.length <= size ? entries.slice() : entries.slice(entries.length - size);
+}
+
+/**
+ * The newest entries that fit into the transfer budget — the entries arrive sorted by
+ * `startedAt`.
+ *
+ * Two at the minimum, even when they do not fit: one point is not a trend, and a chart with
+ * a single dot answers nothing that the snapshot view above it does not already answer.
+ *
+ * @param {number} [bytesPerSnapshot] gzip size of one snapshot; 0 or missing = unknown
+ */
+export function budgetedEntries(entries, bytesPerSnapshot, budget = HISTORY_BUDGET_BYTES) {
+  if (!bytesPerSnapshot || bytesPerSnapshot <= 0) return windowedEntries(entries);
+  const fits = Math.max(2, Math.floor(budget / bytesPerSnapshot));
+  return windowedEntries(entries, fits);
 }
 
 /**

@@ -15,7 +15,6 @@ import {
   visibleActivityBuckets,
 } from "../public/filters.js";
 import { activityBucket, daysBetween, formatSnapshotDate, isNeverOnline } from "../public/shared.js";
-import { HISTORY_WINDOW } from "../public/history.js";
 import { stripComments } from "./source-text.ts";
 
 // The reference is a sample of a real snapshot in the old v1 schema
@@ -698,36 +697,60 @@ describe("the view comes together — a filter set", () => {
     const total = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.brutal
       .total.length;
 
-    // Since 2026-08-26 brutal has more snapshots than the window, so two different things
-    // are missing from the chart at once and the counter has to keep them apart: the window
-    // is a decision, a failed fetch is an accident. Either way it counts against every
-    // snapshot the world has — counting against the window would report a trimmed history
-    // as a complete one.
-    const drawn = Math.min(total, HISTORY_WINDOW);
-    const trimmed = drawn < total ? ` · okno: ostatnie ${drawn}` : "";
+    // The stub prices a brutal snapshot at 300 KB, so exactly 6 of them fit into the 2 MiB
+    // budget — a constant, however many snapshots brutal gains later. Two different things
+    // are then missing from the chart at once, and the counter has to keep them apart: the
+    // budget is a decision, a failed fetch is an accident. Either way it counts against
+    // every snapshot the world has, because counting against the budget would report a
+    // trimmed history as a complete one.
+    expect(out.budgetInput.bytesPerSnapshot).toBe(300_000);
+    const planned = 6;
 
     // A snapshot that did not arrive gets no point — and the view is to say so in the
     // HISTORIA section, not in the error bar 1500 px higher, which is about the snapshot
     // being cross-sectioned.
-    expect(out.partialHistory.status).toBe(`${drawn - 1} z ${total} migawek${trimmed} · 1 nie wczytano`);
+    expect(out.partialHistory.status).toBe(
+      `${planned - 1} z ${total} migawek · limit transferu 2,0 MB · 1 nie wczytano`,
+    );
+    expect(out.partialHistory.points).toBe(planned - 1);
     expect(out.partialHistory.noteHidden).toBe(false);
     expect(out.partialHistory.note).toContain("Historia jest niepełna");
     expect(out.partialHistory.error).toBe("");
 
-    expect(out.partialHistory.windowNoteHidden).toBe(drawn === total);
-    if (drawn < total) {
-      expect(out.partialHistory.windowNote).toContain(`przycięta do ostatnich ${drawn} migawek`);
-      expect(out.partialHistory.windowNote).toContain(`ma ich ${total}`);
-    }
+    // The budget names what it left out and what the rest costs — a trimmed chart is
+    // indistinguishable from a world with a shorter history.
+    expect(out.partialHistory.budgetNoteHidden).toBe(false);
+    expect(out.partialHistory.budgetNote).toContain(`sięga ${planned} najnowszych migawek z ${total}`);
+    expect(out.partialHistory.loadRestLabel).toMatch(/^Dociągnij resztę historii \(\+[\d, ]+ MB\)$/);
+
+    // Pressing the button buys the rest: every snapshot is fetched, the note has nothing
+    // left to say, and the one that answers 503 is still the only point missing.
+    expect(out.afterLoadRest).toEqual({
+      status: `${total - 1} z ${total} migawek · 1 nie wczytano`,
+      budgetNoteHidden: true,
+      points: total - 1,
+      axis: out.partialHistory.axis,
+    });
+
+    // The axis spans the world's whole history in all three states — that is the invariant
+    // the budget must not touch: filtering may take away points, never the period the chart
+    // describes. Compared against trends.json, so "equal to each other" cannot pass by all
+    // three being empty.
+    const brutal = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.brutal;
+    expect(out.partialHistory.axis).toEqual({
+      min: new Date(brutal.startedAt[0]).getTime(),
+      max: new Date(brutal.startedAt.at(-1)).getTime(),
+    });
 
     // Back at the default filter, the history comes from the complete aggregate — the whole
-    // of it, window or no window. The failure counter and the trimming note from the
-    // previous filter have no business still describing it.
+    // of it, budget or no budget. The failure counter and the budget note from the previous
+    // filter have no business still describing it.
     expect(out.afterReset).toEqual({
       status: `${total} migawek`,
       noteHidden: true,
-      windowNoteHidden: true,
+      budgetNoteHidden: true,
       points: total,
+      axis: out.partialHistory.axis,
     });
   });
 

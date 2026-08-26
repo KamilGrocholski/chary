@@ -346,6 +346,13 @@
       align-items: flex-start;
     }
     .note b { color: var(--text); }
+    /* A note can carry an action (#loadRestBtn). Without `wrap` and a basis on the text, the
+       flex row keeps the button beside a paragraph squeezed to a column — the way the chips
+       were squeezed to 0 px before audit #4. Below ~430 px of note the button takes its own
+       line instead. `width: auto` because the default button is full-width by design. */
+    .note { flex-wrap: wrap; }
+    .note button { width: auto; align-self: flex-start; }
+    #budgetNoteText { flex: 1 1 260px; }
     .note.warn { border-color: var(--warn); }
     .note.warn b { color: var(--warn); }
     .suspect {
@@ -565,7 +572,11 @@
 
     <div id="partialNote" class="note card" role="status" hidden></div>
 
-    <div id="windowNote" class="note card" role="status" hidden></div>
+    <div id="budgetNote" class="note card" role="status" hidden>
+      <span aria-hidden="true">ℹ</span>
+      <span id="budgetNoteText"></span>
+      <button id="loadRestBtn" class="reset-btn" type="button">Dociągnij resztę historii</button>
+    </div>
 
     <div id="suspectNote" class="note card warn" role="status" hidden>
       <span aria-hidden="true">⚠</span>

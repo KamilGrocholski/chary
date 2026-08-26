@@ -7,8 +7,10 @@ import { emptyFilters, summarizeFiltered } from "../public/filters.js";
 import {
   ACTIVITY_THRESHOLDS,
   DEFAULT_THRESHOLD,
+  HISTORY_BUDGET_BYTES,
   HISTORY_WINDOW,
   activeCounts,
+  budgetedEntries,
   buildFilteredTrend,
   cachedSnapshots,
   changeRows,
@@ -137,7 +139,7 @@ const trends = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, "trends.json")).t
 
 describe("the published trends.json", () => {
   test("covers every world in the manifest, snapshot by snapshot", () => {
-    expect(trends.schema).toBe(1);
+    expect(trends.schema).toBe(2);
     expect(Object.keys(trends.worlds)).toHaveLength(manifest.worlds.length);
 
     for (const world of manifest.worlds) {
@@ -145,6 +147,19 @@ describe("the published trends.json", () => {
       const dated = world.files.filter((f: { startedAt?: string }) => f.startedAt);
       expect(trend.id).toEqual(dated.map((f: { id: string }) => f.id));
       expect(trend.startedAt).toEqual(dated.map((f: { startedAt: string }) => f.startedAt));
+    }
+  });
+
+  test("every world carries the gzip size of its newest snapshot", async () => {
+    // The transfer budget spends this number, so a wrong one buys either too much or too
+    // little. Measured here from the file rather than copied from the builder — the same
+    // compression the browser is served by GitHub Pages.
+    for (const world of manifest.worlds) {
+      const trend = trends.worlds[world.name];
+      const newest = world.files.filter((f: { startedAt?: string }) => f.startedAt).at(-1);
+      const raw = await Bun.file(path.join(PUBLIC_DIR, newest.filters)).arrayBuffer();
+      expect(trend.bytes).toBe(Bun.gzipSync(new Uint8Array(raw)).length);
+      expect(trend.bytes).toBeGreaterThan(0);
     }
   });
 
@@ -423,14 +438,51 @@ describe("the snapshot window", () => {
     expect(windowedEntries(entries.slice(0, 5), 5)).toHaveLength(5);
   });
 
-  test("what the view draws is what the window leaves of the real history", () => {
-    // Until the round of 2026-08-26 the window cut nothing — the longest history was 11
-    // snapshots against a window of 12. Now brutal has 13, so the chart really does drop
-    // its oldest point, and the only thing between that and a lie is the "N of M" counter
-    // plus #windowNote. dashboard.test.ts holds that end; this one holds the arithmetic.
-    const longest = Math.max(...(Object.values(trends.worlds) as any[]).map((t) => t.id.length));
-    const real = Array.from({ length: longest }, (_, i) => ({ id: `s${i}` }));
-    expect(windowedEntries(real)).toHaveLength(Math.min(longest, HISTORY_WINDOW));
+  test("an unknown size falls back to the count, rather than to everything", () => {
+    // `trends.json` and `history.js` are separate files on Pages with separate cache
+    // lifetimes, so a fresh script can meet an aggregate built before `bytes` existed.
+    // Treating that as "free" would hand somebody gordion's whole history unasked.
+    expect(budgetedEntries(entries, 0)).toHaveLength(HISTORY_WINDOW);
+    expect(budgetedEntries(entries, undefined)).toHaveLength(HISTORY_WINDOW);
+  });
+});
+
+describe("the transfer budget", () => {
+  const entries = Array.from({ length: 20 }, (_, i) => ({ id: `s${i}` }));
+
+  test("buys the newest snapshots it can afford", () => {
+    // 200 KB apiece against 2 MiB: ten fit, and they are the ten newest.
+    const picked = budgetedEntries(entries, 200 * 1024);
+    expect(picked).toHaveLength(10);
+    expect(picked.at(-1)).toEqual({ id: "s19" });
+    expect(picked[0]).toEqual({ id: "s10" });
+  });
+
+  test("a cheap world is never trimmed", () => {
+    // Brutal, priced as it really is: the whole history costs less than the budget.
+    expect(budgetedEntries(entries, 20 * 1024)).toHaveLength(20);
+  });
+
+  test("two points at the minimum, even when they do not fit", () => {
+    // One dot is not a trend, and the snapshot view above already answers "how many are
+    // there now". A single snapshot too big for the budget would leave the chart saying
+    // nothing at all.
+    expect(budgetedEntries(entries, 5 * 1024 * 1024)).toHaveLength(2);
+  });
+
+  test("the ceiling falls on the world that actually costs something", () => {
+    // The point of the whole thing, against real sizes: gordion is trimmed, brutal is not,
+    // even though brutal has MORE snapshots. A count-based window did the exact opposite.
+    const fits = (world: string) =>
+      budgetedEntries(
+        trends.worlds[world].id.map((id: string) => ({ id })),
+        trends.worlds[world].bytes,
+      ).length;
+
+    expect(trends.worlds.brutal.id.length).toBeGreaterThanOrEqual(trends.worlds.gordion.id.length);
+    expect(fits("gordion")).toBeLessThan(trends.worlds.gordion.id.length);
+    expect(fits("brutal")).toBe(trends.worlds.brutal.id.length);
+    expect(trends.worlds.gordion.bytes * fits("gordion")).toBeLessThanOrEqual(HISTORY_BUDGET_BYTES);
   });
 });
 

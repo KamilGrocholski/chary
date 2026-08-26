@@ -14,7 +14,7 @@ import { writeAtomic } from "./atomic.ts";
 // Its predecessor, `src/aggregate.ts`, was deleted for exactly that — producing fields
 // with no consumer. See docs/2026-08-04-spec-trends.md.
 
-export const TRENDS_SCHEMA = 1;
+export const TRENDS_SCHEMA = 2;
 export const TRENDS_FILE = path.join(PUBLIC_DIR, "trends.json");
 
 /**
@@ -70,6 +70,18 @@ export type WorldTrend = {
   act: number[][];
   byProf: number[][];
   suspect: number[];
+  /**
+   * What one of this world's snapshots costs over the wire: the gzip size of the newest
+   * `.f.json`, in bytes. The history view spends its transfer budget in this currency, so
+   * the ceiling falls on gordion (180 KB a snapshot) rather than on brutal (19 KB).
+   *
+   * One number per world, not per snapshot: per-snapshot sizes in the manifest measured
+   * 5835 → 7164 B gzip, i.e. +1.3 KB on every visit for everyone — and within a world the
+   * sizes barely move (gordion 177-185 KB), so count × this is accurate enough to choose a
+   * count. The raw size will not do instead: the gzip ratio is 4.18 for brutal and 4.85 for
+   * gordion, so a constant would misjudge one of them by 15%.
+   */
+  bytes: number;
 };
 
 export type Trends = {
@@ -84,7 +96,9 @@ export type Trends = {
  * time axis. How many dropped out is reported by `rebuildTrends` — losing data silently is
  * not allowed.
  */
-export function buildWorldTrend(snapshots: { id: string; filters: FilterFile }[]): WorldTrend {
+export function buildWorldTrend(snapshots: { id: string; filters: FilterFile }[], bytes = 0): WorldTrend {
+  // `bytes` is filled in by `rebuildTrends`, which is the only place that knows the files
+  // themselves rather than their parsed contents.
   const trend: WorldTrend = {
     id: [],
     startedAt: [],
@@ -92,6 +106,9 @@ export function buildWorldTrend(snapshots: { id: string; filters: FilterFile }[]
     act: [[], [], [], [], []],
     byProf: [[], [], [], [], [], []],
     suspect: [],
+    // 0 means "not measured". The client reads it as unknown and falls back to a count,
+    // rather than treating a world as free and pulling its whole history.
+    bytes,
   };
 
   const dated = snapshots.filter((s) => typeof s.filters.startedAt === "string" && s.filters.startedAt !== "");
@@ -108,6 +125,11 @@ export function buildWorldTrend(snapshots: { id: string; filters: FilterFile }[]
   }
 
   return trend;
+}
+
+/** The size the browser actually downloads — GitHub Pages serves these files gzipped. */
+function gzipSize(bytes: ArrayBuffer): number {
+  return Bun.gzipSync(new Uint8Array(bytes)).length;
 }
 
 /**
@@ -146,7 +168,12 @@ export async function rebuildTrends(): Promise<{ trends: Trends; skipped: number
     const trend = buildWorldTrend(snapshots);
     skipped += snapshots.length - trend.id.length;
     // A world without a single dated snapshot would have nothing to show on a time axis.
-    if (trend.id.length > 0) worlds[world] = trend;
+    if (trend.id.length === 0) continue;
+
+    // What the next snapshot of this world will cost the client. Only the newest file is
+    // compressed — 21 of them instead of 244, and within one world the sizes barely move.
+    trend.bytes = gzipSize(await Bun.file(path.join(dir, `${trend.id.at(-1)}.f.json`)).arrayBuffer());
+    worlds[world] = trend;
   }
 
   const trends: Trends = { schema: TRENDS_SCHEMA, builtAt: new Date().toISOString(), worlds };

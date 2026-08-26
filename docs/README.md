@@ -16,6 +16,7 @@ Starting work on the project? Read [`../AGENTS.md`](../AGENTS.md) first, not thi
 | [`2026-08-04-audit-3.md`](2026-08-04-audit-3.md) | Audit #3 after the views were merged: **eight bugs that 165 tests did not catch**, a DOM stub gentler than a browser, the debt and a list of ideas. |
 | [`2026-08-04-spec-filter-bar.md`](2026-08-04-spec-filter-bar.md) | The spec for the pinned filter bar: the page is **2806 px**, and on a phone the panel eats **87% of the first screen**. The variants, the research (NN/g, Baymard) and examples from other sites. |
 | [`2026-08-05-audit-ui-ux.md`](2026-08-05-audit-ui-ux.md) | Audit #4, the first one about the interface: the borders of controls measured **1.48:1** against a 3:1 threshold, chips vanished to **0 px** in the 721-1100 px band, focus was lost on Escape and on a chip's close button. Plus three hypotheses disproved by measurement. |
+| [`2026-08-26-spec-history-budget.md`](2026-08-26-spec-history-budget.md) | The ceiling on a filtered history in **bytes instead of snapshots**: a count priced gordion (177 KB a snapshot) like brutal (20 KB) and trimmed the wrong one. The budget, where the size comes from, and why the time axis belongs to the aggregate. |
 
 Filenames: `YYYY-MM-DD-<topic>.md`. Add a new note to the table above **and** to the "What
 to read next" section in [`../AGENTS.md`](../AGENTS.md) — otherwise nobody will find it.
