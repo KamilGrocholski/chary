@@ -16,8 +16,9 @@ snapshots to static JSON files, and lets you browse and filter them with no back
 - **Repo:** `git@github.com:KamilGrocholski/chary.git` — note that the repository is called
   `chary` even though the package and the project are `margostat`. That is not a mistake.
 - **Data source:** `https://www.margonem.pl/ladder/<world>/players?page=N`
-- **State:** 202 snapshots from 21 worlds, 11 rounds since 2026-04-17, ~586k players per
-  round, `public/` 137 MB.
+- **State:** 244 snapshots from 21 worlds, 13 rounds since 2026-04-17, ~593k players per
+  round, `public/` 173 MB. `brutal` (13 snapshots) is the first world past `HISTORY_WINDOW`,
+  so the history under a filter is trimmed there and says so — see the traps below.
 
 ---
 
@@ -69,7 +70,7 @@ public/              exactly what lands on GitHub Pages
   vendor/            Chart.js 4.4.7 locally, no CDN + LICENSE.chartjs
   trends.html        redirect to index.html, preserving the query string
   manifest.json      the snapshot index
-  trends.json        the folded history of every world (24 KB, 9 KB gzipped)
+  trends.json        the folded history of every world (28 KB, 11 KB gzipped)
   worlds/<world>/    <id>.f.json + <id>.n.json
 test/
   parser.test.ts     the parser against a capture of a real ranking page
@@ -159,7 +160,7 @@ search exists.
 ### `public/trends.json` — history, not a snapshot
 
 The folded history of every world, one number per snapshot instead of hundreds of thousands
-of rows: 24 KB raw, **9 KB gzipped for all 202 snapshots**. This is the **default** history
+of rows: 28 KB raw, **11 KB gzipped for all 244 snapshots**. This is the **default** history
 path — as long as the filter is at its defaults, the view draws its charts from this file
 alone and fetches no snapshot at all.
 
@@ -184,7 +185,7 @@ The full reasoning behind its shape and the traps in the "last online" metric:
 
 Once the filter stops being the default one, the aggregate is no longer enough:
 `trends.json` knows only global totals. The view then fetches the `.f.json` files of
-**that one world** (0.2-1.9 MB gzipped), converts them to typed arrays and computes the
+**that one world** (0.2-2.2 MB gzipped), converts them to typed arrays and computes the
 history itself — exactly, with no bucketing.
 
 The heart of it is `summarizeFiltered` from `filters.js`: it returns
@@ -192,7 +193,7 @@ The heart of it is `summarizeFiltered` from `filters.js`: it returns
 is why `activeCounts`, `changeRows`, `summarize` and all the drawing cannot tell the two
 paths apart and have no separate code for them. Under the default filter both must produce
 number-for-number what `summarizeSnapshot` from `src/trends.ts` produces — a test checks
-that across all 202 snapshots (~0.9 s).
+that across all 244 snapshots (~1.5 s).
 
 The traps on this path:
 
@@ -207,7 +208,11 @@ The traps on this path:
 - **The activity filter eats thresholds wider than itself** — at "≤ 3 days" the "≤ 7 days"
   threshold counts the same players as the matches chart. `usableThresholds` removes them.
 - Memory holds at most **two worlds**, and `HISTORY_WINDOW` (12) caps the number of
-  snapshots. Today the window cuts nothing — the longest history has 11 snapshots.
+  snapshots. **Since the round of 2026-08-26 that cap cuts**: brutal has 13. What it cuts is
+  said out loud — the counter counts against every dated snapshot of the world (`11 z 13
+  migawek · okno: ostatnie 12`), never against the window, and `#windowNote` names the
+  ceiling. The default filter is untouched by it: that path draws the whole aggregate, so
+  the same world has more points without a filter than with one.
 - **Fetching starts only from behind the debounce, and only once per world.**
   `loadHistory` holds a `world → Promise` map; calling it from the `input` handler pulled
   the same set of files once per keystroke. A test counts fetches per URL.
@@ -231,13 +236,14 @@ Decisions that look odd until you know the reason:
 |---|---|
 | A snapshot in two files | Nicknames are ~2/3 of the volume and filtering has no use for them. The split cut `public/` from 620 MB to 118 MB. |
 | `trends.json` computes only what the view draws | The previous aggregate module was deleted for having fields with no consumer. This one has population, activity and professions — no level distribution (a 43× larger file) and no honor, neither of which the history view reads. |
-| Trends in their own file, not in the manifest | The manifest is fetched on every visit, and the history may never be drawn without a filter. 9 KB added for everyone is a cost with nothing behind it. |
+| Trends in their own file, not in the manifest | The manifest is fetched on every visit, and the history may never be drawn without a filter. 11 KB added for everyone is a cost with nothing behind it. |
 | One view instead of two pages | A snapshot and its history under the same filter is the one question that could not be answered before. The duplicated CSS and the second URL state went away with it. `trends.html` became a redirect so shared links keep working. |
 | World picker and match counter in the sticky bar | It was 961 px from the filter to the first history chart — more than a screen, so a control and the thing it controls were never visible at once. The bar holds the **only copy** of both, so there is nothing to keep in sync. |
 | The filter fields as a `position: absolute` drawer in the bar | It opens where the user is looking — a panel at the top of the document was off-screen after scrolling, so the "Filtry" button did nothing. It takes no space in the layout, so opening and closing **does not move the page**, and the initial state lives in the markup (`hidden`), not in JS after some `fetch`es. |
 | Two border variables: `--border` and `--border-strong` | The borders of controls and cards need 3:1 (WCAG 2.2 SC 1.4.11); dividers inside a table do not. One shared value gave 1.48:1 and a form field was indistinguishable from the card behind it. |
 | Chips scroll rather than get clipped | `overflow: hidden` at 800 px left them a measured **0 px** — three chips entirely invisible, their close buttons with them. Scrolling keeps them reachable by keyboard too. |
-| History fetched lazily, only after the filter moves | The default filter is served by `trends.json` for 9 KB. Whoever does not filter does not pay for gordion's 1.9 MB. |
+| History fetched lazily, only after the filter moves | The default filter is served by `trends.json` for 11 KB. Whoever does not filter does not pay for gordion's 2.2 MB. |
+| The history counter counts against every snapshot, not against the window | The window started cutting in the round of 2026-08-26, and a trimmed chart is indistinguishable from a world with a short history. `11 z 13 migawek · okno: ostatnie 12 · 1 nie wczytano` keeps the ceiling and the failed fetch apart, and `#windowNote` says it in a sentence. Counting against the window would have reported 12 of 13 as the complete set. |
 | Filtering on the client instead of a precomputed cube | A pass over 813k rows is 2.8-7 ms — bucketing would cost accuracy and would not cover honor at all (−35 .. 1.2M). |
 | The logic in `filters.js`/`history.js`, not in `app.js` | `app.js` starts the view immediately on import, so a module sewn to it cannot be tested outside a browser. A test holds this. |
 | Chart.js vendored | A CDN without SRI is a dependency nobody controls; locally it also works offline. |
@@ -303,6 +309,18 @@ Full reasoning and history: the audits below.
    licence, never label them `CC-BY`/`ODbL`, and never invite commercial use in the README
    — that would be claiming rights we do not have. If you change which fields get
    published, weigh what personal data goes with them.
+10. **After a scrape round, refresh the numbers in this file.** Every round makes the
+    "State" line, the `trends.json` sizes and the per-world history figures wrong by one
+    round, and a stale number here is read as a measured one — the last drift went unnoticed
+    for two rounds. Each is one command:
+    ```bash
+    ls public/worlds/*/*.f.json | wc -l    # snapshots
+    du -sh public                          # the Pages artifact against the 1 GB limit
+    gzip -c public/trends.json | wc -c     # what every visitor downloads
+    ```
+    The number of rounds is the longest history — the largest `worlds.<w>.id.length` in
+    `trends.json`. The tests read their figures from `public/` and so move with the data on
+    their own; this file does not.
 
 ---
 
@@ -316,6 +334,12 @@ Full reasoning and history: the audits below.
   but a total falls apart on a changing set of worlds (`luvia` exists only in the last
   round and is 41.3% online), and a comparison needs normalisation, because gordion
   flattens brutal. Deliberately deferred — see the trends spec.
+- **A "load the whole history" button**, even though `HISTORY_WINDOW` now cuts. It cuts
+  `brutal` alone, and brutal is the cheapest world there is: 19 KB gzip per snapshot, 258 KB
+  for all 13. The button starts being worth its code the round **gordion** crosses the
+  window — 180 KB per snapshot, 2.2 MB for the 12 it has today — because that is the first
+  time the ceiling saves anybody a download worth the name. Until then the counter and
+  `#windowNote` say what is missing, which is what the spec asks of them.
 - **An automated scrape (cron)** — it is run by hand, hence the uneven 3-17 day intervals.
 - **37 legacy/private worlds** — the ranking exposes ~57 in total; we track 21.
 - **Typechecking `public/*.js`** — `checkJs` produces dozens of DOM typing errors rather

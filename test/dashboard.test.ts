@@ -15,6 +15,7 @@ import {
   visibleActivityBuckets,
 } from "../public/filters.js";
 import { activityBucket, daysBetween, formatSnapshotDate, isNeverOnline } from "../public/shared.js";
+import { HISTORY_WINDOW } from "../public/history.js";
 import { stripComments } from "./source-text.ts";
 
 // The reference is a sample of a real snapshot in the old v1 schema
@@ -697,17 +698,37 @@ describe("the view comes together — a filter set", () => {
     const total = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.brutal
       .total.length;
 
+    // Since 2026-08-26 brutal has more snapshots than the window, so two different things
+    // are missing from the chart at once and the counter has to keep them apart: the window
+    // is a decision, a failed fetch is an accident. Either way it counts against every
+    // snapshot the world has — counting against the window would report a trimmed history
+    // as a complete one.
+    const drawn = Math.min(total, HISTORY_WINDOW);
+    const trimmed = drawn < total ? ` · okno: ostatnie ${drawn}` : "";
+
     // A snapshot that did not arrive gets no point — and the view is to say so in the
     // HISTORIA section, not in the error bar 1500 px higher, which is about the snapshot
     // being cross-sectioned.
-    expect(out.partialHistory.status).toBe(`${total - 1} z ${total} migawek · 1 nie wczytano`);
+    expect(out.partialHistory.status).toBe(`${drawn - 1} z ${total} migawek${trimmed} · 1 nie wczytano`);
     expect(out.partialHistory.noteHidden).toBe(false);
     expect(out.partialHistory.note).toContain("Historia jest niepełna");
     expect(out.partialHistory.error).toBe("");
 
-    // Back at the default filter, the history comes from the complete aggregate. The
-    // failure counter from the previous filter has no business still describing it.
-    expect(out.afterReset).toEqual({ status: `${total} migawek`, noteHidden: true, points: total });
+    expect(out.partialHistory.windowNoteHidden).toBe(drawn === total);
+    if (drawn < total) {
+      expect(out.partialHistory.windowNote).toContain(`przycięta do ostatnich ${drawn} migawek`);
+      expect(out.partialHistory.windowNote).toContain(`ma ich ${total}`);
+    }
+
+    // Back at the default filter, the history comes from the complete aggregate — the whole
+    // of it, window or no window. The failure counter and the trimming note from the
+    // previous filter have no business still describing it.
+    expect(out.afterReset).toEqual({
+      status: `${total} migawek`,
+      noteHidden: true,
+      windowNoteHidden: true,
+      points: total,
+    });
   });
 
   test("the chosen threshold survives a rebuild of the option list", () => {

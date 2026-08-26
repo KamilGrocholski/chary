@@ -144,10 +144,12 @@ export function viewFromParams(params) {
 /**
  * How many of a world's snapshots we load by default.
  *
- * The history grows by ~185 KB gzip per snapshot of the largest world, so without a ceiling
- * this view gets more expensive every round and nobody notices. Today the longest history
- * has 11 snapshots, so the window cuts nothing yet — but when it starts to, the user is to
- * see it in the "N of M" counter rather than guess.
+ * The history grows by ~180 KB gzip per snapshot of the largest world, so without a ceiling
+ * this view gets more expensive every round and nobody notices. Since the round of
+ * 2026-08-26 the window does cut: brutal has 13 snapshots. What it cuts is said out loud —
+ * `renderHistoryStatus` counts against every dated snapshot, not against the window, and
+ * `#windowNote` names the ceiling. A trimmed chart is indistinguishable from a short
+ * history, so silence here would be a lie.
  */
 export const HISTORY_WINDOW = 12;
 

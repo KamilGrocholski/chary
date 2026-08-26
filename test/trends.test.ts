@@ -423,11 +423,14 @@ describe("the snapshot window", () => {
     expect(windowedEntries(entries.slice(0, 5), 5)).toHaveLength(5);
   });
 
-  test("the default window is wider than today's longest history", () => {
-    // When it stops being so, the "N of M" counter is to show it rather than silently
-    // truncating the chart.
+  test("what the view draws is what the window leaves of the real history", () => {
+    // Until the round of 2026-08-26 the window cut nothing — the longest history was 11
+    // snapshots against a window of 12. Now brutal has 13, so the chart really does drop
+    // its oldest point, and the only thing between that and a lie is the "N of M" counter
+    // plus #windowNote. dashboard.test.ts holds that end; this one holds the arithmetic.
     const longest = Math.max(...(Object.values(trends.worlds) as any[]).map((t) => t.id.length));
-    expect(HISTORY_WINDOW).toBeGreaterThanOrEqual(longest);
+    const real = Array.from({ length: longest }, (_, i) => ({ id: `s${i}` }));
+    expect(windowedEntries(real)).toHaveLength(Math.min(longest, HISTORY_WINDOW));
   });
 });
 

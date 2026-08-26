@@ -382,6 +382,8 @@ if (scenario === "default") {
     status: nodes.historyStatus!.textContent,
     noteHidden: nodes.partialNote!.hidden,
     note: text("partialNote"),
+    windowNoteHidden: nodes.windowNote!.hidden,
+    windowNote: text("windowNote"),
     error: nodes.error!.textContent,
   };
 
@@ -392,6 +394,7 @@ if (scenario === "default") {
   result.afterReset = {
     status: nodes.historyStatus!.textContent,
     noteHidden: nodes.partialNote!.hidden,
+    windowNoteHidden: nodes.windowNote!.hidden,
     points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
   };
 

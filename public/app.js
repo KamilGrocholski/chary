@@ -169,12 +169,17 @@ function setupView() {
   const baseTrend = () => trends?.worlds[currentWorld()] ?? null;
   const currentSnapshot = () => cachedSnapshots(currentWorld()).get(el("snapshotSelect").value) ?? null;
 
-  /** The snapshots that can reach the time axis at all: dated and inside the window. */
-  function historyEntries() {
+  /** Every snapshot of this world that has a date, i.e. a place on the time axis. */
+  function datedEntries() {
     const base = baseTrend();
     if (!base) return [];
     const dated = new Set(base.id);
-    return windowedEntries(currentWorldEntries().filter((e) => dated.has(e.id)));
+    return currentWorldEntries().filter((e) => dated.has(e.id));
+  }
+
+  /** The snapshots the filtered history actually draws: dated and inside the window. */
+  function historyEntries() {
+    return windowedEntries(datedEntries());
   }
 
   // ── Formatting numbers ────────────────────────────────────────────────────
@@ -673,22 +678,36 @@ function setupView() {
     return usable;
   }
 
-  function renderHistoryStatus(loaded, expected) {
+  /**
+   * The history counter, which doubles as the fetch progress bar.
+   *
+   * `available` is every dated snapshot of this world, `expected` only those this view is
+   * drawing — the two part company once `HISTORY_WINDOW` starts cutting. The counter counts
+   * against `available`, because "12 migawek" under a world that has 13 reads as a complete
+   * set of data; trimming the range without saying so is worse than not trimming it.
+   */
+  function renderHistoryStatus(loaded, expected, available) {
     const node = el("historyStatus");
-    if (expected === 0) {
+    if (available === 0) {
       node.textContent = "brak datowanych migawek";
       return;
     }
-    if (loaded >= expected) {
-      node.textContent = `${expected} ${expected === 1 ? "migawka" : "migawek"}`;
+    if (loaded >= available) {
+      node.textContent = `${available} ${available === 1 ? "migawka" : "migawek"}`;
       return;
     }
-    // The full set did not come together. "Wczytywanie…" may be written only while
-    // something is still in flight — otherwise the status stays forever on a progress bar
-    // that has stopped.
-    node.textContent = progress.running
-      ? `wczytywanie dokładnych danych… ${loaded} z ${expected} migawek`
-      : `${loaded} z ${expected} migawek · ${progress.failed} nie wczytano`;
+    // Not the whole set. "Wczytywanie…" may be written only while something is still in
+    // flight — otherwise the status stays forever on a progress bar that has stopped, and
+    // the two reasons for a gap are named separately: the window is a decision, a failed
+    // fetch is an accident.
+    const parts = [
+      progress.running
+        ? `wczytywanie dokładnych danych… ${loaded} z ${available} migawek`
+        : `${loaded} z ${available} migawek`,
+    ];
+    if (available > expected) parts.push(`okno: ostatnie ${expected}`);
+    if (!progress.running && progress.failed > 0) parts.push(`${progress.failed} nie wczytano`);
+    node.textContent = parts.join(" · ");
   }
 
   // ── Rendering ─────────────────────────────────────────────────────────────
@@ -747,6 +766,7 @@ function setupView() {
     }
 
     const allowed = new Set(historyEntries().map((e) => e.id));
+    const available = datedEntries().length;
     const { trend, population, loaded, expected } = buildFilteredTrend(
       base,
       cachedSnapshots(currentWorld()),
@@ -754,7 +774,17 @@ function setupView() {
       allowed,
     );
 
-    renderHistoryStatus(loaded, expected);
+    renderHistoryStatus(loaded, expected, available);
+    // The window is a ceiling we chose, not a failure — but a trimmed chart looks exactly
+    // like a world with a shorter history, so it has to be said out loud. Under the default
+    // filter nothing is trimmed: that path draws the whole aggregate.
+    el("windowNote").hidden = available <= expected;
+    if (!el("windowNote").hidden) {
+      el("windowNote").innerHTML =
+        `<span aria-hidden="true">ℹ</span><span><b>Historia jest przycięta do ostatnich ${num(expected)} migawek.</b> ` +
+        `Ten świat ma ich ${num(available)} — starszych nie pobieramy, żeby jedno filtrowanie nie ściągało ` +
+        `coraz większej paczki danych. Bez filtra wykresy pokazują całą historię.</span>`;
+    }
     // The note hangs on how much is genuinely missing — not on whether anything is still in
     // flight. Otherwise a failed fetch made it disappear, leaving an incomplete chart with
     // nothing said about it.
@@ -764,7 +794,8 @@ function setupView() {
       el("partialNote").innerHTML =
         `<span aria-hidden="true">${stalled ? "⚠" : "⏳"}</span><span><b>` +
         (stalled ? "Historia jest niepełna." : "Historia dopełnia się w tle.") +
-        `</b> Narysowane są tylko migawki już wczytane (${loaded} z ${expected}) — ` +
+        `</b> Narysowane są tylko migawki już wczytane ` +
+        `(${loaded} z ${expected}${available > expected ? " w oknie" : ""}) — ` +
         `brakującym punktom nie podstawiamy niczego zmyślonego.` +
         (stalled && progress.failed > 0 ? ` ${progress.failed} nie udało się pobrać.` : "") +
         `</span>`;
