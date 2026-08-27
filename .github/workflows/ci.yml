@@ -10,15 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          # `test/tools/commit-messages.test.ts` judges this history, and the default
-          # `fetch-depth: 1` leaves it nothing to judge: the single fetched commit is grafted,
-          # so `git log --name-only` reports its WHOLE TREE as added — 488 files under
-          # public/worlds/ — and every run failed with "touches data without saying scrape"
-          # against a commit that touched no data. `blob:none` keeps the download small: the
-          # guard reads commits and trees, and the working tree's own blobs still arrive.
-          fetch-depth: 0
-          filter: blob:none
 
       - uses: oven-sh/setup-bun@v2
 
