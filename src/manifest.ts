@@ -2,8 +2,8 @@ import { mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 import { FILTER_SUFFIX, NAMES_SUFFIX, isLegacySnapshot, getTimestampFromFileName } from "@/src/snapshot.ts";
 import { writeAtomic } from "@/src/atomic.ts";
-import { getValueFromJsonText } from "@/public/lib/json.js";
-import { getTextOrder } from "@/public/lib/text-order.js";
+import { getValueFromJsonText } from "@/src/lib/json.ts";
+import { getTextOrder } from "@/src/lib/text-order.ts";
 
 export const PUBLIC_DIR = "public";
 export const WORLDS_DIR = path.join(PUBLIC_DIR, "worlds");

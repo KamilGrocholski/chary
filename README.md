@@ -33,10 +33,10 @@ margonem.pl/ladder  ──scrape──►  public/worlds/<world>/<ts>.f.json   (
 - **The snapshot split** (`src/snapshot.ts`) — writing to two files sharing one row order.
 - **The manifest** (`public/manifest.json`) — an index of snapshots per world, linking to both files.
 - **The trends** (`src/trends.ts` → `public/trends.json`) — each world's folded history, one number per snapshot.
-- **The world view** (`public/index.html` + `public/app.js`) — a bar pinned to the top (the world, the match counter, chips for the active filters, section anchors), the filter fields below it (level, honor, profession, last activity), and below that two sections: **the cross-section** of the chosen snapshot (the level distribution by profession) and **the history** of every snapshot (population, activity, professions, a change table). The filter governs both.
-- **The logic** (`public/filters.js`, `public/history.js`, `public/shared.js`) — filtering, counting and building the series, with no DOM, tested without a browser.
+- **The world view** (`public/index.html` + `web/app.ts`) — a bar pinned to the top (the world, the match counter, chips for the active filters, section anchors), the filter fields below it (level, honor, profession, last activity), and below that two sections: **the cross-section** of the chosen snapshot (the level distribution by profession) and **the history** of every snapshot (population, activity, professions, a change table). The filter governs both.
+- **The logic** (`web/filters.ts`, `web/history.ts`, `src/shared.ts`) — filtering, counting and building the series, with no DOM, tested without a browser.
 
-The whole of `public/` is static — there is no application server, which makes it a perfect fit for Pages.
+The whole of `public/` is static — there is no application server, which makes it a perfect fit for Pages. `web/` is bundled into `public/app.js` by `bun run build`; that one file is generated and gitignored, everything else in `public/` is committed.
 
 ### Where the view gets its data
 
@@ -154,13 +154,22 @@ bun test        # the parser (against a real ranking page in test/fixtures) + al
 bun run typecheck
 ```
 
-The typecheck covers `public/*.js` too, through JSDoc rather than a build step — see
-[`AGENTS.md`](AGENTS.md) §9.3.
+The gate does not build — nothing under test reads `public/app.js`, so a stale bundle can
+neither pass nor fail it.
+
+## Building the dashboard
+
+```bash
+bun run build   # web/*.ts → public/app.js + public/app.js.map
+```
+
+`bun build` ships inside Bun, so this adds no dependency. `public/app.js` is gitignored and
+rebuilt: by `bun run serve` locally, and by `deploy.yml` before the Pages artefact is uploaded.
 
 ## Local preview
 
 ```bash
-bun run serve
+bun run serve   # builds, then serves
 # http://localhost:3000
 ```
 
@@ -174,7 +183,7 @@ git commit -m "scrape $(date +%Y-%m-%d)"
 git push
 ```
 
-The [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) workflow uploads the `public/` directory as an artifact and publishes it to GitHub Pages. It can also be run by hand from the **Actions** tab (`workflow_dispatch`).
+The [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) workflow runs the gate, builds `public/app.js` and uploads the `public/` directory as an artifact and publishes it to GitHub Pages. It can also be run by hand from the **Actions** tab (`workflow_dispatch`).
 
 > **A caveat about size.** A published site on GitHub Pages has a hard 1 GB limit, and every round adds to `public/`. Run `bun run data:status` for where the artefact stands today — the figure is measured rather than written down here, because a written one goes stale on the next round. The calculation and what to do once the headroom runs out: [`docs/2026-08-01-size-budget.md`](docs/2026-08-01-size-budget.md).
 
@@ -192,6 +201,14 @@ src/
   server.ts          # a local static server for previewing
   scraper-cli.ts     # reading the scraper's arguments (pure, so it can be tested)
   margostat-tool-error.ts  # the base every terminal-side error extends
+  shared.ts          # the vocabulary of the data, read by the scraper AND the dashboard
+  lib/               # the bottom layer: assert, and the only way to read a value
+web/                 # the dashboard, bundled into public/app.js — never shipped as-is
+  app.ts             # the only module that touches the DOM
+  filters.ts         # filtering, counting, the filter state in the URL (no DOM)
+  history.ts         # a world's history: thresholds, series, fetching snapshots (no DOM)
+  fetch-json.ts      # the one place `fetch` is spelled; refuses with a code
+  margostat-error.ts # the base every browser-side error extends
 tools/
   data-status.ts     # what is in public/ right now — `bun run data:status`
 test/
@@ -207,12 +224,7 @@ test/
   tools/             # guards: the rules in AGENTS.md held over the tree itself
 public/              # what lands on GitHub Pages
   index.html         # the whole world view (markup + styles)
-  app.js             # the only module that touches the DOM
-  filters.js         # filtering, counting, the filter state in the URL (no DOM)
-  history.js         # a world's history: thresholds, series, fetching snapshots (no DOM)
-  shared.js          # constants, time, activity bucketing (no DOM)
-  fetch-json.js      # the one place `fetch` is spelled; refuses with a code
-  lib/               # the bottom layer: assert, and the only way to read a value
+  app.js             # GENERATED from web/ by `bun run build`; gitignored
   vendor/            # Chart.js 4.4.7 (local, no CDN)
   trends.html        # a redirect to index.html (old links)
   manifest.json      # the snapshot index
@@ -238,7 +250,7 @@ what you have rights to, and the ranking database belongs to the publisher of Ma
 
 | What | On what terms |
 |---|---|
-| `src/`, `test/*.ts`, `public/*.html`, `public/*.js`, `docs/` | MIT — [`LICENSE`](LICENSE) |
+| `src/`, `web/`, `test/*.ts`, `public/*.html`, `docs/` | MIT — [`LICENSE`](LICENSE) |
 | `public/worlds/`, `manifest.json`, `trends.json`, `test/fixtures/` | **not open source** |
 | `public/vendor/` (Chart.js 4.4.7) | MIT — [`public/vendor/LICENSE.chartjs`](public/vendor/LICENSE.chartjs) |
 

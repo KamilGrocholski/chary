@@ -1,15 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { AssertionFailure, assert, assertDefined } from "@/public/lib/assert.js";
+import { AssertionFailure, assert, assertDefined } from "@/src/lib/assert.ts";
 import {
   composeIntegerText,
   getFiniteNumberFromText,
   getFiniteNumberFromValue,
   getIntegerFromText,
   getIntegerFromValue,
-} from "@/public/lib/number.js";
-import { composeJsonText, getValueFromJsonText } from "@/public/lib/json.js";
-import { getDateFromIsoText, getMillisecondsFromIsoText } from "@/public/lib/timestamp.js";
-import { getTextOrder } from "@/public/lib/text-order.js";
+} from "@/src/lib/number.ts";
+import { composeJsonText, getValueFromJsonText } from "@/src/lib/json.ts";
+import { getDateFromIsoText, getMillisecondsFromIsoText } from "@/src/lib/timestamp.ts";
+import { getTextOrder } from "@/src/lib/text-order.ts";
 
 // The floor of the repository: the only place a number, a JSON document or a date is read.
 // Every case below is a value JavaScript would otherwise have answered with on its own —

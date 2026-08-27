@@ -26,7 +26,7 @@
  *     caller gets a `string` instead of a `null` to thread through.
  */
 
-import { assert } from "./assert.js";
+import { assert } from "@/src/lib/assert.ts";
 
 const INTEGER_TEXT = /^-?\d+$/;
 const FINITE_TEXT = /^-?\d+(\.\d+)?$/;
@@ -37,11 +37,8 @@ const FINITE_TEXT = /^-?\d+(\.\d+)?$/;
  * Beyond 2^53 the digits stop mapping one-to-one onto values, so a longer number would
  * come back as a neighbour of itself. A `charId` is nowhere near that today; the ranking
  * is not ours to make promises about.
- *
- * @param {string} text
- * @returns {number | null}
  */
-export function getIntegerFromText(text) {
+export function getIntegerFromText(text: string): number | null {
   if (!INTEGER_TEXT.test(text)) return null;
   const value = Number(text);
   return Number.isSafeInteger(value) ? value : null;
@@ -50,11 +47,8 @@ export function getIntegerFromText(text) {
 /**
  * Null unless the text is digits, optionally a point and digits. No exponent, no bare
  * `.5`, no hexadecimal — a share read half-way is a share nobody measured.
- *
- * @param {string} text
- * @returns {number | null}
  */
-export function getFiniteNumberFromText(text) {
+export function getFiniteNumberFromText(text: string): number | null {
   if (!FINITE_TEXT.test(text)) return null;
   const value = Number(text);
   return Number.isFinite(value) ? value : null;
@@ -68,33 +62,21 @@ export function getFiniteNumberFromText(text) {
  * Everything else — `null`, `undefined`, an object, a boolean — is `null`, which is the
  * whole point: `Number(undefined)` is `NaN`, and `NaN` reaches a written file as `null`
  * after `JSON.stringify`, so a value nobody wrote becomes a gap nobody notices.
- *
- * @param {unknown} value
- * @returns {number | null}
  */
-export function getIntegerFromValue(value) {
+export function getIntegerFromValue(value: unknown): number | null {
   if (typeof value === "number") return Number.isSafeInteger(value) ? value : null;
   if (typeof value === "string") return getIntegerFromText(value.trim());
   return null;
 }
 
-/**
- * @param {unknown} value
- * @returns {number | null}
- */
-export function getFiniteNumberFromValue(value) {
+export function getFiniteNumberFromValue(value: unknown): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value === "string") return getFiniteNumberFromText(value.trim());
   return null;
 }
 
-/**
- * A number of ours as text. Asserts, because by this point we counted it.
- *
- * @param {number} value
- * @returns {string}
- */
-export function composeIntegerText(value) {
+/** A number of ours as text. Asserts, because by this point we counted it. */
+export function composeIntegerText(value: number): string {
   assert(Number.isSafeInteger(value), "a number written as an integer is a safe integer");
   return String(value);
 }

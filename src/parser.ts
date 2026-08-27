@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
-import { getIntegerFromText } from "@/public/lib/number.js";
+import { getIntegerFromText } from "@/src/lib/number.ts";
 import { MargoStatToolError } from "@/src/margostat-tool-error.ts";
-import { getProfessionEntries } from "@/public/shared.js";
+import { getProfessionEntries } from "@/src/shared.ts";
 
 // ── The row schema (v2) ───────────────────────────────────────────────────────
 //

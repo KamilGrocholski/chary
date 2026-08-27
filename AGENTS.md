@@ -8,7 +8,7 @@ usually a measurement or a trap somebody already fell into. Longer reasoning liv
 docblock of the file it concerns, or in `docs/`. What never belongs here is a number
 describing the tree or the data as it stands today — §5.
 
-**The section numbers are addresses.** Comments across `src/`, `public/`, `tools/` and
+**The section numbers are addresses.** Comments across `src/`, `web/`, `tools/` and
 `test/` cite them, so a number is never reused and a removed section leaves its number
 unused rather than shifting its neighbours.
 
@@ -28,16 +28,16 @@ one HTTP request per second against a public ranking page.
   disagreements is a mistake.
 - **Data source:** `https://www.margonem.pl/ladder/<world>?page=N`
 
-Bun + TypeScript for the scraper, plain ES modules for the dashboard, one runtime dependency
-(`cheerio`) and one vendored library (Chart.js). **There is no build step**: `public/` is byte
-for byte what Pages serves, which is why the dashboard is JavaScript typechecked through
-`checkJs` rather than compiled — §9.3.
+Bun + TypeScript throughout, one runtime dependency (`cheerio`) and one vendored library
+(Chart.js). `bun build` — which ships inside Bun, so it is not a dependency — bundles the
+dashboard into `public/app.js`, the one generated file there and the only one gitignored.
 
-**Orientation.** `src/` is the scraper and the data format, terminal only. `public/` is exactly
-what Pages serves: `lib/` the bottom layer, `shared.js` the vocabulary both sides read, `app.js`
-the view, `worlds/` the data. `tools/` ships nowhere. `test/` sits beside what it tests. `docs/`
-holds dated specs and audits, indexed by `docs/README.md`. Why a file is the way it is lives in
-its own docblock; what is in `public/` right now is `bun run data:status`, never prose (§5).
+**Orientation.** `src/` is the scraper and the data format, terminal only; `src/lib/` is the
+bottom layer both sides read and `src/shared.ts` the vocabulary of the data. `web/` is the
+dashboard, built into `public/`. `public/` is what Pages serves: the markup, `vendor/`, `worlds/` — and `app.js`, which is
+output. `tools/` ships nowhere. `test/` sits beside what it tests. `docs/` holds dated specs
+and audits, indexed by `docs/README.md`. Why a file is the way it is lives in its own docblock;
+what is in `public/` right now is `bun run data:status`, never prose (§5).
 
 ## 2. Labels
 
@@ -124,7 +124,8 @@ bun test           # tests only, while iterating
 bun run typecheck  # types only
 ```
 
-One command, so there is no version of "I ran the tests but not the typecheck".
+One command, so there is no version of "I ran the tests but not the typecheck". It does not
+build: nothing under test reads `public/app.js`, so a stale bundle can neither pass nor fail it.
 
 ### 6.2 Working commands
 
@@ -134,7 +135,8 @@ bun run scrape                       # every world in src/worlds.ts, ~1 req/s
 bun run scrape aether                # a single world
 bun run scrape aether,tempest 2000   # chosen worlds, custom interval in ms (min. 250)
 bun run rebuild                      # data maintenance: migrate old schemas + manifest + trends
-bun run serve                        # http://localhost:3000 — the dashboard locally
+bun run build                        # web/ → public/app.js (+ .map), gitignored, what Pages serves
+bun run serve                        # builds, then http://localhost:3000
 bun run data:status                  # what is in public/ right now — §5
 ```
 
@@ -204,7 +206,7 @@ Rules that arrived this way, each paid for at least once:
   real ranking page, the filters against a real snapshot in the old schema.
 - **Before writing a guard that two modules agree, ask why there are two.**
   `getActivityBucket` was written twice with a test holding them equal value for value. The
-  test was right and the second copy was not: the rule keeping `src/` out of `shared.js`
+  test was right and the second copy was not: the rule keeping `src/` out of the shared vocabulary
   created it, and opening that edge (§9.1) left one function and nothing to compare.
 
 ### 7.6 Working from the ranking
@@ -273,27 +275,27 @@ guard that kept it true cost more than the block was worth — `docs/2026-08-28-
 
 ### 9.1 Architecture
 
-- `[ALWAYS]` **`public/lib/` is the bottom layer** and knows nothing of the ranking, the scraper
-  or the document. Everything may read it; it reads nothing. ⚠️ It sits under `public/` because
-  with no build step the published directory is the only place **both** sides can import from —
-  `src/*.ts` by path, the dashboard over HTTP. A visitor downloads only what a dashboard module
-  imports.
-- `[ALWAYS]` **`src/` may read `public/lib/` and `public/shared.js`, and nothing else under
-  `public/`.** `app.js` starts the view on import and `filters.js`/`history.js` are written
-  against the browser's `fetch`; `shared.js` is none of those — no document, no `fetch`, nothing
-  run on import, and a test holds each — so it is the one place the vocabulary of the data can
-  be stated once for both sides.
+- `[ALWAYS]` **`src/lib/` is the bottom layer** and knows nothing of the ranking, the scraper or
+  the document. Everything may read it; it reads nothing. `src/shared.ts` sits just above it: the
+  vocabulary of the data, stated once for the scraper and the dashboard alike.
 
-  ⚠️ Opened after counting what its absence cost: the activity scale written out four times, the
-  bucket and profession counts as an array literal nine times, the profession names three. What
-  may cross is the vocabulary of the ranking and of the published format — a colour, a Polish
-  label or a date format travels the other way and `src/` has no business importing it.
-- `[ALWAYS]` **`app.js` is the only module that touches the DOM.** `shared.js`, `filters.js` and
-  `history.js` touch no document and run nothing on import — that is what makes them testable
-  outside a browser, and a test holds it. `fetch` in `history.js` is not an exception: it is not
-  the document interface, and the tests substitute a stub.
-- `[ALWAYS]` **A tool may read `src/` and `public/` alike.** It ships nowhere — and a report
-  about what the dashboard costs is only true if it reads the same material the dashboard reads.
+  ⚠️ `src/shared.ts` crossing to the browser was opened after counting what its absence cost: the
+  activity scale written out four times, the bucket and profession counts as an array literal nine
+  times, the profession names three. What may cross is the vocabulary of the ranking and of the
+  published format — a colour, a Polish label or a date format travels the other way and `src/`
+  has no business importing it.
+- `[ALWAYS]` **`src/` never imports `web/`.** The dependency runs one way: `web/` reads `src/lib/`
+  and `src/shared.ts`, and nothing in `src/` reads the dashboard. `web/app.ts` starts the view on
+  import and `web/fetch-json.ts` is written against the browser's `fetch`, so an import the other
+  way would start a view inside a scrape.
+- `[ALWAYS]` **`web/app.ts` is the only module that touches the DOM.** `src/shared.ts`,
+  `web/filters.ts` and `web/history.ts` touch no document and run nothing on import — that is what
+  makes them testable outside a browser, and a test holds it. `fetch` in `web/history.ts` is not
+  an exception: it is not the document interface, and the tests substitute a stub.
+- `[ALWAYS]` **A tool may read anything.** It ships nowhere — and a report about what the
+  dashboard costs is only true if it reads the same material the dashboard reads.
+- `[ALWAYS]` **`public/app.js` is output, never a source.** It is gitignored and rebuilt; a rule
+  or a test read over it would be read over a transformation of what it means to hold.
 - `[ALWAYS]` **A file holds one subject, however long that subject runs.** What forces a split
   is a **second** subject — never a line count, and never a docblock that got long.
 - `[ALWAYS]` **Two spellings of one answer need a guard.** Where the server and the browser must
@@ -360,7 +362,7 @@ filtering has no use for them; the split cut `public/` from 620 MB to 118 MB.
 **`public/trends.json` — history, not a snapshot.** Every world's history folded to one
 number per snapshot. Columnar: row *i* of every column is the same snapshot, the same
 convention as the `.f.json`/`.n.json` pair. **The `act` buckets are disjoint** — §10 — so
-"active ≤ 7 days" is the sum of the first two, and `ACTIVITY_THRESHOLDS` in `history.js` is
+"active ≤ 7 days" is the sum of the first two, and `ACTIVITY_THRESHOLDS` in `web/history.ts` is
 the only place allowed to mix the two scales. A snapshot with no `startedAt` drops out of it,
 because there is nowhere to put it on a time axis, and how many dropped is reported rather
 than swallowed.
@@ -373,10 +375,8 @@ every visit for everyone) against +96 B for this.
 ### 9.3 Code
 
 - **No linter, by choice — the compiler replaces it.** `strict`, `noUnusedLocals`,
-  `noUnusedParameters`, `noUncheckedIndexedAccess`, `checkJs`. `[ASK]` before weakening any.
+  `noUnusedParameters`, `noUncheckedIndexedAccess`. `[ASK]` before weakening any.
   Dead code has already survived two rebuilds here.
-- **`checkJs` is on and there is no build step**, so the dashboard is typed through JSDoc on
-  its exports. That is the price of `public/` being byte for byte what Pages serves.
 - **Comments say WHY, never WHAT**, and only what earns it: a decision with a rejected
   alternative, a measurement, a constraint the ranking imposes, a trap someone will otherwise
   fall into twice. Length is not the axis; what it carries is.
@@ -384,20 +384,19 @@ every visit for everyone) against +96 B for this.
 - `[ALWAYS]` **A literal earns a name by being spelled twice, or by deciding something** — and
   not by "no magic numbers". `maxRotation: 45` says what it is; `const MAX_ROTATION = 45` above
   it says it twice. ⚠️ A literal shared across a **file boundary** is a different problem that a
-  name does not solve (§9.7's colours, `:root` against `app.js`): there the answer is one
+  name does not solve (§9.7's colours, `:root` against `web/app.ts`): there the answer is one
   address and a guard, because two files cannot be read together.
 - `[ALWAYS]` **Imports are written from the repository root** — `@/src/parser.ts`, never
   `./parser.ts`, at no depth. `@/*` maps to the repository root, so a path reads the same
-  wherever it appears and moving a file does not rewrite its neighbours' imports. The dashboard
-  is the one exception and it is the browser's, not ours: a `<script type="module">` resolves
-  relative URLs and knows nothing of `tsconfig.json`, so `public/*.js` imports its siblings as
-  `./shared.js`.
+  wherever it appears and moving a file does not rewrite its neighbours' imports. There is no
+  exception left — the dashboard was one, because a `<script type="module">` resolves relative
+  URLs and knows nothing of `tsconfig.json`, and `bun build` resolving the graph removed it.
 
 ### 9.4 Naming
 
 - `[ALWAYS]` **A function name starts with the action it performs**, and the rule binds every
   function, not only the exported ones. An accessor named like a value reads like a value:
-  `baseTrend()` and `currentSnapshot()` in `app.js` were calls that looked like fields. A
+  `baseTrend()` and `currentSnapshot()` in `web/app.ts` were calls that looked like fields. A
   variable is never named exactly an action, for the same reason — `const read` for a list of
   lines read as a call that never happens.
 - `[ALWAYS]` **Booleans carry a prefix that says what they answer** — `is`, `has`, `should`,
@@ -429,7 +428,7 @@ a console shows it first.
 
 | Base | Where | `name` looks like |
 |---|---|---|
-| `MargoStatError` — `public/lib/margostat-error.js` | the dashboard, a player's browser | `MargoStat/…` |
+| `MargoStatError` — `web/margostat-error.ts` | the dashboard, a player's browser | `MargoStat/…` |
 | `MargoStatToolError` — `src/margostat-tool-error.ts` | the scraper and the tools, a terminal | `MargoStatTool/…` |
 
 Deliberately disjoint, so a `catch` on one side cannot swallow the other believing it caught its
@@ -450,11 +449,11 @@ callers never match on message text.
 
 **Assertions are a different category.** A `code` exists so a failure can be recognised and
 handled; a broken invariant cannot be, so it gets neither a code nor a hierarchy —
-`public/lib/assert.js` holds `AssertionFailure` outside both.
+`src/lib/assert.ts` holds `AssertionFailure` outside both.
 
 - `[ALWAYS]` `assert` / `assertDefined` for what must never happen, never for a failure you know
   can occur — that is an error class. The message names the **invariant**, not the condition.
-- `[NEVER]` **`!` in `src/`, `tools/` or `public/`.** Use `assertDefined` — but first ask whether
+- `[NEVER]` **`!` in `src/`, `web/` or `tools/`.** Use `assertDefined` — but first ask whether
   the type can be made precise; an assert over a type that could have been exact is covering for
   a loose type. Tests keep `!`.
 
@@ -471,20 +470,20 @@ handled; a broken invariant cannot be, so it gets neither a code nor a hierarchy
 checked, and `JSON.parse(…) as FilterFile` is how a truncated file became a snapshot with
 `undefined` columns.
 
-**`[ALWAYS]` A construct belongs to a primitive in `public/lib/` if it has more than one spelling
+**`[ALWAYS]` A construct belongs to a primitive in `src/lib/` if it has more than one spelling
 in JavaScript, or can answer with a value nobody wrote.** `Number("")` is `0` and `0` is a
 perfectly good honor reading, so a cell that arrived empty must not be indistinguishable from one
 that arrived as zero. Each owner's docblock lists what its construct invents.
 
 | Owner | Owns | Reading gives |
 |---|---|---|
-| `public/lib/number.js` | `Number()`, `parseInt`, `parseFloat`, unary `+`, `typeof … === "number"`, `String()` on a number | `getIntegerFromText`, `getFiniteNumberFromText`, `getIntegerFromValue`, `getFiniteNumberFromValue`; writing asserts, via `composeIntegerText` |
-| `public/lib/json.js` | `JSON.parse` and its `try`/`catch`, `JSON.stringify` | `getValueFromJsonText` → the value **or** the `SyntaxError`; `composeJsonText` refuses a value with no JSON |
-| `public/lib/timestamp.js` | `Date.parse`, `new Date(text)` | `getMillisecondsFromIsoText` → a number or `null`, never `NaN` |
-| `public/lib/text-order.js` | `localeCompare` | `getTextOrder`, by code unit — a sort deciding which snapshot is newest must not depend on a locale |
+| `src/lib/number.ts` | `Number()`, `parseInt`, `parseFloat`, unary `+`, `typeof … === "number"`, `String()` on a number | `getIntegerFromText`, `getFiniteNumberFromText`, `getIntegerFromValue`, `getFiniteNumberFromValue`; writing asserts, via `composeIntegerText` |
+| `src/lib/json.ts` | `JSON.parse` and its `try`/`catch`, `JSON.stringify` | `getValueFromJsonText` → the value **or** the `SyntaxError`; `composeJsonText` refuses a value with no JSON |
+| `src/lib/timestamp.ts` | `Date.parse`, `new Date(text)` | `getMillisecondsFromIsoText` → a number or `null`, never `NaN` |
+| `src/lib/text-order.ts` | `localeCompare` | `getTextOrder`, by code unit — a sort deciding which snapshot is newest must not depend on a locale |
 
-`byte-size.js` is in the same directory on a different ticket: the one place `1024` and its
-powers are written. Look in `public/lib/` first; if a construct is not there and meets the
+`src/lib/byte-size.ts` is in the same directory on a different ticket: the one place `1024` and its
+powers are written. Look in `src/lib/` first; if a construct is not there and meets the
 criterion, add it there rather than at the call site, even for one caller. **Reading returns
 `null` and throws nothing** — only the caller knows whether that is an assert, an error or an
 unknown. **Writing asserts**, because the number is ours by then. A new primitive lands with its
@@ -519,7 +518,7 @@ and is replaced in place, everything else unaffected.
 **The two paths to one set of charts.** At the default filter the history is drawn from
 `trends.json` alone and no snapshot is fetched, so whoever does not filter pays nothing for the
 largest world's history. Once the filter moves, the view fetches **every** `.f.json` of that one
-world and computes the history exactly. `summarizeFiltered` in `filters.js` returns the shape of
+world and computes the history exactly. `summarizeFiltered` in `web/filters.ts` returns the shape of
 a `trends.json` row, which is why the drawing cannot tell the paths apart — and under the default
 filter it must produce number for number what `summarizeSnapshot` in `src/trends.ts` does, over
 every snapshot on disk. §9.1's last rule, and a test holds it.
@@ -534,7 +533,7 @@ every snapshot on disk. §9.1's last rule, and a test holds it.
 - `[ALWAYS]` **`null` in `days` becomes `−1`** once a snapshot is converted to typed arrays,
   which cannot hold `null`. `−1 > maxDays` is **false**, so the `isNeverOnline` check comes
   **before** the threshold — otherwise accounts never used fall into every activity threshold.
-  One place: `shared.js`.
+  One place: `src/shared.ts`.
 - `[ALWAYS]` **The denominator of a share is the unfiltered population**, not the filtered set —
   that one would sum to 100%.
 - `[ALWAYS]` **An activity filter eats thresholds wider than itself.** At "≤ 3 days" the
@@ -550,8 +549,8 @@ every snapshot on disk. §9.1's last rule, and a test holds it.
 ### 9.7 Design system
 
 - `[ALWAYS]` **Tokens, not literals — and the rule does not stop at the stylesheet.** A raw
-  hex in a CSS rule is a bug, and a raw hex in `app.js` is the same bug one file to the left.
-  It was measured: 13 tokens in `:root` against 24 colour literals in `app.js`, every one an
+  hex in a CSS rule is a bug, and a raw hex in `web/app.ts` is the same bug one file to the left.
+  It was measured: 13 tokens in `:root` against 24 colour literals in `web/app.ts`, every one an
   exact copy of a token's value, so changing `--muted` repainted the page and left every
   chart, tooltip and legend on the old grey with nothing to say so.
 
@@ -559,7 +558,7 @@ every snapshot on disk. §9.1's last rule, and a test holds it.
   `var(--token)` in its `style="…"`, and Chart.js — which takes a concrete colour — is handed
   `getThemeTokens()`, read once from the document. A token that does not resolve is an
   **assertion**, not a fallback. Two exemptions: `<meta name="theme-color">` cannot hold a
-  `var()`, so a test holds it equal to `--bg`; and the series palette in `shared.js` is a
+  `var()`, so a test holds it equal to `--bg`; and the series palette in `src/shared.ts` is a
   vocabulary of its own, in a module that may not touch the document at all.
 - **Two border tokens, and the split is load-bearing.** The borders of controls and cards need
   3:1 (WCAG 2.2 SC 1.4.11); dividers inside a table do not. One shared value measured 1.48:1
@@ -577,8 +576,8 @@ every snapshot on disk. §9.1's last rule, and a test holds it.
 | Stays Polish | Where |
 |---|---|
 | The text a player reads | `public/index.html` body copy, `aria-label`s, placeholders, `<title>`, `<meta description>`, `lang="pl"`, `trends.html`, `404.html` |
-| UI strings built in JS | chart titles, chips, table headings, status and error copy in `app.js`; `PROFESSION_NAMES` in `shared.js`; `activityLabel`/`filterChips` in `filters.js`; `ACTIVITY_THRESHOLDS[].label` in `history.js`; `toLocaleString("pl-PL")` |
-| Keys that match scraped material | `PROFESSION_NAMES` in `shared.js`, which `parser.ts` folds through `ł → l` to read a heading, and `PROFESSION_BY_LETTER` in `parser.ts` — the ranking's own letter code; the captured page in `test/fixtures/`; the "N dni temu" pattern in `parser.ts` |
+| UI strings built in JS | chart titles, chips, table headings, status and error copy in `web/app.ts`; `PROFESSION_NAMES` in `src/shared.ts`; `activityLabel`/`filterChips` in `web/filters.ts`; `ACTIVITY_THRESHOLDS[].label` in `web/history.ts`; `toLocaleString("pl-PL")` |
+| Keys that match scraped material | `PROFESSION_NAMES` in `src/shared.ts`, which `parser.ts` folds through `ł → l` to read a heading, and `PROFESSION_BY_LETTER` in `parser.ts` — the ranking's own letter code; the captured page in `test/fixtures/`; the "N dni temu" pattern in `parser.ts` |
 | `suspect.reason` | written by `snapshot.ts` into every flagged `.f.json` and rendered verbatim by the dashboard |
 | The assertions pinning all of the above | the Polish expected values in `test/dashboard.test.ts` |
 

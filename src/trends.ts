@@ -3,16 +3,16 @@ import path from "node:path";
 import { PUBLIC_DIR, WORLDS_DIR } from "@/src/manifest.ts";
 import { FILTER_SUFFIX, getTimestampFromFileName, type FilterFile } from "@/src/snapshot.ts";
 import { writeAtomic } from "@/src/atomic.ts";
-import { assertDefined } from "@/public/lib/assert.js";
-import { getValueFromJsonText } from "@/public/lib/json.js";
-import { getTextOrder } from "@/public/lib/text-order.js";
+import { assertDefined } from "@/src/lib/assert.ts";
+import { getValueFromJsonText } from "@/src/lib/json.ts";
+import { getTextOrder } from "@/src/lib/text-order.ts";
 import {
   composeActivityCounts,
   composeActivitySeries,
   composeProfessionCounts,
   composeProfessionSeries,
   getActivityBucket,
-} from "@/public/shared.js";
+} from "@/src/shared.ts";
 
 // The folded history of one world: a single number per snapshot instead of hundreds of
 // thousands of rows. The whole history (202 snapshots, 21 worlds) fits in ~24 KB, i.e.
@@ -33,7 +33,7 @@ export const TRENDS_FILE = path.join(PUBLIC_DIR, "trends.json");
  * the two paths must be indistinguishable to the drawing (§9.6). Re-exported here so the
  * scraper's callers read it from the module that builds it.
  */
-export type SnapshotSummary = import("@/public/shared.js").SnapshotSummary;
+export type SnapshotSummary = import("@/src/shared.ts").SnapshotSummary;
 
 export function summarizeSnapshot(filters: FilterFile): SnapshotSummary {
   const act = composeActivityCounts();
@@ -65,7 +65,7 @@ export function summarizeSnapshot(filters: FilterFile): SnapshotSummary {
  * reason as `SnapshotSummary`: this is the shape of a file this repository publishes and the
  * browser reads, so it has one definition and not one per side.
  */
-export type WorldTrend = import("@/public/shared.js").WorldTrend;
+export type WorldTrend = import("@/src/shared.ts").WorldTrend;
 
 export type Trends = {
   schema: number;

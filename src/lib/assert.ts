@@ -20,19 +20,14 @@
  */
 
 export class AssertionFailure extends Error {
-  /** @param {string} message */
-  constructor(message) {
+  constructor(message: string) {
     super(message);
     this.name = "MargoStat/Assertion";
   }
 }
 
-/**
- * @param {unknown} condition
- * @param {string} invariant what must hold, stated as a fact — not the condition's source
- * @returns {asserts condition}
- */
-export function assert(condition, invariant) {
+/** @param invariant what must hold, stated as a fact — not the condition's source */
+export function assert(condition: unknown, invariant: string): asserts condition {
   if (!condition) throw new AssertionFailure(invariant);
 }
 
@@ -42,13 +37,8 @@ export function assert(condition, invariant) {
  * A truthiness check here would reject values this repository reads all day — `days: 0`
  * means "online today" and a honor of `0` is a measurement, so both are exactly the
  * readings a looser assert would throw away.
- *
- * @template Value
- * @param {Value | null | undefined} value
- * @param {string} invariant
- * @returns {Value}
  */
-export function assertDefined(value, invariant) {
+export function assertDefined<Value>(value: Value | null | undefined, invariant: string): Value {
   if (value === null || value === undefined) throw new AssertionFailure(invariant);
   return value;
 }

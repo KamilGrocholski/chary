@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import path from "node:path";
 import { MANIFEST_FILE, type SnapshotEntry as WrittenEntry } from "@/src/manifest.ts";
-import { getValueFromJsonText } from "@/public/lib/json.js";
+import { getValueFromJsonText } from "@/src/lib/json.ts";
 
-type ReadEntry = import("@/public/shared.js").ManifestEntry;
+type ReadEntry = import("@/src/shared.ts").ManifestEntry;
 
 // One side writes `manifest.json` and the other reads it, and after §9.1 was opened the
 // shapes that could be stated once are: `SnapshotSummary` and `WorldTrend` now live in

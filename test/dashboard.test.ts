@@ -13,8 +13,8 @@ import {
   isDefaultFilters,
   getTotalsFromCounts,
   getVisibleActivityBuckets,
-} from "@/public/filters.js";
-import { getActivityBucket, getDaysBetween, formatSnapshotDate, isNeverOnline } from "@/public/shared.js";
+} from "@/web/filters.ts";
+import { getActivityBucket, getDaysBetween, formatSnapshotDate, isNeverOnline } from "@/src/shared.ts";
 import { stripComments } from "@/test/source-text.ts";
 
 // The reference is a sample of a real snapshot in the old v1 schema
@@ -25,7 +25,8 @@ import { stripComments } from "@/test/source-text.ts";
 // a count taken straight from the original rows. That way it checks at once that the
 // migration loses nothing and that the view counts exactly.
 
-const PUBLIC_DIR = path.resolve(import.meta.dir, "../public");
+const repositoryRoot = path.resolve(import.meta.dir, "..");
+const PUBLIC_DIR = path.join(repositoryRoot, "public");
 
 const legacy = JSON.parse(
   await Bun.file(path.join(import.meta.dir, "fixtures/legacy-snapshot-aether.json")).text(),
@@ -242,11 +243,16 @@ describe("the published data", () => {
 });
 
 const html = await Bun.file(path.join(PUBLIC_DIR, "index.html")).text();
-const appSource = await Bun.file(path.join(PUBLIC_DIR, "app.js")).text();
-const sharedJs = await Bun.file(path.join(PUBLIC_DIR, "shared.js")).text();
-const filtersJs = await Bun.file(path.join(PUBLIC_DIR, "filters.js")).text();
-const historyJs = await Bun.file(path.join(PUBLIC_DIR, "history.js")).text();
 const trendsHtml = await Bun.file(path.join(PUBLIC_DIR, "trends.html")).text();
+
+// The dashboard's sources, not the bundle `bun run build` writes into public/. A rule read
+// over the bundle would be read over a transformation of what it means to hold, and the
+// bundle is not in git.
+const readSource = (file: string) => readFileSync(path.join(repositoryRoot, file), "utf8");
+const appSource = readSource("web/app.ts");
+const sharedJs = readSource("src/shared.ts");
+const filtersJs = readSource("web/filters.ts");
+const historyJs = readSource("web/history.ts");
 
 describe("app.js agrees with index.html", () => {
   test("every element fetched through getElement() exists in the markup", () => {
@@ -292,7 +298,7 @@ describe("app.js agrees with index.html", () => {
 
     // And `fetch` itself is spelled in exactly one place, which is what makes the line
     // above a complete list rather than a sample of one.
-    const fetchJs = readFileSync(path.join(repositoryRoot, "public/fetch-json.js"), "utf8");
+    const fetchJs = readSource("web/fetch-json.ts");
     expect(stripComments(fetchJs)).toContain("await fetch(url)");
     for (const module of [appSource, historyJs, filtersJs, sharedJs]) {
       expect(stripComments(module)).not.toMatch(/[^.\w]fetch\(/);
@@ -338,7 +344,7 @@ describe("app.js asks index.html for the right kind of node", () => {
 
   test("no module spells a colour that the stylesheet already names", () => {
     const offenders: string[] = [];
-    for (const [name, source] of [["app.js", appSource], ["filters.js", filtersJs], ["history.js", historyJs]] as const) {
+    for (const [name, source] of [["app.ts", appSource], ["filters.ts", filtersJs], ["history.ts", historyJs]] as const) {
       for (const [literal] of stripComments(source).matchAll(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\([^)]*\)/g)) {
         offenders.push(`${name}: ${literal}`);
       }
@@ -379,15 +385,15 @@ describe("the pure modules must not run anything", () => {
   const getCode = stripComments;
 
   test("the counting logic does not touch the DOM", () => {
-    // app.js starts the view as soon as it loads, so if a pure module imported anything
+    // app.ts starts the view as soon as it loads, so if a pure module imported anything
     // from it, the tests could not be run outside a browser.
     for (const module of [sharedJs, filtersJs, historyJs]) {
       expect(getCode(module)).not.toMatch(/\bdocument\b|\bwindow\b/);
-      expect(module).not.toContain('from "./app.js"');
+      expect(module).not.toContain('from "@/web/app.ts"');
     }
-    expect(appSource).toContain('from "./shared.js"');
-    expect(appSource).toContain('from "./filters.js"');
-    expect(appSource).toContain('from "./history.js"');
+    expect(appSource).toContain('from "@/src/shared.ts"');
+    expect(appSource).toContain('from "@/web/filters.ts"');
+    expect(appSource).toContain('from "@/web/history.ts"');
   });
 });
 
@@ -593,7 +599,6 @@ describe("the activity distribution labels", () => {
 // both: the default filter (history from trends.json) and a filter set (history from
 // `.f.json`).
 
-const repositoryRoot = path.resolve(import.meta.dir, "..");
 const runSmoke = (scenario: string) => {
   const result = Bun.spawnSync(["bun", path.join(repositoryRoot, "test/dom-smoke.ts"), scenario], { cwd: repositoryRoot });
   return {

@@ -8,31 +8,27 @@
  * Abstract on purpose: every kind of failure gets its own named subclass with a `code`, so
  * a caller tells them apart without matching on message text — and message text here is
  * the one thing that legitimately changes, because some of it is composed for a player.
- * JavaScript has no `abstract`, so the constructor refuses to be the one you instantiate.
+ * The constructor refuses to be the one you instantiate.
  *
  * Deliberately disjoint from `MargoStatToolError`: a `catch` in the dashboard must not
  * swallow a scraper error believing it caught its own. The two never run in one process.
  */
 
-import { assert } from "./assert.js";
+import { assert } from "@/src/lib/assert.ts";
 
-/**
- * Every failure the dashboard can raise. One entry per subclass.
- *
- * @typedef {"MissingElement" | "ResourceFetch" | "ResourceParse"} MargoStatErrorCode
- */
+/** Every failure the dashboard can raise. One entry per subclass. */
+export type MargoStatErrorCode = "MissingElement" | "ResourceFetch" | "ResourceParse";
 
 export class MargoStatError extends Error {
+  readonly code: MargoStatErrorCode;
+
   /**
-   * @param {MargoStatErrorCode} code
-   * @param {string} message English, always — a sentence a player reads is composed by the
-   *   view from the code, never taken from here. See §9.8.
-   * @param {ErrorOptions} [options]
+   * @param message English, always — a sentence a player reads is composed by the view
+   *   from the code, never taken from here. See §9.8.
    */
-  constructor(code, message, options) {
+  constructor(code: MargoStatErrorCode, message: string, options?: ErrorOptions) {
     assert(new.target !== MargoStatError, "MargoStatError is thrown through a named subclass");
     super(message, options);
-    /** @type {MargoStatErrorCode} */
     this.code = code;
     this.name = `MargoStat/${code}`;
   }

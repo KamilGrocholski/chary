@@ -5,8 +5,6 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
-    "jsx": "react-jsx",
-    "allowJs": true,
 
     // Every import is written from the repository root — a path reads the same wherever it
     // appears, and moving a file does not rewrite its neighbours' imports. AGENTS.md §9.3.
@@ -25,7 +23,7 @@
     "noFallthroughCasesInSwitch": true,
 
     // Dead code is not to accumulate — NEVER_ONLINE_DAYS survived a format rebuild in
-    // public/app.js only because nobody was holding it.
+    // web/app.ts only because nobody was holding it.
     "noUnusedLocals": true,
     "noUnusedParameters": true,
 
@@ -34,14 +32,10 @@
     // invariant that is now stated as one — see AGENTS.md §9.5.
     "noUncheckedIndexedAccess": true,
 
-    // The dashboard ships as plain ES modules with no build step (§1), so the only way it
-    // gets typechecked at all is here, through JSDoc on its exports.
-    "checkJs": true,
-
     "noPropertyAccessFromIndexSignature": false
   },
 
-  // Chart.js is vendored, minified and somebody else's — checking it would report their
-  // code, not ours. public/worlds/ is data. Neither is a source of this repository.
-  "exclude": ["node_modules", "public/vendor", "public/worlds"]
+  // public/ holds no source any more: the dashboard is built into it from web/, and
+  // everything else there is markup, data or somebody else's vendored library.
+  "exclude": ["node_modules", "public"]
 }

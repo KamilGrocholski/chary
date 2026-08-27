@@ -11,17 +11,16 @@
  * publishes. The dashboard fetches nothing else (§5).
  */
 
-import { MargoStatError } from "./lib/margostat-error.js";
-import { getValueFromJsonText } from "./lib/json.js";
+import { MargoStatError } from "@/web/margostat-error.ts";
+import { getValueFromJsonText } from "@/src/lib/json.ts";
 
 /** The server answered, and the answer was not the document. */
 export class ResourceFetchError extends MargoStatError {
-  /**
-   * @param {string} url
-   * @param {number} status the HTTP status, so the view never parses one out of a message
-   * @param {ErrorOptions} [options]
-   */
-  constructor(url, status, options) {
+  readonly url: string;
+  /** The HTTP status, so the view never parses one out of a message. */
+  readonly status: number;
+
+  constructor(url: string, status: number, options?: ErrorOptions) {
     super("ResourceFetch", `HTTP ${status} — ${url}`, options);
     this.url = url;
     this.status = status;
@@ -30,11 +29,9 @@ export class ResourceFetchError extends MargoStatError {
 
 /** The document arrived and was not JSON — a truncated file, or a 404 page in its place. */
 export class ResourceParseError extends MargoStatError {
-  /**
-   * @param {string} url
-   * @param {ErrorOptions} [options]
-   */
-  constructor(url, options) {
+  readonly url: string;
+
+  constructor(url: string, options?: ErrorOptions) {
     super("ResourceParse", `not JSON — ${url}`, options);
     this.url = url;
   }
@@ -50,11 +47,8 @@ export class ResourceParseError extends MargoStatError {
  * The body is read as text and put through our own JSON reader rather than through
  * `res.json()`, so a parse failure arrives as a `ResourceParseError` naming the URL
  * instead of as a bare `SyntaxError` naming a character offset.
- *
- * @param {string} url
- * @returns {Promise<unknown>}
  */
-export async function getJsonFromUrl(url) {
+export async function getJsonFromUrl(url: string): Promise<unknown> {
   const response = await fetch(url);
   if (!response.ok) throw new ResourceFetchError(url, response.status);
 

@@ -11,9 +11,9 @@ import {
   getTimestampFromFileName,
 } from "@/src/snapshot.ts";
 import { rebuildTrends } from "@/src/trends.ts";
-import { getValueFromJsonText } from "@/public/lib/json.js";
-import { BYTES_IN_MEGABYTE } from "@/public/lib/byte-size.js";
-import { getIntegerFromValue } from "@/public/lib/number.js";
+import { getValueFromJsonText } from "@/src/lib/json.ts";
+import { BYTES_IN_MEGABYTE } from "@/src/lib/byte-size.ts";
+import { getIntegerFromValue } from "@/src/lib/number.ts";
 import { writeAtomic } from "@/src/atomic.ts";
 
 // Data maintenance in public/:

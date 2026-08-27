@@ -10,10 +10,11 @@
   },
   "scripts": {
     "check": "bun run typecheck && bun test",
+    "build": "bun build web/app.ts --outdir public --target=browser --sourcemap=linked",
     "scrape": "bun src/world-scraper.ts",
     "scrape:check": "bun src/world-scraper.ts --dry-run",
     "rebuild": "bun src/rebuild-data.ts",
-    "serve": "bun src/server.ts",
+    "serve": "bun run build && bun src/server.ts",
     "data:status": "bun tools/data-status.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"

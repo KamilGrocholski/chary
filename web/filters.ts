@@ -3,8 +3,8 @@
 //
 // It works on two representations of a snapshot at once, and has to stay that way:
 //   • a raw `.f.json` — `level/profession/honor` are `number[]`, `days` is `(number|null)[]`
-//   • a snapshot after the conversion in `history.js` — typed arrays, `null` stored as −1
-// Only `isNeverOnline` from `shared.js` knows the difference, so there is one code path here.
+//   • a snapshot after the conversion in `history.ts` — typed arrays, `null` stored as −1
+// Only `isNeverOnline` from `shared.ts` knows the difference, so there is one code path here.
 //
 // The strings below are Polish because a player reads them — see "Language" in AGENTS.md.
 
@@ -18,22 +18,20 @@ import {
   composeProfessionCounts,
   getActivityBucket,
   isNeverOnline,
-} from "./shared.js";
-import { getFiniteNumberFromText, getIntegerFromText } from "./lib/number.js";
-import { assertDefined } from "./lib/assert.js";
+  type Filters,
+  type Snapshot,
+  type SnapshotSummary,
+} from "@/src/shared.ts";
+import { getFiniteNumberFromText, getIntegerFromText } from "@/src/lib/number.ts";
+import { assertDefined } from "@/src/lib/assert.ts";
 
-/**
- * @typedef {import("./shared.js").Filters} Filters
- * @typedef {import("./shared.js").Snapshot} Snapshot
- * @typedef {import("./shared.js").SnapshotSummary} SnapshotSummary
- * @typedef {{ key: string, label: string }} FilterChip
- */
+export type FilterChip = { key: string; label: string };
 
 // The bounds of the activity buckets, in days — bucket 4 is accounts never used. Disjoint,
 // not cumulative, which is what the labels below have to convey: "≤ 7 dni" over the 1-7
 // bucket suggested everyone from the last week, when it is only those not in "< 24h".
 //
-// The scale itself lives in `shared.js`, because `src/trends.ts` reads it too (§9.1).
+// The scale itself lives in `shared.ts`, because `src/trends.ts` reads it too (§9.1).
 // Re-exported under the name this module's callers already use.
 export { ACTIVITY_BUCKET_BOUNDS as ACTIVITY_BOUNDS };
 
@@ -41,11 +39,9 @@ export { ACTIVITY_BUCKET_BOUNDS as ACTIVITY_BOUNDS };
  * A bucket's label trimmed to the active threshold — under a "14 days" filter the 8-30
  * bucket really holds 8-14 days, and that is how it is to be labelled.
  *
- * @param {number} bucket 0-4
- * @param {number} [maxDays]
- * @returns {string}
+ * @param bucket 0-4
  */
-export function getActivityLabel(bucket, maxDays = Infinity) {
+export function getActivityLabel(bucket: number, maxDays = Infinity): string {
   if (bucket === NEVER_ONLINE_BUCKET) return "nigdy";
 
   const [from, to] = assertDefined(ACTIVITY_BUCKET_BOUNDS[bucket], "an activity bucket outside 0-4 has no bounds");
@@ -59,19 +55,15 @@ export function getActivityLabel(bucket, maxDays = Infinity) {
 /**
  * The buckets that can be non-empty under a given threshold. Without this the view showed
  * "> 30 dni: 0 · nigdy: 0" — zeros by definition, looking like broken data.
- *
- * @param {number} [maxDays]
- * @returns {number[]}
  */
-export function getVisibleActivityBuckets(maxDays = Infinity) {
+export function getVisibleActivityBuckets(maxDays = Infinity): number[] {
   if (maxDays === Infinity) return [0, 1, 2, 3, 4];
   return ACTIVITY_BUCKET_BOUNDS.flatMap(([from], bucket) => (from <= maxDays ? [bucket] : []));
 }
 
 // ── Filters ─────────────────────────────────────────────────────────────────
 
-/** @returns {Filters} */
-export function getEmptyFilters() {
+export function getEmptyFilters(): Filters {
   return {
     minLevel: -Infinity,
     maxLevel: Infinity,
@@ -86,11 +78,8 @@ export function getEmptyFilters() {
  * Whether the filter rejects nothing. This is not cosmetic: under the default filter the
  * history view takes the ready-made `trends.json` (9 KB) instead of fetching one world's
  * snapshots (up to 1.9 MB). The whole lazy fetching path hangs on this function.
- *
- * @param {Filters} filters
- * @returns {boolean}
  */
-export function isDefaultFilters(filters) {
+export function isDefaultFilters(filters: Filters): boolean {
   return (
     filters.minLevel === -Infinity &&
     filters.maxLevel === Infinity &&
@@ -110,16 +99,12 @@ export function isDefaultFilters(filters) {
  *
  * The chips are a view of `readFilters()`, not separate state — otherwise they would be a
  * second place able to drift from the form.
- *
- * @param {Filters} filters
- * @returns {FilterChip[]}
  */
-export function describeFilters(filters) {
-  const formatNumber = (/** @type {number} */ value) => value.toLocaleString(POLISH_LOCALE);
-  /** @type {FilterChip[]} */
-  const chips = [];
+export function describeFilters(filters: Filters): FilterChip[] {
+  const formatNumber = (value: number) => value.toLocaleString(POLISH_LOCALE);
+  const chips: FilterChip[] = [];
 
-  const addRangeChip = (/** @type {string} */ key, /** @type {string} */ name, /** @type {number} */ minimum, /** @type {number} */ maximum) => {
+  const addRangeChip = (key: string, name: string, minimum: number, maximum: number) => {
     const hasMin = Number.isFinite(minimum);
     const hasMax = Number.isFinite(maximum);
     if (!hasMin && !hasMax) return;
@@ -140,7 +125,7 @@ export function describeFilters(filters) {
   if (filters.professions.size !== 6) {
     const names = [...filters.professions]
       .sort((left, right) => left - right)
-      .map((profession) => assertDefined(PROFESSION_NAMES[/** @type {1|2|3|4|5|6} */ (profession)], `profession ${profession} has a name`));
+      .map((profession) => assertDefined(PROFESSION_NAMES[profession], `profession ${profession} has a name`));
     chips.push({
       key: "prof",
       // Past two names the label pushes the bar beyond one line, and nobody reads it whole
@@ -152,13 +137,7 @@ export function describeFilters(filters) {
   return chips;
 }
 
-/**
- * @param {Snapshot} data
- * @param {number} index
- * @param {Filters} filters
- * @returns {boolean}
- */
-export function isMatch(data, index, filters) {
+export function isMatch(data: Snapshot, index: number, filters: Filters): boolean {
   // A row past the end is not a row: `count` is the length of every column (§9.2), so
   // this only fires on a file that broke that promise, and it must not read as a match.
   const level = data.level[index];
@@ -173,7 +152,7 @@ export function isMatch(data, index, filters) {
   // "never online" falls out under every activity threshold — and it has to be checked
   // before the threshold, because the −1 sentinel passes every `>` comparison.
   const days = data.days[index];
-  if (filters.maxDays !== Infinity && (isNeverOnline(days) || /** @type {number} */ (days) > filters.maxDays)) return false;
+  if (filters.maxDays !== Infinity && (isNeverOnline(days) || (days as number) > filters.maxDays)) return false;
   return true;
 }
 
@@ -181,14 +160,9 @@ export function isMatch(data, index, filters) {
 
 /**
  * A map level → [count for professions 1..6]. Needed only by the single-snapshot view.
- *
- * @param {Snapshot} data
- * @param {Filters} filters
- * @returns {Map<number, number[]>}
  */
-export function countByLevel(data, filters) {
-  /** @type {Map<number, number[]>} */
-  const counts = new Map();
+export function countByLevel(data: Snapshot, filters: Filters): Map<number, number[]> {
+  const counts = new Map<number, number[]>();
   for (let index = 0; index < data.count; index++) {
     if (!isMatch(data, index, filters)) continue;
 
@@ -205,26 +179,17 @@ export function countByLevel(data, filters) {
   return counts;
 }
 
-/**
- * @param {Snapshot} data
- * @param {Filters} filters
- * @returns {[number, number][]}
- */
-export function countByActivity(data, filters) {
+export function countByActivity(data: Snapshot, filters: Filters): [number, number][] {
   const buckets = composeActivityCounts();
   for (let index = 0; index < data.count; index++) {
     if (!isMatch(data, index, filters)) continue;
     const bucket = getActivityBucket(data.days[index]);
     buckets[bucket] = assertDefined(buckets[bucket], "getActivityBucket answers 0-4") + 1;
   }
-  return buckets.map((count, bucket) => /** @type {[number, number]} */ ([bucket, count]));
+  return buckets.map((count, bucket): [number, number] => [bucket, count]);
 }
 
-/**
- * @param {Map<number, number[]>} counts
- * @returns {{ total: number, perProfession: number[] }}
- */
-export function getTotalsFromCounts(counts) {
+export function getTotalsFromCounts(counts: Map<number, number[]>): { total: number; perProfession: number[] } {
   const perProfession = composeProfessionCounts();
   let total = 0;
   for (const row of counts.values()) {
@@ -248,12 +213,8 @@ export function getTotalsFromCounts(counts) {
  *
  * Under the default filter it must give number for number what `summarizeSnapshot` from
  * `src/trends.ts` computed on the server — a test over every snapshot holds this.
- *
- * @param {Snapshot} data
- * @param {Filters} filters
- * @returns {SnapshotSummary}
  */
-export function summarizeFiltered(data, filters) {
+export function summarizeFiltered(data: Snapshot, filters: Filters): SnapshotSummary {
   const act = composeActivityCounts();
   const byProf = composeProfessionCounts();
   let total = 0;
@@ -275,13 +236,9 @@ export function summarizeFiltered(data, filters) {
 // set level 250-320 and honor > 100k got something other than what was on their screen
 // after copying the address or reloading the page.
 
-/**
- * @param {Filters} filters
- * @returns {URLSearchParams}
- */
-export function composeFiltersParams(filters) {
+export function composeFiltersParams(filters: Filters): URLSearchParams {
   const params = new URLSearchParams();
-  const setParam = (/** @type {string} */ key, /** @type {number} */ value) => {
+  const setParam = (key: string, value: number) => {
     if (Number.isFinite(value)) params.set(key, String(value));
   };
 
@@ -297,15 +254,11 @@ export function composeFiltersParams(filters) {
   return params;
 }
 
-/**
- * @param {URLSearchParams} params
- * @returns {Filters}
- */
-export function readFiltersFromParams(params) {
+export function readFiltersFromParams(params: URLSearchParams): Filters {
   // A query string is text a stranger can write, so every reading may fail and every
   // failure falls back to the default rather than to a number nobody typed: `Number("")`
   // is 0, which would read as a deliberate "minimum level 0".
-  const getNumberFromParam = (/** @type {string} */ key, /** @type {number} */ fallback) => {
+  const getNumberFromParam = (key: string, fallback: number) => {
     const rawValue = params.get(key);
     if (rawValue === null || rawValue === "") return fallback;
     return getFiniteNumberFromText(rawValue.trim()) ?? fallback;

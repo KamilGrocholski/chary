@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import path from "node:path";
 import { normalizeLegacyRows, splitNormalized, type FilterFile } from "@/src/snapshot.ts";
 import { buildWorldTrend, summarizeSnapshot } from "@/src/trends.ts";
-import { ACTIVITY_BUCKET_BOUNDS, ACTIVITY_BUCKET_COUNT, getActivityBucket } from "@/public/shared.js";
-import { getEmptyFilters, summarizeFiltered } from "@/public/filters.js";
+import { ACTIVITY_BUCKET_BOUNDS, ACTIVITY_BUCKET_COUNT, getActivityBucket } from "@/src/shared.ts";
+import { getEmptyFilters, summarizeFiltered } from "@/web/filters.ts";
 import {
   ACTIVITY_THRESHOLDS,
   DEFAULT_THRESHOLD,
@@ -20,7 +20,7 @@ import {
   getUsableThresholds,
   readViewFromParams,
   composeViewParams,
-} from "@/public/history.js";
+} from "@/web/history.ts";
 
 // The reference is real data, not a reimplementation of the same arithmetic: the aggregate
 // is checked against a sample of a real snapshot in schema v1 (the same one dashboard.test.ts

@@ -10,7 +10,7 @@ import { stripComments } from "@/test/source-text.ts";
 // spell it, and so does the assertion in this file.
 
 /** The sources of this repository. Data, fixtures and the vendored library are not ours. */
-const SOURCE_GLOBS = ["src/**/*.ts", "tools/**/*.ts", "test/**/*.ts", "public/*.js", "public/lib/*.js"];
+const SOURCE_GLOBS = ["src/**/*.ts", "web/**/*.ts", "tools/**/*.ts", "test/**/*.ts"];
 
 const sources = new Map<string, string>();
 for (const pattern of SOURCE_GLOBS) {
@@ -116,18 +116,16 @@ const shipped = [...sources].filter(([file]) => !isTest(file));
 
 describe("the scan", () => {
   test("reaches every directory the rules below claim to cover", () => {
-    for (const prefix of ["src/", "tools/", "test/", "public/lib/"]) {
+    for (const prefix of ["src/", "src/lib/", "web/", "tools/", "test/"]) {
       expect([...sources.keys()].some((file) => file.startsWith(prefix))).toBe(true);
     }
-    // The dashboard's own modules sit directly in public/ and are easy to miss.
-    expect([...sources.keys()]).toContain("public/app.js");
+    expect([...sources.keys()]).toContain("web/app.ts");
   });
 
-  test("does not reach the vendored library or the data", () => {
-    for (const file of sources.keys()) {
-      expect(file.startsWith("public/vendor/")).toBe(false);
-      expect(file.startsWith("public/worlds/")).toBe(false);
-    }
+  test("does not reach public/ — the data, the markup and the vendored library", () => {
+    // `public/app.js` is the build's output, not a source: reading it here would hold the
+    // rules over a bundle of what they already hold over `web/`.
+    for (const file of sources.keys()) expect(file.startsWith("public/")).toBe(false);
   });
 });
 
@@ -136,9 +134,9 @@ describe("§9.5 — every error we throw carries a brand and a code", () => {
   // only ones allowed to spell it bare — `AssertionFailure` is the third, and it sits
   // outside both hierarchies deliberately.
   const BASE_FILES = [
-    "public/lib/margostat-error.js",
+    "web/margostat-error.ts",
     "src/margostat-tool-error.ts",
-    "public/lib/assert.js",
+    "src/lib/assert.ts",
   ];
 
   test("the bases exist and are where the rules say they are", () => {
@@ -169,7 +167,7 @@ describe("§9.5 — every error we throw carries a brand and a code", () => {
 
     for (const [file, source] of sources) {
       const specs = getImports(source);
-      const importsBrowser = specs.some((specification) => specification.endsWith("margostat-error.js"));
+      const importsBrowser = specs.some((specification) => specification.endsWith("margostat-error.ts"));
       const importsTool = specs.some((specification) => specification.endsWith("margostat-tool-error.ts"));
       if (importsBrowser) browserReaders += 1;
       if (importsTool) terminalReaders += 1;
@@ -194,20 +192,20 @@ describe("§9.5 — every error we throw carries a brand and a code", () => {
     }
     // Read off the declarations rather than trusted: every code either side can raise is
     // listed in its base, and a subclass passing something else would not compile.
-    const browser = sources.get("public/lib/margostat-error.js") ?? "";
+    const browser = sources.get("web/margostat-error.ts") ?? "";
     const terminal = sources.get("src/margostat-tool-error.ts") ?? "";
     expect(browser).toContain("MargoStatErrorCode");
     expect(terminal).toContain("MargoStatToolErrorCode");
   });
 
   test("the brand goes in `name`, where a console shows it first", () => {
-    expect(sources.get("public/lib/margostat-error.js")).toContain("MargoStat/${code}");
+    expect(sources.get("web/margostat-error.ts")).toContain("MargoStat/${code}");
     expect(sources.get("src/margostat-tool-error.ts")).toContain("MargoStatTool/${code}");
-    expect(sources.get("public/lib/assert.js")).toContain('"MargoStat/Assertion"');
+    expect(sources.get("src/lib/assert.ts")).toContain('"MargoStat/Assertion"');
   });
 
   test("an assertion carries no code — nobody handles a broken invariant", () => {
-    const assertSource = getCode(sources.get("public/lib/assert.js") ?? "");
+    const assertSource = getCode(sources.get("src/lib/assert.ts") ?? "");
     expect(assertSource).not.toMatch(/\bcode\b/);
   });
 });
@@ -242,22 +240,22 @@ describe("§9.5 — nothing is cast off JSON.parse", () => {
   });
 });
 
-describe("§9.5 — one way to read a value, and it lives in public/lib/", () => {
+describe("§9.5 — one way to read a value, and it lives in src/lib/", () => {
   // The register from AGENTS.md §9.5. Each construct has more than one spelling in
   // JavaScript, or can answer with a value nobody wrote — so exactly one file spells it.
   const REGISTER: { construct: RegExp; owner: string; subject: string; spelled: boolean }[] = [
-    { construct: /\bNumber\s*\(/, owner: "public/lib/number.js", subject: "Number()", spelled: true },
-    { construct: /\bJSON\.parse\s*\(/, owner: "public/lib/json.js", subject: "JSON.parse", spelled: true },
-    { construct: /\bDate\.parse\s*\(/, owner: "public/lib/timestamp.js", subject: "Date.parse", spelled: true },
+    { construct: /\bNumber\s*\(/, owner: "src/lib/number.ts", subject: "Number()", spelled: true },
+    { construct: /\bJSON\.parse\s*\(/, owner: "src/lib/json.ts", subject: "JSON.parse", spelled: true },
+    { construct: /\bDate\.parse\s*\(/, owner: "src/lib/timestamp.ts", subject: "Date.parse", spelled: true },
 
     // Three constructs are spelled nowhere at all, and that is their register entry. Each
     // owner reads by a pattern instead — `number.js` matches the digits before converting,
     // `text-order.js` compares with `<` — so there is no call to point at. The row still
     // binds: it says where the construct would go if something ever needed it, and it is
     // what makes "nowhere" a decision rather than an accident.
-    { construct: /\bparseInt\s*\(/, owner: "public/lib/number.js", subject: "parseInt", spelled: false },
-    { construct: /\bparseFloat\s*\(/, owner: "public/lib/number.js", subject: "parseFloat", spelled: false },
-    { construct: /\.localeCompare\s*\(/, owner: "public/lib/text-order.js", subject: "localeCompare", spelled: false },
+    { construct: /\bparseInt\s*\(/, owner: "src/lib/number.ts", subject: "parseInt", spelled: false },
+    { construct: /\bparseFloat\s*\(/, owner: "src/lib/number.ts", subject: "parseFloat", spelled: false },
+    { construct: /\.localeCompare\s*\(/, owner: "src/lib/text-order.ts", subject: "localeCompare", spelled: false },
   ];
 
   // Tests restate what they check on purpose (§9.3): a test asserting that a reader refuses
@@ -283,8 +281,8 @@ describe("§9.5 — one way to read a value, and it lives in public/lib/", () =>
     // register owns is the reading of *text*. The three sites outside `lib/` are checked by
     // name rather than by pattern, because no regex can tell a string from a number here.
     const allowed = new Map([
-      ["public/lib/timestamp.js", 1],
-      ["public/shared.js", 1], // formatShortDate(ms) — milliseconds this repo computed
+      ["src/lib/timestamp.ts", 1],
+      ["src/shared.ts", 1], // formatShortDate(ms) — milliseconds this repo computed
       ["src/world-scraper.ts", 3], // the round's own clock: the log stamp, the start, the end
       ["src/trends.ts", 1], // builtAt
     ]);
@@ -297,11 +295,13 @@ describe("§9.5 — one way to read a value, and it lives in public/lib/", () =>
 });
 
 describe("§9.3 — imports are written from the repository root", () => {
-  test("src/, tools/ and test/ import through @/", () => {
+  // Every source, with no exception left. The dashboard used to be one: with no build step
+  // it was fetched by a browser, which resolves relative URLs and knows nothing of
+  // tsconfig, so `web/` had to spell `./shared.js`. `bun build` resolves the graph now.
+  test("every source imports through @/", () => {
     const offenders: string[] = [];
     let checked = 0;
     for (const [file, source] of sources) {
-      if (file.startsWith("public/")) continue;
       for (const specification of getImports(source)) {
         checked += 1;
         if (specification.startsWith(".")) offenders.push(`${file}: ${specification}`);
@@ -310,20 +310,6 @@ describe("§9.3 — imports are written from the repository root", () => {
     expect(offenders).toEqual([]);
     // A rule read over no imports at all is a rule that holds nothing.
     expect(checked).toBeGreaterThan(20);
-  });
-
-  test("the dashboard imports its siblings relatively — that one is the browser's rule", () => {
-    // A `<script type="module">` resolves relative URLs and knows nothing of tsconfig, so
-    // `@/` in public/ would be a path no browser can fetch.
-    let checked = 0;
-    for (const [file, source] of sources) {
-      if (!file.startsWith("public/")) continue;
-      for (const specification of getImports(source)) {
-        checked += 1;
-        expect(`${file}: ${specification}`).toBe(`${file}: ${specification.startsWith(".") ? specification : "a relative path"}`);
-      }
-    }
-    expect(checked).toBeGreaterThan(5);
   });
 });
 

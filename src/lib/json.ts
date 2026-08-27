@@ -13,15 +13,9 @@
  * not read the same as a file that is not JSON at all.
  */
 
-/**
- * @typedef {{ ok: true, value: unknown } | { ok: false, error: SyntaxError }} JsonReading
- */
+export type JsonReading = { ok: true; value: unknown } | { ok: false; error: SyntaxError };
 
-/**
- * @param {string} text
- * @returns {JsonReading}
- */
-export function getValueFromJsonText(text) {
+export function getValueFromJsonText(text: string): JsonReading {
   try {
     return { ok: true, value: JSON.parse(text) };
   } catch (error) {
@@ -37,12 +31,8 @@ export function getValueFromJsonText(text) {
  * `JSON.stringify` answers `undefined` — not a string — for a function, a symbol or a bare
  * `undefined`, and every write in this repository goes to a file that cannot be fetched
  * again, so the caller is told rather than left holding it.
- *
- * @param {unknown} value
- * @param {number} [indent]
- * @returns {string | null}
  */
-export function composeJsonText(value, indent) {
+export function composeJsonText(value: unknown, indent?: number): string | null {
   const text = JSON.stringify(value, null, indent);
   return typeof text === "string" ? text : null;
 }

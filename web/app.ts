@@ -1,6 +1,6 @@
 // The view of one world: the chosen snapshot in cross-section and the history of all of
 // them, under one filter. This is the only module that touches the DOM — all the counting
-// logic sits in `filters.js` and `history.js` and is tested without a browser.
+// logic sits in `filters.ts` and `history.ts` and is tested without a browser.
 //
 // Two data paths, deliberately unequal:
 //   • the default filter → history from `trends.json`, fetched anyway
@@ -10,7 +10,19 @@
 //
 // The strings a reader sees are Polish — see "Language" in AGENTS.md.
 
-import { POLISH_LOCALE, PROFESSION_COLORS, getProfessionEntries, capitalize, formatSnapshotDate, formatShortDate, formatUtcTime } from "./shared.js";
+import {
+  POLISH_LOCALE,
+  PROFESSION_COLORS,
+  getProfessionEntries,
+  capitalize,
+  formatSnapshotDate,
+  formatShortDate,
+  formatUtcTime,
+  type Filters,
+  type ManifestEntry,
+  type SnapshotEntry,
+  type WorldTrend,
+} from "@/src/shared.ts";
 import {
   getActivityLabel,
   countByActivity,
@@ -21,7 +33,7 @@ import {
   isDefaultFilters,
   getTotalsFromCounts,
   getVisibleActivityBuckets,
-} from "./filters.js";
+} from "@/web/filters.ts";
 import {
   getActiveCounts,
   buildFilteredTrend,
@@ -37,29 +49,24 @@ import {
   getUsableThresholds,
   readViewFromParams,
   composeViewParams,
-} from "./history.js";
-import { MargoStatError } from "./lib/margostat-error.js";
-import { assert, assertDefined } from "./lib/assert.js";
-import { BYTES_IN_KILOBYTE, BYTES_IN_MEGABYTE } from "./lib/byte-size.js";
-import { getFiniteNumberFromText, getIntegerFromText } from "./lib/number.js";
-import { getMillisecondsFromIsoText } from "./lib/timestamp.js";
-import { ResourceFetchError, ResourceParseError, getJsonFromUrl } from "./fetch-json.js";
+} from "@/web/history.ts";
+import { MargoStatError } from "@/web/margostat-error.ts";
+import { assert, assertDefined } from "@/src/lib/assert.ts";
+import { BYTES_IN_KILOBYTE, BYTES_IN_MEGABYTE } from "@/src/lib/byte-size.ts";
+import { getFiniteNumberFromText, getIntegerFromText } from "@/src/lib/number.ts";
+import { getMillisecondsFromIsoText } from "@/src/lib/timestamp.ts";
+import { ResourceFetchError, ResourceParseError, getJsonFromUrl } from "@/web/fetch-json.ts";
+
+type ManifestWorld = { name: string; files: ManifestEntry[] };
+type Manifest = { worlds: ManifestWorld[] };
+type Trends = { schema: number; builtAt: string; worlds: Record<string, WorldTrend> };
 
 /**
- * @typedef {import("./shared.js").Filters} Filters
- * @typedef {import("./shared.js").SnapshotEntry} SnapshotEntry
- * @typedef {import("./shared.js").ManifestEntry} ManifestEntry
- * @typedef {import("./shared.js").TypedSnapshot} TypedSnapshot
- * @typedef {import("./shared.js").WorldTrend} WorldTrend
- * @typedef {import("./shared.js").SnapshotSummary} SnapshotSummary
- * @typedef {{ name: string, files: ManifestEntry[] }} ManifestWorld
- * @typedef {{ worlds: ManifestWorld[] }} Manifest
- * @typedef {{ schema: number, builtAt: string, worlds: Record<string, WorldTrend> }} Trends
- *
- * @typedef {any} ChartInstance Chart.js is vendored, minified and carries no types
- *   (§9.3). Naming the hole here is the point: it is one name, in one place, rather
- *   than an implicit `any` spreading out of every chart the view touches.
+ * Chart.js is vendored, minified and carries no types (§9.3). Naming the hole here is the
+ * point: it is one name, in one place, rather than an implicit `any` spreading out of every
+ * chart the view touches.
  */
+type ChartInstance = any;
 
 /**
  * A node this view expects `index.html` to hold.
@@ -69,10 +76,9 @@ import { ResourceFetchError, ResourceParseError, getJsonFromUrl } from "./fetch-
  * step, and the code says that at a glance in a console shared with nothing.
  */
 class MissingElementError extends MargoStatError {
-  /**
-   * @param {string} id
-   */
-  constructor(id) {
+  readonly elementId: string;
+
+  constructor(id: string) {
     super("MissingElement", `index.html has no element #${id}`);
     this.elementId = id;
   }
@@ -104,7 +110,7 @@ const RENDER_DEBOUNCE_MS = 150;
 
 function getThemeTokens() {
   const style = getComputedStyle(document.documentElement);
-  const requireToken = (/** @type {string} */ name) => {
+  const requireToken = (name: string) => {
     const value = style.getPropertyValue(name).trim();
     assert(value !== "", `index.html defines the token ${name}`);
     return value;
@@ -123,11 +129,8 @@ function getThemeTokens() {
 function startView() {
   /**
    * A node `index.html` is expected to hold.
-   *
-   * @param {string} id
-   * @returns {HTMLElement}
    */
-  const getElement = (id) => {
+  const getElement = (id: string): HTMLElement => {
     const node = document.getElementById(id);
     if (!node) throw new MissingElementError(id);
     return node;
@@ -143,28 +146,18 @@ function startView() {
    * really `<input>`s and `<select>`s is held statically: `dashboard.test.ts` reads the
    * ids passed to `field()` out of this file and checks each against the markup, so the
    * pairing is proved where it is written rather than asserted where it is used.
-   *
-   * @param {string} id
-   * @returns {HTMLInputElement | HTMLSelectElement}
    */
-  const getField = (id) => /** @type {HTMLInputElement | HTMLSelectElement} */ (getElement(id));
+  const getField = (id: string): HTMLInputElement | HTMLSelectElement => (getElement(id) as HTMLInputElement | HTMLSelectElement);
 
   /**
    * The checkable inputs inside a container — the profession checkboxes.
-   *
-   * @param {string} id
-   * @param {string} [selector]
-   * @returns {HTMLInputElement[]}
    */
-  const getCheckboxes = (id, selector = "input") =>
-    /** @type {HTMLInputElement[]} */ ([...getElement(id).querySelectorAll(selector)]);
+  const getCheckboxes = (id: string, selector: string = "input"): HTMLInputElement[] =>
+    ([...getElement(id).querySelectorAll(selector)] as HTMLInputElement[]);
 
-  /** @type {Manifest | null} */
-  let manifest = null;
-  /** @type {Trends | null} */
-  let trends = null;
-  /** @type {ReturnType<typeof setTimeout> | null} */
-  let renderTimer = null;
+  let manifest: Manifest | null = null;
+  let trends: Trends | null = null;
+  let renderTimer: ReturnType<typeof setTimeout> | null = null;
 
   // The history is bought knowingly: as long as nobody has moved the filter, `trends.json`
   // is enough and there is no reason to pull megabytes.
@@ -172,28 +165,24 @@ function startView() {
   let snapshotToken = 0; // the same for the single snapshot being cross-sectioned
   let progress = { loaded: 0, expected: 0, failed: 0, running: false };
 
-  /** @type {Record<string, ChartInstance>} */
-  const charts = {};
+  const charts: Record<string, ChartInstance> = {};
   // The X axis is linear in epoch milliseconds, so 3-17 day intervals are visibly
   // different. Chart.js has a time scale for this, but it needs a date adapter we do not
   // vendor — so we generate the labels ourselves and put the ticks exactly at the snapshots.
-  /** @type {number[]} */
-  let tickValues = [];
+  let tickValues: number[] = [];
   // The ends of the X axis, in the same epoch milliseconds. They come from the aggregate,
   // never from the drawn series: a snapshot can still be missing — one that failed to fetch,
   // or one still in flight — and an axis that shrank with it would move the left edge of the
   // chart the moment somebody typed a level, the same world silently changing the period it
   // describes.
-  /** @type {{ min: number, max: number } | null} */
-  let axisRange = null;
-  /** @type {Map<number, SnapshotEntry>} */
-  let entriesByTime = new Map();
+  let axisRange: { min: number, max: number } | null = null;
+  let entriesByTime: Map<number, SnapshotEntry> = new Map();
   let thresholdKeys = ""; // the last set of thresholds filled in, so the choice is not cleared
 
   // Chart.js arrives as a global from `vendor/`, minified and with no type information —
   // so it is named once, here, and the hole it leaves is `ChartInstance` rather than an
   // implicit `any` on every chart the view touches (§9.3).
-  const Chart = /** @type {any} */ (/** @type {any} */ (window).Chart);
+  const Chart = ((window as any).Chart as any);
   if (Chart) {
     Chart.defaults.color = theme.muted;
     Chart.defaults.borderColor = theme.grid;
@@ -219,12 +208,7 @@ function startView() {
 
   // ── Reading the state out of the form ─────────────────────────────────────
 
-  /**
-   * @param {string} id
-   * @param {number} fallback
-   * @returns {number}
-   */
-  function readFieldNumber(id, fallback) {
+  function readFieldNumber(id: string, fallback: number): number {
     const value = getField(id).value;
     if (value === "") return fallback;
     // A field left holding something unreadable falls back rather than becoming a number:
@@ -238,11 +222,8 @@ function startView() {
    * An assertion rather than a fallback: these come from `index.html` and from a constant
    * in `shared.js`, both ours, so a value that is not 1-6 means the two went out of step
    * and no reading here could repair it (§9.5).
-   *
-   * @param {string | number} value
-   * @returns {number}
    */
-  function requireProfessionId(value) {
+  function requireProfessionId(value: string | number): number {
     const id = assertDefined(getIntegerFromText(String(value)), `a profession id is a whole number, got "${value}"`);
     assert(id >= 1 && id <= 6, `a profession id is 1-6, got ${id}`);
     return id;
@@ -273,10 +254,9 @@ function startView() {
 
   /** The inverse of readFilters — puts the state from the URL back into the form fields. */
   /**
-   * @param {Filters} filters
    */
-  function applyFilters(filters) {
-    const setFieldValue = (/** @type {string} */ id, /** @type {number} */ value) => {
+  function applyFilters(filters: Filters) {
+    const setFieldValue = (id: string, value: number) => {
       getField(id).value = Number.isFinite(value) ? String(value) : "";
     };
     setFieldValue("minLevel", filters.minLevel);
@@ -340,15 +320,15 @@ function startView() {
 
   // ── Formatting numbers ────────────────────────────────────────────────────
 
-  const formatNumber = (/** @type {number} */ value) => value.toLocaleString(POLISH_LOCALE);
+  const formatNumber = (value: number) => value.toLocaleString(POLISH_LOCALE);
   // Fractions in Polish too — "−5,3%" next to "23 719" rather than "−5.3%", two
   // conventions at once.
-  const formatDecimal = (/** @type {number} */ value, digits = 1) =>
+  const formatDecimal = (value: number, digits = 1) =>
     value.toLocaleString(POLISH_LOCALE, { minimumFractionDigits: digits, maximumFractionDigits: digits });
-  const formatSigned = (/** @type {number} */ value, format = formatNumber) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${format(Math.abs(value))}`;
+  const formatSigned = (value: number, format = formatNumber) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${format(Math.abs(value))}`;
   // A transfer, as the person paying for it reads it. Under a megabyte in whole kilobytes:
   // "0,4 MB" says less than "360 KB" to somebody deciding whether to press the button.
-  const formatBytes = (/** @type {number} */ value) =>
+  const formatBytes = (value: number) =>
     value >= BYTES_IN_MEGABYTE
       ? `${formatDecimal(value / BYTES_IN_MEGABYTE)} MB`
       : `${formatNumber(Math.round(value / BYTES_IN_KILOBYTE))} KB`;
@@ -368,11 +348,9 @@ function startView() {
    * with every test still green (§9.5).
    */
   /**
-   * @param {unknown} error
-   * @param {string} subject what could not be fetched, in Polish, for the sentence
-   * @returns {string}
+   * @param subject what could not be fetched, in Polish, for the sentence
    */
-  function describeFailure(error, subject) {
+  function describeFailure(error: unknown, subject: string): string {
     if (error instanceof ResourceFetchError) {
       return `Nie udało się pobrać ${subject}: serwer odpowiedział kodem ${error.status}.`;
     }
@@ -403,10 +381,7 @@ function startView() {
     };
   }
 
-  /**
-   * @param {{ chart: ChartInstance, tooltip: any }} context
-   */
-  function renderLevelTooltip({ chart, tooltip }) {
+  function renderLevelTooltip({ chart, tooltip }: { chart: ChartInstance, tooltip: any }) {
     let node = document.getElementById("profTooltip");
     if (!node) {
       node = document.createElement("div");
@@ -426,13 +401,13 @@ function startView() {
       return;
     }
 
-    const total = chart.data.datasets.reduce((/** @type {number} */ sum, /** @type {any} */ dataset) => sum + (dataset.data[dataIndex] || 0), 0);
+    const total = chart.data.datasets.reduce((sum: number, dataset: any) => sum + (dataset.data[dataIndex] || 0), 0);
     const level = chart.data.labels[dataIndex];
     const rows = chart.data.datasets
-      .map((/** @type {any} */ dataset) => ({ label: dataset.label, color: dataset.backgroundColor, value: dataset.data[dataIndex] || 0 }))
-      .filter((/** @type {{ value: number }} */ row) => row.value > 0)
-      .sort((/** @type {{ value: number }} */ left, /** @type {{ value: number }} */ right) => right.value - left.value)
-      .map((/** @type {{ label: string, color: string, value: number }} */ row) => {
+      .map((dataset: any) => ({ label: dataset.label, color: dataset.backgroundColor, value: dataset.data[dataIndex] || 0 }))
+      .filter((row: { value: number }) => row.value > 0)
+      .sort((left: { value: number }, right: { value: number }) => right.value - left.value)
+      .map((row: { label: string, color: string, value: number }) => {
         // The same notation as in the bar and the table: "12,3%" and "1 234", not "12.3%".
         const percentText = total ? formatDecimal((row.value / total) * 100, 1) : formatDecimal(0, 1);
         return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
@@ -472,10 +447,7 @@ function startView() {
     node.style.top = `${y}px`;
   }
 
-  /**
-   * @param {Map<number, number[]>} counts
-   */
-  function renderLevelChart(counts) {
+  function renderLevelChart(counts: Map<number, number[]>) {
     const labels = [...counts.keys()].sort((left, right) => left - right);
     const datasets = getProfessionEntries().map(([id, name]) => ({
       label: name,
@@ -507,11 +479,9 @@ function startView() {
   // ── The history charts ────────────────────────────────────────────────────
 
   /**
-   * @param {string} title
-   * @param {{ percent?: boolean }} [options]
-   * @returns {any} Chart.js's own options shape — §9.3
+   * @returns Chart.js's own options shape — §9.3
    */
-  function composeTimeChartOptions(title, { percent = false } = {}) {
+  function composeTimeChartOptions(title: string, { percent = false }: { percent?: boolean } = {}): any {
     return {
       responsive: true,
       maintainAspectRatio: false,
@@ -522,30 +492,30 @@ function startView() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: (/** @type {any[]} */ items) => {
+            title: (items: any[]) => {
               const entry = entriesByTime.get(items[0].parsed.x);
               if (!entry) return "";
               // The UTC hour, because it is what explains the jumps in "last online".
               return `${formatSnapshotDate(entry)} (${formatUtcTime(entry.startedAt)} UTC)`;
             },
-            label: (/** @type {any} */ item) => `${item.dataset.label}: ${percent ? `${formatDecimal(item.parsed.y)}%` : formatNumber(item.parsed.y)}`,
-            footer: (/** @type {any[]} */ items) => (entriesByTime.get(items[0].parsed.x)?.suspect ? "⚠ migawka może być obcięta" : ""),
+            label: (item: any) => `${item.dataset.label}: ${percent ? `${formatDecimal(item.parsed.y)}%` : formatNumber(item.parsed.y)}`,
+            footer: (items: any[]) => (entriesByTime.get(items[0].parsed.x)?.suspect ? "⚠ migawka może być obcięta" : ""),
           },
         },
       },
       scales: {
         y: {
           beginAtZero: percent,
-          ticks: { precision: percent ? 1 : 0, callback: (/** @type {number} */ value) => (percent ? `${formatDecimal(value)}%` : formatNumber(value)) },
+          ticks: { precision: percent ? 1 : 0, callback: (value: number) => (percent ? `${formatDecimal(value)}%` : formatNumber(value)) },
           grid: { color: theme.grid },
         },
         x: {
           type: "linear",
           ...(axisRange ?? {}),
-          afterBuildTicks: (/** @type {any} */ axis) => {
+          afterBuildTicks: (axis: any) => {
             axis.ticks = tickValues.map((value) => ({ value }));
           },
-          ticks: { callback: (/** @type {number} */ value) => formatShortDate(value), maxRotation: 45, autoSkip: false },
+          ticks: { callback: (value: number) => formatShortDate(value), maxRotation: 45, autoSkip: false },
           grid: { color: theme.gridSoft },
         },
       },
@@ -554,37 +524,26 @@ function startView() {
 
   /** A suspect snapshot's point is drawn hollow — otherwise a truncated scrape looks like a drop. */
   /**
-   * @param {WorldTrend} trend
-   * @param {string} color
    */
-  function composePointStyle(trend, color) {
+  function composePointStyle(trend: WorldTrend, color: string) {
     return {
-      pointBackgroundColor: trend.suspect.map((/** @type {number} */ suspect) => (suspect ? "transparent" : color)),
-      pointBorderColor: trend.suspect.map((/** @type {number} */ suspect) => (suspect ? theme.warn : color)),
-      pointBorderWidth: trend.suspect.map((/** @type {number} */ suspect) => (suspect ? 2 : 1)),
-      pointRadius: trend.suspect.map((/** @type {number} */ suspect) => (suspect ? 6 : 3)),
+      pointBackgroundColor: trend.suspect.map((suspect: number) => (suspect ? "transparent" : color)),
+      pointBorderColor: trend.suspect.map((suspect: number) => (suspect ? theme.warn : color)),
+      pointBorderWidth: trend.suspect.map((suspect: number) => (suspect ? 2 : 1)),
+      pointRadius: trend.suspect.map((suspect: number) => (suspect ? 6 : 3)),
       pointHoverRadius: 6,
     };
   }
 
-  /**
-   * @param {WorldTrend} trend
-   * @param {number[]} values
-   */
-  function composeSeries(trend, values) {
+  function composeSeries(trend: WorldTrend, values: number[]) {
     // A point whose date cannot be read is dropped rather than placed at NaN, where
     // Chart.js draws nothing and the series silently loses a snapshot without saying so.
     return values
-      .map((/** @type {number} */ y, /** @type {number} */ index) => ({ x: getMillisecondsFromIsoText(trend.startedAt[index]), y }))
-      .filter((/** @type {{ x: number | null }} */ point) => point.x !== null);
+      .map((y: number, index: number) => ({ x: getMillisecondsFromIsoText(trend.startedAt[index]), y }))
+      .filter((point: { x: number | null }) => point.x !== null);
   }
 
-  /**
-   * @param {string} id
-   * @param {any[]} datasets
-   * @param {any} options
-   */
-  function drawChart(id, datasets, options) {
+  function drawChart(id: string, datasets: any[], options: any) {
     if (!charts[id]) {
       charts[id] = new Chart(getElement(id), { type: "line", data: { datasets }, options });
       return;
@@ -595,12 +554,9 @@ function startView() {
   }
 
   /**
-   * @param {WorldTrend} trend
-   * @param {number[]} population the **unfiltered** population — §9.6
-   * @param {Filters} filters
-   * @param {boolean} share
+   * @param population the **unfiltered** population — §9.6
    */
-  function renderHistoryCharts(trend, population, filters, share) {
+  function renderHistoryCharts(trend: WorldTrend, population: number[], filters: Filters, share: boolean) {
     // Under the default filter, "the isMatch' share of the population" is 100% by
     // definition — so the population chart stays in counts instead of drawing a flat line.
     const filtered = !isDefaultFilters(filters);
@@ -655,7 +611,7 @@ function startView() {
     });
     // The only chart with six series, so the only one that needs a legend. The options
     // object is Chart.js's own shape, which carries no types here (§9.3).
-    /** @type {any} */ (professionOptions.plugins).legend = {
+    (professionOptions.plugins as any).legend = {
       display: true,
       position: "bottom",
       labels: { boxWidth: 12, usePointStyle: true },
@@ -691,12 +647,12 @@ function startView() {
     days: ["onlineValue"],
   };
 
-  /** @param {string} key one of `FILTER_GROUPS`'s keys, or "prof" */
-  function clearFilterGroup(key) {
+  /** @param key one of `FILTER_GROUPS`'s keys, or "prof" */
+  function clearFilterGroup(key: string) {
     if (key === "prof") {
       for (const checkbox of getCheckboxes("profCheckboxes")) checkbox.checked = true;
     } else {
-      for (const id of FILTER_GROUPS[/** @type {keyof typeof FILTER_GROUPS} */ (key)] ?? []) getField(id).value = "";
+      for (const id of FILTER_GROUPS[(key as keyof typeof FILTER_GROUPS)] ?? []) getField(id).value = "";
       if (key === "days") getField("onlinePreset").value = "all";
     }
     scheduleRender();
@@ -710,10 +666,7 @@ function startView() {
    * The chips are a view of `readFilters()`, not their own state: `describeFilters`
    * computes the labels, and the close button writes back into the same form fields.
    */
-  /**
-   * @param {Filters} filters
-   */
-  function renderChips(filters) {
+  function renderChips(filters: Filters) {
     const chips = describeFilters(filters);
     const box = getElement("filterChips");
     // The chips are rebuilt on every render, so pressing a close button destroyed the
@@ -722,7 +675,7 @@ function startView() {
     const active = typeof document !== "undefined" ? document.activeElement : null;
     const hadFocus =
       active && box.contains?.(active)
-        ? (/** @type {HTMLElement} */ (active).dataset?.clear ?? "")
+        ? ((active as HTMLElement).dataset?.clear ?? "")
         : null;
 
     box.innerHTML = chips
@@ -741,10 +694,7 @@ function startView() {
     next.focus?.();
   }
 
-  /**
-   * @param {boolean} open
-   */
-  function setFieldsOpen(open) {
+  function setFieldsOpen(open: boolean) {
     // Closing hides the drawer with `display: none`. If focus were inside, the browser
     // would drop it onto `<body>` and the next Tab would start from the top of the
     // document — so we hand it to the button that opens the drawer.
@@ -757,11 +707,7 @@ function startView() {
     if (focusWasInside) getElement("filtersToggle").focus?.();
   }
 
-  /**
-   * @param {number} matched
-   * @param {number} population
-   */
-  function renderMatchLine(matched, population) {
+  function renderMatchLine(matched: number, population: number) {
     const share = population > 0 ? (matched / population) * 100 : 0;
     getElement("matchLine").innerHTML =
       `<span>Pasuje: <b>${formatNumber(matched)}</b></span>` +
@@ -769,13 +715,7 @@ function startView() {
       `<span>(${formatDecimal(share, 1)}%)</span>`;
   }
 
-  /**
-   * @param {Map<number, number[]>} counts
-   * @param {[number, number][]} activity
-   * @param {number} maxDays
-   * @param {Set<number>} professions
-   */
-  function renderStats(counts, activity, maxDays, professions) {
+  function renderStats(counts: Map<number, number[]>, activity: [number, number][], maxDays: number, professions: Set<number>) {
     const { perProfession } = getTotalsFromCounts(counts);
 
     // Zero isMatch is not a distribution made of zeros: six professions and five activity
@@ -806,9 +746,9 @@ function startView() {
 
     const visible = new Set(getVisibleActivityBuckets(maxDays));
     const activityLine = activity
-      .filter((/** @type {[number, number]} */ [bucket]) => visible.has(bucket))
+      .filter(([bucket]: [number, number]) => visible.has(bucket))
       .map(
-        (/** @type {[number, number]} */ [bucket, count]) =>
+        ([bucket, count]: [number, number]) =>
           `<span>${getActivityLabel(bucket, maxDays)}: <b style="color:var(--text)">${formatNumber(count)}</b></span>`,
       )
       .join(" · ");
@@ -825,9 +765,9 @@ function startView() {
    * would be written for nobody.
    */
   /**
-   * @param {{ reason: string } | null | undefined} suspect written by the scraper, in Polish, for a player — §9.8
+   * @param suspect written by the scraper, in Polish, for a player — §9.8
    */
-  function showSuspect(suspect) {
+  function showSuspect(suspect: { reason: string } | null | undefined) {
     const node = getElement("suspect");
     if (!suspect) {
       node.hidden = true;
@@ -839,10 +779,9 @@ function startView() {
   }
 
   /**
-   * @param {WorldTrend} trend
-   * @param {WorldTrend} base the aggregate, which owns the time axis — §9.6
+   * @param base the aggregate, which owns the time axis — §9.6
    */
-  function renderSummary(trend, base) {
+  function renderSummary(trend: WorldTrend, base: WorldTrend) {
     const summary = summarize(trend);
     if (!summary) {
       getElement("summary").textContent = "—";
@@ -868,10 +807,7 @@ function startView() {
     `;
   }
 
-  /**
-   * @param {WorldTrend} trend
-   */
-  function renderTable(trend) {
+  function renderTable(trend: WorldTrend) {
     const rows = getChangeRows(trend).reverse(); // the newest at the top
     // A world with one snapshot has nothing to compare against anything. Clearing the
     // content alone left the `.card` with its border and padding — an empty box that still
@@ -914,11 +850,7 @@ function startView() {
    * would count exactly the same players as the isMatch chart, so they would collapse onto
    * it into one line that looks like confirmation of something.
    */
-  /**
-   * @param {number} maxDays
-   * @param {string} [preferred]
-   */
-  function fillThresholdSelect(maxDays, preferred) {
+  function fillThresholdSelect(maxDays: number, preferred?: string) {
     const usable = getUsableThresholds(maxDays);
     const keys = usable.map((threshold) => threshold.key).join(",");
     // The choice is read BEFORE the options are replaced. `innerHTML` on a `<select>`
@@ -970,11 +902,9 @@ function startView() {
    * Measured on aether, 12 × 98.5 KB = 1.15 MB against 1.156 MB actually on disk — close,
    * but a number that might be wrong may not look like one that is right (§9.6).
    *
-   * @param {number} loaded
-   * @param {number} available
-   * @param {number} bytes gzip size of one snapshot; 0 = not measured
+   * @param bytes gzip size of one snapshot; 0 = not measured
    */
-  function renderHistoryStatus(loaded, available, bytes) {
+  function renderHistoryStatus(loaded: number, available: number, bytes: number) {
     const node = getElement("historyStatus");
     if (available === 0) {
       node.textContent = "brak datowanych migawek";
@@ -1021,10 +951,7 @@ function startView() {
     getElement("changeTable").innerHTML = "";
   }
 
-  /**
-   * @param {Filters} filters
-   */
-  function renderCrossSection(filters) {
+  function renderCrossSection(filters: Filters) {
     const data = getCurrentSnapshot();
     const base = getBaseTrend();
     if (!data) {
@@ -1051,10 +978,7 @@ function startView() {
     renderStats(counts, countByActivity(data, filters), filters.maxDays, filters.professions);
   }
 
-  /**
-   * @param {Filters} filters
-   */
-  function renderHistory(filters) {
+  function renderHistory(filters: Filters) {
     const base = getBaseTrend();
     if (!base) {
       getElement("historyStatus").textContent = "brak historii dla tego świata";
@@ -1118,7 +1042,7 @@ function startView() {
     entriesByTime = new Map(
       getSnapshotEntries(base).flatMap((entry) => {
         const milliseconds = getMillisecondsFromIsoText(entry.startedAt);
-        return milliseconds === null ? [] : [/** @type {[number, SnapshotEntry]} */ ([milliseconds, entry])];
+        return milliseconds === null ? [] : [([milliseconds, entry] as [number, SnapshotEntry])];
       }),
     );
     renderHistoryCharts(trend, population, filters, share);
@@ -1161,10 +1085,7 @@ function startView() {
 
   // ── Fetching ──────────────────────────────────────────────────────────────
 
-  /**
-   * @param {ManifestEntry | undefined} entry
-   */
-  async function loadSnapshot(entry) {
+  async function loadSnapshot(entry: ManifestEntry | undefined) {
     if (!entry) return;
     const token = ++snapshotToken;
     const world = getCurrentWorld();
@@ -1253,9 +1174,9 @@ function startView() {
   // ── The selects ───────────────────────────────────────────────────────────
 
   /**
-   * @param {string | null} [selected] the world to keep chosen, where one is to be kept
+   * @param selected the world to keep chosen, where one is to be kept
    */
-  function fillWorldSelect(selected) {
+  function fillWorldSelect(selected?: string | null) {
     getElement("worldSelect").innerHTML = getWorlds()
       .map((world) => `<option value="${world.name}">${capitalize(world.name)}</option>`)
       .join("");
@@ -1263,9 +1184,9 @@ function startView() {
   }
 
   /**
-   * @param {string | null} [selected] the id to keep chosen, where one is to be kept
+   * @param selected the id to keep chosen, where one is to be kept
    */
-  function fillSnapshotSelect(selected) {
+  function fillSnapshotSelect(selected?: string | null) {
     const files = [...getCurrentWorldEntries()].reverse(); // the newest at the top
     getElement("snapshotSelect").innerHTML = files
       .map((filters) => `<option value="${filters.id}">${formatSnapshotDate(filters)}</option>`)
@@ -1279,24 +1200,16 @@ function startView() {
     await ensureHistory();
   }
 
-  /**
-   * @param {unknown} json
-   * @returns {Manifest}
-   */
-  function readManifest(json) {
-    const worlds = /** @type {{ worlds?: unknown }} */ (json)?.worlds;
+  function readManifest(json: unknown): Manifest {
+    const worlds = (json as { worlds?: unknown })?.worlds;
     if (!Array.isArray(worlds)) throw new ResourceParseError("manifest.json");
-    return /** @type {Manifest} */ (json);
+    return (json as Manifest);
   }
 
-  /**
-   * @param {unknown} json
-   * @returns {Trends}
-   */
-  function readTrends(json) {
-    const worlds = /** @type {{ worlds?: unknown }} */ (json)?.worlds;
+  function readTrends(json: unknown): Trends {
+    const worlds = (json as { worlds?: unknown })?.worlds;
     if (typeof worlds !== "object" || worlds === null) throw new ResourceParseError("trends.json");
-    return /** @type {Trends} */ (json);
+    return (json as Trends);
   }
 
   async function loadInitialView() {
@@ -1390,11 +1303,11 @@ function startView() {
   });
   document.addEventListener("click", (event) => {
     if (getElement("filterFields").hidden) return;
-    if (!getElement("filterBar").contains?.(/** @type {Node | null} */ (event.target))) setFieldsOpen(false);
+    if (!getElement("filterBar").contains?.((event.target as Node | null))) setFieldsOpen(false);
   });
 
   getElement("filterChips").addEventListener("click", (event) => {
-    const key = /** @type {HTMLElement | null} */ (event.target)?.dataset?.clear;
+    const key = (event.target as HTMLElement | null)?.dataset?.clear;
     if (key) clearFilterGroup(key);
   });
 

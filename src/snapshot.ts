@@ -2,8 +2,8 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { parseLastOnlineDays, type PlayerRow } from "@/src/parser.ts";
 import { MargoStatToolError } from "@/src/margostat-tool-error.ts";
-import { getIntegerFromValue } from "@/public/lib/number.js";
-import { getValueFromJsonText } from "@/public/lib/json.js";
+import { getIntegerFromValue } from "@/src/lib/number.ts";
+import { getValueFromJsonText } from "@/src/lib/json.ts";
 
 // A snapshot is written as two complementary files sharing one row order
 // (row i ↔ rank i+1), so together they reconstruct it 1:1 and nothing is duplicated:

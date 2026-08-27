@@ -12,7 +12,7 @@ const POLISH = /[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]/;
 
 // The game's own names for its professions. They are proper nouns of somebody else's system,
 // so a comment written in English may still have to spell one — `parser.ts` reads them out of
-// the ranking's HTML and `shared.js` prints them on a chart.
+// the ranking's HTML and `src/shared.ts` prints them on a chart.
 const GAME_NAMES = ["Wojownik", "Mag", "Paladyn", "Tropiciel", "Tancerz ostrzy", "Łowca"];
 
 /**
@@ -23,22 +23,22 @@ const GAME_NAMES = ["Wojownik", "Mag", "Paladyn", "Tropiciel", "Tancerz ostrzy",
  * machine can hold is *which files are allowed to*. A further one appearing is a decision
  * somebody should have to make on purpose.
  *
- * `phrase` exists because a Polish string can carry no diacritic at all — `history.js` says
+ * `phrase` exists because a Polish string can carry no diacritic at all — `history.ts` says
  * "≤ 7 dni", which the detector above is blind to. Without naming the phrase, that file would
  * silently drop out of the second direction of the check.
  */
 const SPEAKS_POLISH: Array<{ file: string; phrase?: string }> = [
   // The dashboard — the text a player reads.
-  { file: "public/app.js" },
-  { file: "public/filters.js" },
-  { file: "public/shared.js" },
-  { file: "public/history.js", phrase: "≤ 7 dni" },
+  { file: "web/app.ts" },
+  { file: "web/filters.ts" },
+  { file: "src/shared.ts" },
+  { file: "web/history.ts", phrase: "≤ 7 dni" },
   // Keys that match Margonem's own HTML, and the sentence the scraper writes for a player.
   { file: "src/parser.ts" },
   { file: "src/snapshot.ts" },
   // Tests pinning the Polish interface, and samples of captured material.
   // This file is on the list because it spells the game's professions and the phrase it holds
-  // `history.js` to — a guard exempting itself would be the first thing to go stale.
+  // `web/history.ts` to — a guard exempting itself would be the first thing to go stale.
   { file: "test/language.test.ts" },
   { file: "test/dashboard.test.ts" },
   { file: "test/parser.test.ts" },
@@ -47,7 +47,7 @@ const SPEAKS_POLISH: Array<{ file: string; phrase?: string }> = [
 
 // Every directory holding a source of ours. A new one that is not here is a whole layer
 // the boundary stops being checked over, which is why the first test below counts.
-const SCANNED = ["src/**/*.ts", "test/*.ts", "public/*.js", "public/lib/*.js", "tools/*.ts"];
+const SCANNED = ["src/**/*.ts", "web/*.ts", "test/*.ts", "tools/*.ts"];
 
 const sources = new Map<string, string>();
 for (const pattern of SCANNED) {

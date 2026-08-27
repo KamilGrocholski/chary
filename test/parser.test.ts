@@ -9,7 +9,7 @@ import {
   parseTotalPages,
   getProfessionId,
 } from "@/src/parser.ts";
-import { PROFESSION_COUNT, getProfessionEntries } from "@/public/shared.js";
+import { PROFESSION_COUNT, getProfessionEntries } from "@/src/shared.ts";
 
 const fixture = await Bun.file(
   new URL("./fixtures/ladder-aether-p1.html", import.meta.url).pathname,

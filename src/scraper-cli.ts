@@ -12,7 +12,7 @@
  * is accepted — not a stack trace through a module they did not write.
  */
 
-import { getFiniteNumberFromText, getIntegerFromText } from "@/public/lib/number.js";
+import { getFiniteNumberFromText, getIntegerFromText } from "@/src/lib/number.ts";
 import { DEFAULT_DROP_THRESHOLD } from "@/src/snapshot.ts";
 
 /** A world name goes into a URL and into a file path alike — it has to be boring. */

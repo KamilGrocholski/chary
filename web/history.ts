@@ -24,24 +24,24 @@ import {
   composeProfessionSeries,
   getActivityBucketBound,
   getDaysBetween,
-} from "./shared.js";
-import { isDefaultFilters, summarizeFiltered } from "./filters.js";
-import { getJsonFromUrl } from "./fetch-json.js";
-import { assertDefined } from "./lib/assert.js";
+  type Filters,
+  type ManifestEntry,
+  type SnapshotEntry,
+  type TypedSnapshot,
+  type WorldTrend,
+} from "@/src/shared.ts";
+import { isDefaultFilters, summarizeFiltered } from "@/web/filters.ts";
+import { getJsonFromUrl } from "@/web/fetch-json.ts";
+import { assertDefined } from "@/src/lib/assert.ts";
 
-/**
- * @typedef {import("./shared.js").Filters} Filters
- * @typedef {import("./shared.js").SnapshotEntry} SnapshotEntry
- * @typedef {import("./shared.js").ManifestEntry} ManifestEntry
- * @typedef {import("./shared.js").TypedSnapshot} TypedSnapshot
- * @typedef {import("./shared.js").WorldTrend} WorldTrend
- * @typedef {Map<string, TypedSnapshot>} SnapshotStore Loaded snapshots of one world, by id.
- * @typedef {{ world: string|null, date: string|null, threshold: string, share: boolean }} ViewState
- */
+/** Loaded snapshots of one world, by id. */
+export type SnapshotStore = Map<string, TypedSnapshot>;
+
+export type ViewState = { world: string | null; date: string | null; threshold: string; share: boolean };
 
 /**
  * The activity thresholds — **cumulative**, unlike the disjoint `act` buckets in the file
- * and `ACTIVITY_BOUNDS` in `filters.js`. "≤ 7 dni" is buckets 0 and 1 together; confusing
+ * and `ACTIVITY_BOUNDS` in `filters.ts`. "≤ 7 dni" is buckets 0 and 1 together; confusing
  * the two scales would give a chart understated by the whole "< 24h" bucket.
  *
  * `bound` is the highest number of days a threshold still covers — it is what detects the
@@ -72,20 +72,14 @@ export const DEFAULT_THRESHOLD = "7d";
  * of each other look like confirmation of something, while being the same question asked
  * three times, so a threshold wider than the filter simply leaves the picker.
  */
-/**
- * @param {number} [maxDays]
- * @returns {typeof ACTIVITY_THRESHOLDS}
- */
-export function getUsableThresholds(maxDays = Infinity) {
+export function getUsableThresholds(maxDays = Infinity): typeof ACTIVITY_THRESHOLDS {
   return ACTIVITY_THRESHOLDS.filter((threshold) => threshold.bound < maxDays);
 }
 
-/**
- * @param {string | null} key
- * @param {number} [maxDays]
- * @returns {(typeof ACTIVITY_THRESHOLDS)[number] | null}
- */
-export function getThresholdByKey(key, maxDays = Infinity) {
+export function getThresholdByKey(
+  key: string | null,
+  maxDays = Infinity,
+): (typeof ACTIVITY_THRESHOLDS)[number] | null {
   const usable = getUsableThresholds(maxDays);
   if (usable.length === 0) return null;
   return (
@@ -98,13 +92,8 @@ export function getThresholdByKey(key, maxDays = Infinity) {
 
 /**
  * The number of active players in each snapshot at a given threshold.
- *
- * @param {WorldTrend} trend
- * @param {string | null} key
- * @param {number} [maxDays]
- * @returns {number[]}
  */
-export function getActiveCounts(trend, key, maxDays = Infinity) {
+export function getActiveCounts(trend: WorldTrend, key: string | null, maxDays = Infinity): number[] {
   const threshold = getThresholdByKey(key, maxDays);
   if (!threshold) return trend.total.slice();
   return trend.total.map((_, index) =>
@@ -118,11 +107,9 @@ export function getActiveCounts(trend, key, maxDays = Infinity) {
 /**
  * The share of the population, as a percentage. A snapshot with no players gives 0, not NaN.
  *
- * @param {number[]} counts
- * @param {number[]} totals the **unfiltered** population — §9.6
- * @returns {number[]}
+ * @param totals the **unfiltered** population — §9.6
  */
-export function getShareSeries(counts, totals) {
+export function getShareSeries(counts: number[], totals: number[]): number[] {
   return counts.map((count, index) => {
     const total = totals[index] ?? 0;
     return total > 0 ? (count / total) * 100 : 0;
@@ -130,12 +117,9 @@ export function getShareSeries(counts, totals) {
 }
 
 /**
- * Snapshots as `{ id, startedAt }` entries — the format the functions in shared.js read.
- *
- * @param {WorldTrend} trend
- * @returns {SnapshotEntry[]}
+ * Snapshots as `{ id, startedAt }` entries — the format the functions in shared.ts read.
  */
-export function getSnapshotEntries(trend) {
+export function getSnapshotEntries(trend: WorldTrend): SnapshotEntry[] {
   return trend.id.map((id, index) => ({ id, startedAt: trend.startedAt[index], suspect: trend.suspect[index] === 1 }));
 }
 
@@ -153,10 +137,7 @@ export function getSnapshotEntries(trend) {
  * missing from the data. A reader counting rows against the chart beside them found one
  * short in every world.
  */
-/**
- * @param {WorldTrend} trend
- */
-export function getChangeRows(trend) {
+export function getChangeRows(trend: WorldTrend) {
   const entries = getSnapshotEntries(trend);
   const rows = [];
 
@@ -183,10 +164,8 @@ export function getChangeRows(trend) {
 
 /**
  * A world's whole history summarised — from the first snapshot to the last.
- *
- * @param {WorldTrend} trend
  */
-export function summarize(trend) {
+export function summarize(trend: WorldTrend) {
   const last = trend.total.length - 1;
   if (last < 0) return null;
 
@@ -208,11 +187,7 @@ export function summarize(trend) {
 // `prog` and `udzial` are Polish and stay that way: they are the contract of links people
 // have already shared, which is why trends.html still exists. See "Language" in AGENTS.md.
 
-/**
- * @param {ViewState} view
- * @returns {URLSearchParams}
- */
-export function composeViewParams(view) {
+export function composeViewParams(view: ViewState): URLSearchParams {
   const params = new URLSearchParams();
   if (view.world) params.set("world", view.world);
   if (view.date) params.set("date", view.date);
@@ -221,11 +196,7 @@ export function composeViewParams(view) {
   return params;
 }
 
-/**
- * @param {URLSearchParams} params
- * @returns {ViewState}
- */
-export function readViewFromParams(params) {
+export function readViewFromParams(params: URLSearchParams): ViewState {
   const threshold = params.get("prog");
   return {
     world: params.get("world") || null,
@@ -246,26 +217,22 @@ export function readViewFromParams(params) {
  * into 16 bits with room to spare, but an overflow would wrap to a negative number, i.e.
  * silently turn a player from years ago into an account never used. Two bytes per row is a
  * cheap price for not having that class of bug.
+ *
+ * @param json a parsed `.f.json`
  */
-/**
- * @param {unknown} json a parsed `.f.json`
- * @returns {TypedSnapshot & { suspect: unknown }}
- */
-export function composeTypedSnapshot(json) {
+export function composeTypedSnapshot(json: unknown): TypedSnapshot {
   // The one place a fetched `.f.json` becomes ours. Read rather than cast: a truncated
   // file parses as perfectly good JSON, and every column below would then be `undefined`
   // — which `Int16Array.from` turns into a snapshot full of zeros rather than an error
   // anybody could see (§9.5).
-  const file = /** @type {Record<string, unknown>} */ (json);
-  const count = file.count;
-  assertDefined(count, "a .f.json states its row count");
+  const file = json as Record<string, unknown>;
+  const rows = assertDefined(file.count, "a .f.json states its row count") as number;
 
-  const rows = /** @type {number} */ (count);
   const source = {
-    level: /** @type {number[]} */ (file.level),
-    profession: /** @type {number[]} */ (file.profession),
-    honor: /** @type {number[]} */ (file.honor),
-    days: /** @type {(number|null)[]} */ (file.days),
+    level: file.level as number[],
+    profession: file.profession as number[],
+    honor: file.honor as number[],
+    days: file.days as (number | null)[],
   };
   for (const [column, values] of Object.entries(source)) {
     assertDefined(values, `a .f.json holds a ${column} column`);
@@ -285,21 +252,16 @@ export function composeTypedSnapshot(json) {
     days,
     // Read for the one field the view draws. The scraper writes four; naming only the
     // sentence keeps this type honest about what is actually consumed (§9.2).
-    suspect: /** @type {{ reason: string } | null} */ (file.suspect ?? null),
+    suspect: (file.suspect ?? null) as { reason: string } | null,
   };
 }
 
 // The snapshots are held in memory per world. Without a ceiling, switching worlds one by
 // one would collect all 21 in the tab, well over 100 MB.
 const MAX_CACHED_WORLDS = 2;
-/** @type {Map<string, SnapshotStore>} */
-const cache = new Map();
+const cache = new Map<string, SnapshotStore>();
 
-/**
- * @param {string} world
- * @returns {SnapshotStore}
- */
-export function getCachedSnapshots(world) {
+export function getCachedSnapshots(world: string): SnapshotStore {
   let store = cache.get(world);
   if (!store) {
     store = new Map();
@@ -315,12 +277,8 @@ export function getCachedSnapshots(world) {
 
 /**
  * How many of the given snapshots are already in memory.
- *
- * @param {SnapshotStore} store
- * @param {SnapshotEntry[]} entries
- * @returns {number}
  */
-export function getLoadedCount(store, entries) {
+export function getLoadedCount(store: SnapshotStore, entries: SnapshotEntry[]): number {
   return entries.reduce((loaded, entry) => loaded + (store.has(entry.id) ? 1 : 0), 0);
 }
 
@@ -330,15 +288,16 @@ export function getLoadedCount(store, entries) {
 // missing snapshots is computed at start, so three characters typed into "Min level" pulled
 // the same set of files three times. For gordion that is 5.7 MB instead of 1.9 MB — the
 // exact opposite of the promise that transfer is bought knowingly.
-/**
- * @typedef {object} FetchOptions
- * @property {number} [concurrency]
- * @property {(loaded: number, total: number, failed: number) => void} [onProgress]
- * @property {() => boolean} [isStale] answers true once the reader has moved on
- */
+export type FetchOptions = {
+  concurrency?: number;
+  onProgress?: (loaded: number, total: number, failed: number) => void;
+  /** Answers true once the reader has moved on. */
+  isStale?: () => boolean;
+};
 
-/** @type {Map<string, Promise<{ store: SnapshotStore, failed: string[] }>>} */
-const inFlight = new Map();
+type HistoryReading = { store: SnapshotStore; failed: string[] };
+
+const inFlight = new Map<string, Promise<HistoryReading>>();
 
 /**
  * Fetches a world's missing snapshots, `concurrency` at a time. A second call for the same
@@ -349,13 +308,11 @@ const inFlight = new Map();
  * not be fetched lands in `failed` and simply has no point on the chart: one broken
  * response must not take down the whole history.
  */
-/**
- * @param {string} world
- * @param {ManifestEntry[]} entries
- * @param {FetchOptions} [options]
- * @returns {Promise<{ store: SnapshotStore, failed: string[] }>}
- */
-export function loadHistory(world, entries, options = {}) {
+export function loadHistory(
+  world: string,
+  entries: ManifestEntry[],
+  options: FetchOptions = {},
+): Promise<HistoryReading> {
   const running = inFlight.get(world);
   if (running) return running;
 
@@ -364,17 +321,15 @@ export function loadHistory(world, entries, options = {}) {
   return loading;
 }
 
-/**
- * @param {string} world
- * @param {ManifestEntry[]} entries
- * @param {FetchOptions} options
- */
-async function loadMissingSnapshots(world, entries, options) {
+async function loadMissingSnapshots(
+  world: string,
+  entries: ManifestEntry[],
+  options: FetchOptions,
+): Promise<HistoryReading> {
   const { concurrency = 4, onProgress = () => {}, isStale = () => false } = options;
   const store = getCachedSnapshots(world);
   const missing = entries.filter((entry) => !store.has(entry.id));
-  /** @type {string[]} */
-  const failed = [];
+  const failed: string[] = [];
   let nextIndex = 0;
 
   const runWorker = async () => {
@@ -420,20 +375,18 @@ async function loadMissingSnapshots(world, entries, options) {
  * no fetch is ever planned for, and "the history is incomplete" would stand forever. It does
  * not apply under the default filter: the aggregate is already fetched, so narrowing it
  * saves nothing.
- *
- * @param {WorldTrend} base
- * @param {SnapshotStore} store
- * @param {Filters} filters
- * @param {Set<string>|null} [allowed]
- * @returns {{ trend: WorldTrend, population: number[], loaded: number, expected: number }}
  */
-export function buildFilteredTrend(base, store, filters, allowed = null) {
+export function buildFilteredTrend(
+  base: WorldTrend,
+  store: SnapshotStore,
+  filters: Filters,
+  allowed: Set<string> | null = null,
+): { trend: WorldTrend; population: number[]; loaded: number; expected: number } {
   if (isDefaultFilters(filters)) {
     return { trend: base, population: base.total, loaded: base.id.length, expected: base.id.length };
   }
 
-  /** @type {WorldTrend} */
-  const trend = {
+  const trend: WorldTrend = {
     id: [],
     startedAt: [],
     total: [],
@@ -444,8 +397,7 @@ export function buildFilteredTrend(base, store, filters, allowed = null) {
     // trend is built, so there is nothing left to price.
     bytes: base.bytes,
   };
-  /** @type {number[]} */
-  const population = [];
+  const population: number[] = [];
 
   let expected = 0;
   for (let index = 0; index < base.id.length; index++) {

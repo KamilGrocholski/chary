@@ -14,10 +14,10 @@ import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { PUBLIC_DIR, WORLDS_DIR } from "@/src/manifest.ts";
 import { TRENDS_FILE, readFilterFile, type Trends } from "@/src/trends.ts";
-import { getValueFromJsonText } from "@/public/lib/json.js";
-import { assert } from "@/public/lib/assert.js";
-import { BYTES_IN_GIGABYTE, BYTES_IN_KILOBYTE, BYTES_IN_MEGABYTE } from "@/public/lib/byte-size.js";
-import { getTextOrder } from "@/public/lib/text-order.js";
+import { getValueFromJsonText } from "@/src/lib/json.ts";
+import { assert } from "@/src/lib/assert.ts";
+import { BYTES_IN_GIGABYTE, BYTES_IN_KILOBYTE, BYTES_IN_MEGABYTE } from "@/src/lib/byte-size.ts";
+import { getTextOrder } from "@/src/lib/text-order.ts";
 import { FILTER_SUFFIX, getTimestampFromFileName } from "@/src/snapshot.ts";
 
 /** GitHub Pages refuses to publish an artefact past this. Not ours to raise. */

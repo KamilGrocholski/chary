@@ -176,3 +176,7 @@ dist
 
 # lokalne ustawienia Claude Code
 .claude/settings.local.json
+
+# the dashboard bundle, built from web/ by `bun run build`
+/public/app.js
+/public/app.js.map

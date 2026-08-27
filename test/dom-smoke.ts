@@ -1,5 +1,5 @@
 // A DOM stub for the view layer. Run in a separate process by dashboard.test.ts —
-// a `globalThis.document` set here would make importing app.js in another test file start
+// a `globalThis.document` set here would make importing app.ts in another test file start
 // the view on somebody else's markup.
 //
 // The static tests only check that every `el("...")` has its node in the HTML. This one
@@ -154,7 +154,7 @@ const search =
 
 // The theme, straight out of the stylesheet the browser would have applied. Reading it here
 // rather than answering a fixed colour is the point: `getThemeTokens` asserts on a token that
-// does not resolve, so a token renamed in `index.html` and not in `app.js` fails the smoke
+// does not resolve, so a token renamed in `index.html` and not in `app.ts` fails the smoke
 // run instead of painting a chart with an empty string.
 const rootTokens = new Map(
   [...(/:root\s*\{([\s\S]*?)\n\s*\}/.exec(markup)?.[1] ?? "").matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(
@@ -235,7 +235,9 @@ async function waitFor(check: () => boolean, timeoutMs = 20_000) {
 }
 
 // The import starts the view's setup, because `document` already exists.
-await import(`${process.cwd()}/public/app.js`);
+// The source, not `public/app.js`: the bundle is built and gitignored, so importing it
+// would make `bun test` pass or fail on whether somebody had run `bun run build`.
+await import(`${process.cwd()}/web/app.ts`);
 
 // A filtered history pulls ten `.f.json` files, so we wait for the full set of points
 // rather than for a fixed time — otherwise the test would be measuring disk speed.

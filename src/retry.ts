@@ -5,8 +5,8 @@
 // lives here: an untested backoff is exactly how `Retry-After: 0` spent months wiping out
 // the pause between attempts.
 
-import { getIntegerFromText } from "@/public/lib/number.js";
-import { getMillisecondsFromIsoText } from "@/public/lib/timestamp.js";
+import { getIntegerFromText } from "@/src/lib/number.ts";
+import { getMillisecondsFromIsoText } from "@/src/lib/timestamp.ts";
 
 export const MAX_PAGE_RETRIES = 3;
 export const BACKOFF_BASE_MS = 5_000;
