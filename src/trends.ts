@@ -40,18 +40,18 @@ export function summarizeSnapshot(filters: FilterFile): SnapshotSummary {
   const byProf = composeProfessionCounts();
   let total = 0;
 
-  for (let i = 0; i < filters.count; i++) {
+  for (let index = 0; index < filters.count; index++) {
     // `count` is the row count of every column — the whole premise of the columnar format
     // (§9.2), so a short column is a broken file rather than a case to handle.
-    const level = assertDefined(filters.level[i], "every .f.json column holds `count` rows");
-    const profession = assertDefined(filters.profession[i], "every .f.json column holds `count` rows");
+    const level = assertDefined(filters.level[index], "every .f.json column holds `count` rows");
+    const profession = assertDefined(filters.profession[index], "every .f.json column holds `count` rows");
 
     // The same condition as `isMatch` in public/filters.js: a row with no level, or with
     // a profession outside 1-6, reaches no chart, so it must not count towards the
     // population.
     if (!level || level < 1 || profession < 1 || profession > 6) continue;
 
-    const bucket = getActivityBucket(filters.days[i]);
+    const bucket = getActivityBucket(filters.days[index]);
     total += 1;
     byProf[profession - 1] = assertDefined(byProf[profession - 1], "professions are 1-6") + 1;
     act[bucket] = assertDefined(act[bucket], "getActivityBucket answers 0-4") + 1;
@@ -102,7 +102,7 @@ export function buildWorldTrend(snapshots: { id: string; filters: FilterFile }[]
     if (typeof startedAt !== "string" || startedAt === "") continue;
     dated.push({ id, startedAt, filters });
   }
-  dated.sort((a, b) => getTextOrder(a.startedAt, b.startedAt));
+  dated.sort((left, right) => getTextOrder(left.startedAt, right.startedAt));
 
   for (const { id, startedAt, filters } of dated) {
     const { total, act, byProf } = summarizeSnapshot(filters);
@@ -143,7 +143,7 @@ function readFilterFile(value: unknown): FilterFile | null {
 }
 
 /** The size the browser actually downloads — GitHub Pages serves these files gzipped. */
-function gzipSize(bytes: ArrayBuffer): number {
+function getGzipSizeBytes(bytes: ArrayBuffer): number {
   return Bun.gzipSync(new Uint8Array(bytes)).length;
 }
 
@@ -154,23 +154,23 @@ function gzipSize(bytes: ArrayBuffer): number {
  */
 export async function rebuildTrends(): Promise<{ trends: Trends; skipped: number }> {
   const worldDirs = (await readdir(WORLDS_DIR, { withFileTypes: true }))
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
     .sort();
 
   const worlds: Record<string, WorldTrend> = {};
   let skipped = 0;
 
   for (const world of worldDirs) {
-    const dir = path.join(WORLDS_DIR, world);
-    const files = (await readdir(dir)).filter((f) => f.endsWith(FILTER_SUFFIX)).sort();
+    const directory = path.join(WORLDS_DIR, world);
+    const files = (await readdir(directory)).filter((file) => file.endsWith(FILTER_SUFFIX)).sort();
 
     const snapshots: { id: string; filters: FilterFile }[] = [];
     for (const file of files) {
       // An unreadable file is skipped with a warning rather than taking down the whole
       // rebuild — otherwise a single snapshot truncated by Ctrl-C blocks `bun run rebuild`,
       // which is exactly the command meant to repair it.
-      const reading = getValueFromJsonText(await Bun.file(path.join(dir, file)).text());
+      const reading = getValueFromJsonText(await Bun.file(path.join(directory, file)).text());
       if (!reading.ok) {
         // The boundary with a file another process may have truncated (§9.5). Skipped with
         // a warning rather than fatal: a snapshot cut short by a Ctrl-C must not block
@@ -194,7 +194,7 @@ export async function rebuildTrends(): Promise<{ trends: Trends; skipped: number
 
     // What the next snapshot of this world will cost the client. Only the newest file is
     // compressed — 21 of them instead of 244, and within one world the sizes barely move.
-    trend.bytes = gzipSize(await Bun.file(path.join(dir, `${trend.id.at(-1)}${FILTER_SUFFIX}`)).arrayBuffer());
+    trend.bytes = getGzipSizeBytes(await Bun.file(path.join(directory, `${trend.id.at(-1)}${FILTER_SUFFIX}`)).arrayBuffer());
     worlds[world] = trend;
   }
 

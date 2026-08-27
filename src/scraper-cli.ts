@@ -29,7 +29,7 @@ export type ScraperCommand = {
   worlds: string[];
   intervalMs: number;
   dropThreshold: number;
-  dryRun: boolean;
+  isDryRun: boolean;
 };
 
 export type ScraperCommandReading =
@@ -37,17 +37,17 @@ export type ScraperCommandReading =
   | { ok: false; message: string };
 
 /**
- * @param args `process.argv.slice(2)`
+ * @param argumentTexts `process.argv.slice(2)`
  * @param defaultWorlds the list scraped when none is named — `WORLDS` from `worlds.ts`
  */
-export function readScraperCommand(args: string[], defaultWorlds: string[]): ScraperCommandReading {
-  const dryRun = args.includes("--dry-run");
-  const positional = args.filter((arg) => !arg.startsWith("--"));
+export function readScraperCommand(argumentTexts: string[], defaultWorlds: string[]): ScraperCommandReading {
+  const isDryRun = argumentTexts.includes("--dry-run");
+  const positional = argumentTexts.filter((argument) => !argument.startsWith("--"));
 
   // An unknown flag must not be silently dropped from `positional` — that is the typo
   // above. Every accepted spelling is listed here and nowhere else.
-  const unknownFlags = args.filter(
-    (arg) => arg.startsWith("--") && arg !== "--dry-run" && !arg.startsWith(DROP_THRESHOLD_FLAG),
+  const unknownFlags = argumentTexts.filter(
+    (argument) => argument.startsWith("--") && argument !== "--dry-run" && !argument.startsWith(DROP_THRESHOLD_FLAG),
   );
   if (unknownFlags.length > 0) {
     return {
@@ -56,7 +56,7 @@ export function readScraperCommand(args: string[], defaultWorlds: string[]): Scr
     };
   }
 
-  const dropThresholdReading = readDropThreshold(args);
+  const dropThresholdReading = readDropThreshold(argumentTexts);
   if (!dropThresholdReading.ok) return dropThresholdReading;
 
   const intervalReading = readInterval(positional[1]);
@@ -71,13 +71,13 @@ export function readScraperCommand(args: string[], defaultWorlds: string[]): Scr
       worlds: worldsReading.worlds,
       intervalMs: intervalReading.intervalMs,
       dropThreshold: dropThresholdReading.dropThreshold,
-      dryRun,
+      isDryRun,
     },
   };
 }
 
-function readDropThreshold(args: string[]): { ok: true; dropThreshold: number } | { ok: false; message: string } {
-  const flag = args.find((arg) => arg.startsWith(DROP_THRESHOLD_FLAG));
+function readDropThreshold(argumentTexts: string[]): { ok: true; dropThreshold: number } | { ok: false; message: string } {
+  const flag = argumentTexts.find((argument) => argument.startsWith(DROP_THRESHOLD_FLAG));
   if (flag === undefined) return { ok: true, dropThreshold: DEFAULT_DROP_THRESHOLD };
 
   // A share, not a percentage, and read as one: `Number("0x1")` is 1 and `Number("")` is 0,

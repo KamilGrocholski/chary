@@ -12,8 +12,8 @@ function resolveInsideRoot(pathname: string): string | null {
 
 const server = Bun.serve({
   port: 3000,
-  async fetch(req) {
-    const url = new URL(req.url);
+  async fetch(request) {
+    const url = new URL(request.url);
     let pathname = decodeURIComponent(url.pathname);
     if (pathname.endsWith("/")) pathname += "index.html";
 

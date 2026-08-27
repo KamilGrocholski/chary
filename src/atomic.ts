@@ -17,10 +17,10 @@ export async function writeAtomic(filePath: string, contents: string): Promise<v
   try {
     await Bun.write(temporaryPath, contents);
     await rename(temporaryPath, filePath);
-  } catch (e) {
+  } catch (error) {
     // The temp file must not survive: a `.tmp` in `public/worlds/` would ship to Pages,
     // and on the next write it would pretend everything was fine.
     await unlink(temporaryPath).catch(() => {});
-    throw e;
+    throw error;
   }
 }

@@ -45,23 +45,23 @@ describe("splitting a snapshot", () => {
   });
 
   test("the two files together reconstruct the rows 1:1", () => {
-    for (let i = 0; i < rows.length; i++) {
+    for (let index = 0; index < rows.length; index++) {
       expect([
-        i + 1, // the rank comes from the order
-        names.name[i],
-        names.charId![i],
-        filters.level[i],
-        filters.profession[i],
-        filters.honor[i],
-        filters.days[i],
-      ]).toEqual(rows[i]!);
+        index + 1, // the rank comes from the order
+        names.name[index],
+        names.charId![index],
+        filters.level[index],
+        filters.profession[index],
+        filters.honor[index],
+        filters.days[index],
+      ]).toEqual(rows[index]!);
     }
   });
 });
 
 describe("migrating old snapshots", () => {
   test("v1 — days derived from the text, the ISO dropped, no charId", () => {
-    const v1 = {
+    const schemaOneRows = {
       world: "aether",
       rows: [
         [1, "essobe", 378, 4, 8749, "Mniej niż 24h temu", "2026-07-21T20:03:12.814Z"],
@@ -69,9 +69,9 @@ describe("migrating old snapshots", () => {
         [3, "Widmo", 12, 1, 0, "20655 dni temu", "1969-12-06T00:00:00.000Z"],
       ],
     };
-    const normalized = normalizeLegacyRows(v1);
-    expect(normalized.map((r) => r.days)).toEqual([0, 5, null]);
-    expect(normalized.map((r) => r.charId)).toEqual([null, null, null]);
+    const normalized = normalizeLegacyRows(schemaOneRows);
+    expect(normalized.map((row) => row.days)).toEqual([0, 5, null]);
+    expect(normalized.map((row) => row.charId)).toEqual([null, null, null]);
 
     const { filters, names } = splitNormalized(normalized, META);
     expect(filters.level).toEqual([378, 300, 12]);
@@ -82,10 +82,10 @@ describe("migrating old snapshots", () => {
   });
 
   test("v2 — read as-is, keeping the charId", () => {
-    const v2 = { schema: 2, world: "aether", rows: rows as unknown[][] };
-    const normalized = normalizeLegacyRows(v2);
-    expect(normalized.map((r) => r.charId)).toEqual([729, 32789, 5]);
-    expect(normalized.map((r) => r.days)).toEqual([0, 12, null]);
+    const schemaTwoRows = { schema: 2, world: "aether", rows: rows as unknown[][] };
+    const normalized = normalizeLegacyRows(schemaTwoRows);
+    expect(normalized.map((row) => row.charId)).toEqual([729, 32789, 5]);
+    expect(normalized.map((row) => row.days)).toEqual([0, 12, null]);
     expect(splitNormalized(normalized, META).names.charId).toEqual([729, 32789, 5]);
   });
 });
@@ -160,10 +160,10 @@ describe("the guard against a truncated scrape", () => {
 });
 
 describe("reading the previous snapshot", () => {
-  const tmp = path.join(import.meta.dir, "..", "node_modules", ".tmp-snapshot-test");
+  const temporaryDirectory = path.join(import.meta.dir, "..", "node_modules", ".tmp-snapshot-test");
 
-  async function world(name: string, files: Record<string, unknown>) {
-    const dir = path.join(tmp, name);
+  async function composeWorld(name: string, files: Record<string, unknown>) {
+    const dir = path.join(temporaryDirectory, name);
     await mkdir(dir, { recursive: true });
     for (const [file, content] of Object.entries(files)) {
       await Bun.write(path.join(dir, file), JSON.stringify(content));
@@ -172,11 +172,11 @@ describe("reading the previous snapshot", () => {
   }
 
   afterAll(async () => {
-    await rm(tmp, { recursive: true, force: true });
+    await rm(temporaryDirectory, { recursive: true, force: true });
   });
 
   test("takes count from the newest snapshot, not from whichever comes first", async () => {
-    const dir = await world("ordering", {
+    const dir = await composeWorld("ordering", {
       "2026-06-01T00-00-00.f.json": { count: 100 },
       "2026-08-01T00-00-00.f.json": { count: 300 },
       "2026-07-01T00-00-00.f.json": { count: 200 },
@@ -185,7 +185,7 @@ describe("reading the previous snapshot", () => {
   });
 
   test("skips the names files", async () => {
-    const dir = await world("names", {
+    const dir = await composeWorld("names", {
       "2026-08-01T00-00-00.f.json": { count: 42 },
       "2026-09-01T00-00-00.n.json": { count: 999 },
     });
@@ -193,17 +193,17 @@ describe("reading the previous snapshot", () => {
   });
 
   test("a new world, a corrupted file and a missing directory give null, not an exception", async () => {
-    expect(await getLatestSnapshotCount(path.join(tmp, "no-such-world"))).toBeNull();
-    expect(await getLatestSnapshotCount(await world("empty", {}))).toBeNull();
+    expect(await getLatestSnapshotCount(path.join(temporaryDirectory, "no-such-world"))).toBeNull();
+    expect(await getLatestSnapshotCount(await composeWorld("empty", {}))).toBeNull();
 
-    const corrupted = path.join(tmp, "corrupted");
+    const corrupted = path.join(temporaryDirectory, "corrupted");
     await mkdir(corrupted, { recursive: true });
     await Bun.write(path.join(corrupted, "2026-08-01T00-00-00.f.json"), "{ this is not json");
     expect(await getLatestSnapshotCount(corrupted)).toBeNull();
   });
 
   test("together with the guard: a truncated snapshot gets flagged", async () => {
-    const dir = await world("truncated", { "2026-07-01T00-00-00.f.json": { count: 7754 } });
+    const dir = await composeWorld("truncated", { "2026-07-01T00-00-00.f.json": { count: 7754 } });
     const suspect = checkPopulationDrop(3900, await getLatestSnapshotCount(dir));
 
     expect(suspect).not.toBeNull();
@@ -215,7 +215,7 @@ describe("reading the previous snapshot", () => {
     // `Bun.write` is truncate + write: an interruption left a truncated `.f.json`, and
     // `JSON.parse` then took down both the tail of a round and `bun run rebuild`.
     test("replaces the contents and leaves no temp file behind", async () => {
-      const dir = await world("atomic", { "file.json": { old: true } });
+      const dir = await composeWorld("atomic", { "file.json": { old: true } });
       const file = path.join(dir, "file.json");
 
       await writeAtomic(file, JSON.stringify({ fresh: true }));
@@ -224,7 +224,7 @@ describe("reading the previous snapshot", () => {
     });
 
     test("a failed write neither touches the previous contents nor leaves litter", async () => {
-      const dir = await world("atomic-failure", { "file.json": { old: true } });
+      const dir = await composeWorld("atomic-failure", { "file.json": { old: true } });
       const file = path.join(dir, "file.json");
 
       // A directory where the temp file goes — `Bun.write` has nowhere to write.

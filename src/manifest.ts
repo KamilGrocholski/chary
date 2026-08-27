@@ -42,10 +42,10 @@ export async function rebuildManifest(): Promise<Manifest> {
 
     const worldName = worldDir.name;
     const names = (await readdir(path.join(WORLDS_DIR, worldName), { withFileTypes: true }))
-      .filter((f) => f.isFile() && f.name.endsWith(".json"))
-      .map((f) => f.name);
+      .filter((file) => file.isFile() && file.name.endsWith(".json"))
+      .map((file) => file.name);
     const present = new Set(names);
-    const rel = (file: string) => path.posix.join("worlds", worldName, file);
+    const composeWorldPath = (file: string) => path.posix.join("worlds", worldName, file);
 
     const ids = new Set(names.map(getTimestampFromFileName));
     const snapshots: SnapshotEntry[] = [];
@@ -79,19 +79,19 @@ export async function rebuildManifest(): Promise<Manifest> {
       snapshots.push({
         id,
         ...(startedAt ? { startedAt } : {}),
-        filters: rel(source),
-        ...(present.has(`${id}${NAMES_SUFFIX}`) ? { names: rel(`${id}${NAMES_SUFFIX}`) } : {}),
-        ...(present.has(legacy) ? { file: rel(legacy) } : {}),
+        filters: composeWorldPath(source),
+        ...(present.has(`${id}${NAMES_SUFFIX}`) ? { names: composeWorldPath(`${id}${NAMES_SUFFIX}`) } : {}),
+        ...(present.has(legacy) ? { file: composeWorldPath(legacy) } : {}),
       });
     }
 
     // By the real scrape time, not by filename — otherwise snapshots from the timezone
     // seam would sit 2 h away from the truth relative to each other.
-    snapshots.sort((a, b) => getTextOrder(a.startedAt ?? a.id, b.startedAt ?? b.id));
+    snapshots.sort((left, right) => getTextOrder(left.startedAt ?? left.id, right.startedAt ?? right.id));
     manifest.worlds.push({ name: worldName, files: snapshots });
   }
 
-  manifest.worlds.sort((a, b) => getTextOrder(a.name, b.name));
+  manifest.worlds.sort((left, right) => getTextOrder(left.name, right.name));
   await writeAtomic(MANIFEST_FILE, JSON.stringify(manifest, null, 2));
   return manifest;
 }

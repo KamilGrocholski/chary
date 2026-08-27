@@ -21,15 +21,15 @@ const RULES_LANDED_AT = "test/tools/commit-messages.test.ts";
 
 type Commit = { hash: string; subject: string; files: string[] };
 
-async function run(...args: string[]): Promise<string> {
-  const proc = Bun.spawnSync(["git", ...args]);
-  expect(proc.exitCode).toBe(0);
-  return new TextDecoder().decode(proc.stdout).trim();
+async function runGit(...args: string[]): Promise<string> {
+  const result = Bun.spawnSync(["git", ...args]);
+  expect(result.exitCode).toBe(0);
+  return new TextDecoder().decode(result.stdout).trim();
 }
 
 /** Commits that touched AGENTS.md, newest first — the rewrite and everything after it. */
 const commits: Commit[] = await (async () => {
-  const first = (await run("log", "--format=%H", "--reverse", "--", RULES_LANDED_AT)).split("\n")[0] ?? "";
+  const first = (await runGit("log", "--format=%H", "--reverse", "--", RULES_LANDED_AT)).split("\n")[0] ?? "";
   if (first === "") return [];
 
   // Inclusive of `first`, and read by walking back from HEAD rather than with `first..HEAD`.
@@ -37,10 +37,10 @@ const commits: Commit[] = await (async () => {
   // of this guard would have judged nothing while looking exactly like a run that judged
   // everything, which is the failure the test below exists to make impossible.
   const parsed: Commit[] = [];
-  for (const line of (await run("log", "--format=%H%x00%s", "HEAD")).split("\n")) {
+  for (const line of (await runGit("log", "--format=%H%x00%s", "HEAD")).split("\n")) {
     const [hash = "", subject = ""] = line.split("\0");
     if (hash === "") continue;
-    const files = (await run("show", "--name-only", "--format=", hash)).split("\n").filter((f) => f !== "");
+    const files = (await runGit("show", "--name-only", "--format=", hash)).split("\n").filter((file) => file !== "");
     parsed.push({ hash, subject, files });
     if (hash === first) break;
   }
@@ -54,7 +54,7 @@ describe("§7.2 — commit messages", () => {
     // honest reason for an empty range: the commit adding this file is the one being
     // written, so the rule has no history to judge yet.
     if (commits.length > 0) return;
-    const tracked = await run("ls-files", RULES_LANDED_AT);
+    const tracked = await runGit("ls-files", RULES_LANDED_AT);
     expect(`${RULES_LANDED_AT} is tracked: ${tracked !== ""}`).toBe(`${RULES_LANDED_AT} is tracked: false`);
   });
 
@@ -81,8 +81,8 @@ describe("§7.2 — commit messages", () => {
     const offenders: string[] = [];
     for (const { hash, subject, files } of commits) {
       const isScrape = subject.startsWith("scrape:") || subject.startsWith("scrape(");
-      const touchesData = files.some((f) => f.startsWith("public/worlds/"));
-      const touchesCode = files.some((f) => /^(src|tools|test|public\/(app|filters|history|shared|lib))/.test(f));
+      const touchesData = files.some((file) => file.startsWith("public/worlds/"));
+      const touchesCode = files.some((file) => /^(src|tools|test|public\/(app|filters|history|shared|lib))/.test(file));
 
       // A round rewrites the manifest and the aggregate and adds tens of megabytes; a code
       // change hiding in that diff is a code change nobody will ever read.

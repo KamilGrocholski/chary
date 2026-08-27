@@ -127,10 +127,10 @@ export function splitSnapshot(rows: PlayerRow[], meta: SnapshotMeta): { filters:
       kind: "filter",
       ...meta,
       count: rows.length,
-      level: rows.map((r) => r[3]),
-      profession: rows.map((r) => r[4]),
-      honor: rows.map((r) => r[5]),
-      days: rows.map((r) => r[6]),
+      level: rows.map((row) => row[3]),
+      profession: rows.map((row) => row[4]),
+      honor: rows.map((row) => row[5]),
+      days: rows.map((row) => row[6]),
     },
     names: {
       schema: SNAPSHOT_SCHEMA,
@@ -138,8 +138,8 @@ export function splitSnapshot(rows: PlayerRow[], meta: SnapshotMeta): { filters:
       world: meta.world,
       timestamp: meta.timestamp,
       count: rows.length,
-      name: rows.map((r) => r[1]),
-      charId: rows.map((r) => r[2]),
+      name: rows.map((row) => row[1]),
+      charId: rows.map((row) => row[2]),
     },
   };
 }
@@ -155,34 +155,34 @@ export function normalizeLegacyRows(payload: { schema?: number; rows: unknown[][
   const schema = payload.schema ?? (typeof payload.rows[0]?.[5] === "string" ? 1 : 2);
 
   return payload.rows.map((row, index) => {
-    const at = (column: number) => `row ${index}, column ${column}`;
+    const composeCellLocation = (column: number) => `row ${index}, column ${column}`;
 
     // Every number goes through a reader that answers `null` rather than through `Number`,
     // which answers `0` for an empty cell and `NaN` for a missing one — and `NaN` reaches
     // the written file as `null` after `JSON.stringify`, so a value nobody wrote becomes a
     // gap nobody notices. A row that cannot be read stops the migration instead.
-    const name = requireText(row[1], at(1));
+    const name = requireText(row[1], composeCellLocation(1));
 
     if (schema >= 2) {
       return {
         name,
-        charId: readOptionalInteger(row[2], at(2)),
-        level: requireInteger(row[3], at(3)),
-        profession: requireInteger(row[4], at(4)),
-        honor: requireInteger(row[5], at(5)),
-        days: readOptionalInteger(row[6], at(6)),
+        charId: readOptionalInteger(row[2], composeCellLocation(2)),
+        level: requireInteger(row[3], composeCellLocation(3)),
+        profession: requireInteger(row[4], composeCellLocation(4)),
+        honor: requireInteger(row[5], composeCellLocation(5)),
+        days: readOptionalInteger(row[6], composeCellLocation(6)),
       };
     }
 
     // v1 stored the "last online" column as the ranking's own sentence, so an unreadable
     // one is `undefined` and becomes `null` — that is the schema's own gap, not ours.
-    const days = parseLastOnlineDays(requireText(row[5] ?? "", at(5)));
+    const days = parseLastOnlineDays(requireText(row[5] ?? "", composeCellLocation(5)));
     return {
       name,
       charId: null,
-      level: requireInteger(row[2], at(2)),
-      profession: requireInteger(row[3], at(3)),
-      honor: requireInteger(row[4], at(4)),
+      level: requireInteger(row[2], composeCellLocation(2)),
+      profession: requireInteger(row[3], composeCellLocation(3)),
+      honor: requireInteger(row[4], composeCellLocation(4)),
       days: days === undefined ? null : days,
     };
   });
@@ -210,17 +210,17 @@ function readOptionalInteger(value: unknown, where: string): number | null {
 }
 
 export function splitNormalized(rows: NormalizedRow[], meta: SnapshotMeta): { filters: FilterFile; names: NamesFile } {
-  const hasCharIds = rows.some((r) => r.charId !== null);
+  const hasCharIds = rows.some((row) => row.charId !== null);
   return {
     filters: {
       schema: SNAPSHOT_SCHEMA,
       kind: "filter",
       ...meta,
       count: rows.length,
-      level: rows.map((r) => r.level),
-      profession: rows.map((r) => r.profession),
-      honor: rows.map((r) => r.honor),
-      days: rows.map((r) => r.days),
+      level: rows.map((row) => row.level),
+      profession: rows.map((row) => row.profession),
+      honor: rows.map((row) => row.honor),
+      days: rows.map((row) => row.days),
     },
     names: {
       schema: SNAPSHOT_SCHEMA,
@@ -228,8 +228,8 @@ export function splitNormalized(rows: NormalizedRow[], meta: SnapshotMeta): { fi
       world: meta.world,
       timestamp: meta.timestamp,
       count: rows.length,
-      name: rows.map((r) => r.name),
-      ...(hasCharIds ? { charId: rows.map((r) => r.charId) } : {}),
+      name: rows.map((row) => row.name),
+      ...(hasCharIds ? { charId: rows.map((row) => row.charId) } : {}),
     },
   };
 }
@@ -239,10 +239,10 @@ export function splitNormalized(rows: NormalizedRow[], meta: SnapshotMeta): { fi
  * A missing directory, no snapshots or an unreadable file is not an error: a new world
  * simply has nothing to compare against.
  */
-export async function getLatestSnapshotCount(dir: string): Promise<number | null> {
+export async function getLatestSnapshotCount(directory: string): Promise<number | null> {
   let files: string[];
   try {
-    files = (await readdir(dir)).filter((f) => f.endsWith(FILTER_SUFFIX)).sort();
+    files = (await readdir(directory)).filter((file) => file.endsWith(FILTER_SUFFIX)).sort();
   } catch {
     // The only expected failure here, and the only one worth answering `null` to: a world
     // scraped for the first time has no directory yet. The catch used to wrap the whole
@@ -254,12 +254,12 @@ export async function getLatestSnapshotCount(dir: string): Promise<number | null
   const last = files.at(-1);
   if (last === undefined) return null;
 
-  const reading = getValueFromJsonText(await Bun.file(path.join(dir, last)).text());
+  const reading = getValueFromJsonText(await Bun.file(path.join(directory, last)).text());
   if (!reading.ok) {
     // A truncated snapshot is a real possibility — a round can be interrupted mid-write —
     // and it must not stop the next round. It disarms the guard for this world, so it says
     // so rather than passing for a world with no history.
-    console.warn(`⚠ ${dir}/${last} could not be read, so the population guard has nothing to compare against`);
+    console.warn(`⚠ ${directory}/${last} could not be read, so the population guard has nothing to compare against`);
     return null;
   }
 
@@ -279,12 +279,12 @@ export async function getLatestSnapshotCount(dir: string): Promise<number | null
 export const FILTER_SUFFIX = ".f.json";
 export const NAMES_SUFFIX = ".n.json";
 
-export function composeFilterPath(dir: string, timestamp: string) {
-  return path.join(dir, `${timestamp}${FILTER_SUFFIX}`);
+export function composeFilterPath(directory: string, timestamp: string) {
+  return path.join(directory, `${timestamp}${FILTER_SUFFIX}`);
 }
 
-export function composeNamesPath(dir: string, timestamp: string) {
-  return path.join(dir, `${timestamp}${NAMES_SUFFIX}`);
+export function composeNamesPath(directory: string, timestamp: string) {
+  return path.join(directory, `${timestamp}${NAMES_SUFFIX}`);
 }
 
 /** Whether the filename is a snapshot in the old, single-file format. */

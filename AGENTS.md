@@ -406,10 +406,12 @@ test/              A test sits beside the thing it tests.
                      no cast off JSON.parse, the value-reader register, imports, file names.
     structure-block.test.ts
                      The block above against the tree it claims to describe.
-    naming.test.ts   §9.4 over names. The action a name opens with, over the exported
-                     surface; the synonyms and contractions it may not carry, over every
-                     function; and over every declaration, that it is not named exactly
-                     an action. Why the first one stops at the exports is measured there.
+    naming.test.ts   §9.4 over every name in the tree, tests included: the action a name
+                     opens with, over every function; the synonyms and contractions it may
+                     not carry, over functions and declarations alike; and over every
+                     declaration, that it is not named exactly an action. The verbs beyond
+                     the table, and the names that belong to somebody else's interface, are
+                     listed there with their reasons.
     type-agreement.test.ts
                      The manifest entry the scraper writes against the one the dashboard
                      reads: the fields they share, held by the typechecker.
@@ -601,7 +603,17 @@ You `add` to somewhere, so its inverse is `remove`; you `create` with no destina
 its inverse is `delete`. `parse` and `read` are not synonyms: `parse` knows a grammar and
 throws, `read` takes what somebody else produced and may answer `null` (§9.5). Other verbs
 are allowed where they are more precise, but `[NEVER]` a **synonym** for one in the table:
-no `fetch` where `get` fits, no `update` where `set` fits.
+no `fetch` where `get` fits, no `update` where `set` fits. The verbs this tree has earned —
+`scrape`, `draw`, `fill`, `clear`, `schedule`, `ensure`, `select`, `show`, `find`, `resolve`,
+`pad`, `strip`, `walk`, `wait`, `run`, `log`, `sleep`, `apply`, `start`, `add` — are listed in
+the guard, each next to the reason the table's own would have been vaguer. The list is closed:
+a round adds a verb by defending it there.
+
+**`[ALWAYS] [any]` The rule binds every function, not only the exported ones.** An accessor
+named like a value reads like a value: `baseTrend()` and `currentSnapshot()` in `app.js` were
+calls that looked like fields for as long as nobody was holding them. The exception is a name
+that is somebody else's interface — `fetch` as Bun's server handler, the DOM methods a stub
+has to answer to, `set` in a property descriptor — where our vote does not count.
 
 **`[ALWAYS] [any]` A variable is never named exactly an action.** Those words are spent on
 what a function does, so `const read` for a list of lines and `const pages` for a sentence
@@ -624,8 +636,13 @@ context?`. `getSnapshotCountByWorld` = get + SnapshotCount + ByWorld.
 
 - **S-I-D — short, intuitive, descriptive**, all three.
 - **Reflect the expected result.** `isDisabled`, not `isEnabled` used negated.
-- **No contractions.** `button`, not `btn`. Abbreviate only where the ranking does, and say
-  so in a comment.
+- **No contractions, and that includes a single letter.** `button`, not `btn`; `row`, not `r`;
+  `filters`, not `f`. Abbreviate only where the ranking does, and say so in a comment. Two
+  idioms survive because they are not abbreviations of anything: `$` for a loaded Cheerio
+  document, which is that library's own spelling, and `_` for a parameter nobody reads.
+  A name this repository does not choose is exempt for the same reason a foreign interface is
+  — `byProf` is a column of `trends.json`, and spelling the local out would rename the
+  published field.
 - **Do not duplicate the context a name already sits in.**
 - **Singular is one thing, plural is a collection.**
 - **Files are kebab-case and name their contents, not their category.** `utils`, `helpers`,

@@ -15,7 +15,7 @@
 
 const scenario = process.argv[2] === "filtered" ? "filtered" : "default";
 
-function makeNode(id = "", tag = "") {
+function composeNode(id = "", tag = "") {
   const node: any = {
     id,
     tag,
@@ -32,17 +32,17 @@ function makeNode(id = "", tag = "") {
     setAttribute(name: string, value: string) {
       node.attributes[name] = value;
     },
-    addEventListener(_event: string, fn: (...args: unknown[]) => void) {
-      node.handlers.push(fn);
+    addEventListener(_event: string, handler: (...args: unknown[]) => void) {
+      node.handlers.push(handler);
     },
     appendChild(child: any) {
       node.children.push(child);
       return child;
     },
     querySelectorAll(selector: string) {
-      const walk = (n: any): any[] => (n.children ?? []).flatMap((c: any) => [c, ...walk(c)]);
-      const inputs = walk(node).filter((c: any) => c.tag === "input");
-      return selector.includes(":checked") ? inputs.filter((c: any) => c.checked) : inputs;
+      const walk = (node: any): any[] => (node.children ?? []).flatMap((child: any) => [child, ...walk(child)]);
+      const inputs = walk(node).filter((child: any) => child.tag === "input");
+      return selector.includes(":checked") ? inputs.filter((child: any) => child.checked) : inputs;
     },
     getBoundingClientRect: () => ({ left: 0, top: 0 }),
   };
@@ -65,7 +65,7 @@ function makeNode(id = "", tag = "") {
 
 const markup = await Bun.file("public/index.html").text();
 const nodes: Record<string, any> = {};
-for (const [, id] of markup.matchAll(/id="([^"]+)"/g)) nodes[id!] = makeNode(id!);
+for (const [, id] of markup.matchAll(/id="([^"]+)"/g)) nodes[id!] = composeNode(id!);
 
 // The stub has to know the `hidden` attribute from the markup. Without it an element
 // hidden in the HTML starts out visible, and `hidden === true` assertions pass only because
@@ -82,7 +82,7 @@ for (const tag of markup.matchAll(/<[a-z][^>]*\bid="([^"]+)"[^>]*>/g)) {
  * before parsing it, 25 assertions failed against code a browser runs correctly. A stub
  * that cannot do what a browser does holds nothing about the browser (AGENTS.md §9.6).
  */
-function answer(status: number, body: string) {
+function composeResponse(status: number, body: string) {
   return {
     ok: status >= 200 && status < 300,
     status,
@@ -167,11 +167,11 @@ Object.assign(globalThis, {
   }),
   document: {
     readyState: "complete",
-    body: makeNode("body"),
-    documentElement: makeNode("html"),
+    body: composeNode("body"),
+    documentElement: composeNode("html"),
     getElementById: (id: string) => nodes[id] ?? null,
-    createElement: (tag: string) => makeNode("", tag),
-    createTextNode: (text: string) => ({ text }),
+    createElement: (tag: string) => composeNode("", tag),
+    createTextNode: (getText: string) => ({ getText }),
     addEventListener() {},
   },
   window: { Chart: FakeChart, innerWidth: 1400, innerHeight: 900 },
@@ -194,13 +194,13 @@ Object.assign(globalThis, {
     // the whole concurrent-fetch problem exists only while a fetch is IN FLIGHT — without
     // this the test passes with broken code too and holds nothing.
     if (url.endsWith(".f.json")) await new Promise((resolve) => setTimeout(resolve, 100));
-    if (failUrls.has(url)) return answer(503, "");
-    if (url === SMOKE_ENTRY.filters) return answer(200, JSON.stringify(SMOKE_FILTERS));
+    if (failUrls.has(url)) return composeResponse(503, "");
+    if (url === SMOKE_ENTRY.filters) return composeResponse(200, JSON.stringify(SMOKE_FILTERS));
 
     if (url === "manifest.json") {
       const manifest = JSON.parse(await Bun.file(`public/${url}`).text());
       manifest.worlds.push({ name: SMOKE_WORLD, files: [SMOKE_ENTRY] });
-      return answer(200, JSON.stringify(manifest));
+      return composeResponse(200, JSON.stringify(manifest));
     }
 
     if (url === "trends.json") {
@@ -215,16 +215,16 @@ Object.assign(globalThis, {
         suspect: [0],
         bytes: 1_000,
       };
-      return answer(200, JSON.stringify(trends));
+      return composeResponse(200, JSON.stringify(trends));
     }
 
-    return answer(200, await Bun.file(`public/${url}`).text());
+    return composeResponse(200, await Bun.file(`public/${url}`).text());
   },
 });
 
 const trends = JSON.parse(await Bun.file("public/trends.json").text());
-const world = scenario === "filtered" ? "aether" : "fobos";
-const expectedPoints = trends.worlds[world].total.length;
+const worldName = scenario === "filtered" ? "aether" : "fobos";
+const expectedPoints = trends.worlds[worldName].total.length;
 
 async function waitFor(check: () => boolean, timeoutMs = 20_000) {
   const started = Date.now();
@@ -241,14 +241,14 @@ await import(`${process.cwd()}/public/app.js`);
 await waitFor(() => (charts.popChart?.data.datasets[0]?.data.length ?? 0) >= expectedPoints);
 await new Promise((resolve) => setTimeout(resolve, 300));
 
-const text = (id: string) => nodes[id]!.innerHTML.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+const getText = (id: string) => nodes[id]!.innerHTML.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 // The ends of the time axis. They must not depend on how much of the history was fetched —
 // otherwise typing a level moves the left edge of the chart under the reader.
-const axis = (id: string) => ({
+const getAxis = (id: string) => ({
   min: charts[id]?.options.scales.x.min ?? null,
   max: charts[id]?.options.scales.x.max ?? null,
 });
-const chartShape = (id: string) => ({
+const getChartShape = (id: string) => ({
   series: charts[id]?.data.datasets.length ?? 0,
   points: charts[id]?.data.datasets[0]?.data.length ?? 0,
   title: charts[id]?.options.plugins.title.text ?? null,
@@ -259,9 +259,9 @@ const chartShape = (id: string) => ({
 
 const result: Record<string, unknown> = {
   error: nodes.error!.textContent,
-  matchLine: text("matchLine"),
-  stats: text("stats"),
-  summary: text("summary"),
+  matchLine: getText("matchLine"),
+  stats: getText("stats"),
+  summary: getText("summary"),
   historyStatus: nodes.historyStatus!.textContent,
   professionCheckboxes: nodes.profCheckboxes!.querySelectorAll("input").length,
   source: nodes.sourceInfo!.textContent,
@@ -276,16 +276,16 @@ const result: Record<string, unknown> = {
   // The sum across every histogram series = the number of players matching the URL's filters.
   matched:
     charts.professionChart?.data.datasets.reduce(
-      (sum: number, ds: { data: number[] }) => sum + ds.data.reduce((a, b) => a + b, 0),
+      (sum: number, dataset: { data: number[] }) => sum + dataset.data.reduce((left, right) => left + right, 0),
       0,
     ) ?? 0,
   charts: {
-    popChart: chartShape("popChart"),
-    actChart: chartShape("actChart"),
-    profChart: chartShape("profChart"),
+    popChart: getChartShape("popChart"),
+    actChart: getChartShape("actChart"),
+    profChart: getChartShape("profChart"),
   },
   tableRows: (nodes.changeTable!.innerHTML.match(/<tr>/g) ?? []).length,
-  table: text("changeTable"),
+  table: getText("changeTable"),
   tableHidden: nodes.changeTable!.hidden,
 };
 
@@ -299,7 +299,7 @@ if (scenario === "default") {
   result.afterToggle = {
     title: charts.actChart.options.plugins.title.text,
     updates: charts.actChart.updates,
-    values: charts.actChart.data.datasets[0].data.map((p: { y: number }) => p.y),
+    values: charts.actChart.data.datasets[0].data.map((profession: { y: number }) => profession.y),
     // Under the default filter the population stays in counts: the population's share of
     // the population is 100% and a flat line with nothing in it.
     popTitle: charts.popChart.options.plugins.title.text,
@@ -319,13 +319,13 @@ if (scenario === "default") {
     tableHidden: nodes.changeTable!.hidden,
   };
 } else {
-  const chipLabels = () =>
-    [...nodes.filterChips!.innerHTML.matchAll(/<span class="chip"[^>]*>([^<]*)</g)].map((m) => m[1]);
+  const getChipLabels = () =>
+    [...nodes.filterChips!.innerHTML.matchAll(/<span class="chip"[^>]*>([^<]*)</g)].map((match) => match[1]);
 
   // The drawer starts closed and nobody toggles it once the data arrives — otherwise the
   // page would jump by the panel's height mid-load.
   result.bar = {
-    chips: chipLabels(),
+    chips: getChipLabels(),
     toggle: nodes.filtersToggle!.textContent,
     fieldsHidden: nodes.filterFields!.hidden,
   };
@@ -334,7 +334,7 @@ if (scenario === "default") {
   result.afterOpen = {
     fieldsHidden: nodes.filterFields!.hidden,
     expanded: nodes.filtersToggle!.attributes["aria-expanded"],
-    chips: chipLabels(),
+    chips: getChipLabels(),
   };
 
   nodes.filtersToggle!.handlers[0]!({});
@@ -350,7 +350,7 @@ if (scenario === "default") {
   result.afterChipClear = {
     minLevel: nodes.minLevel!.value,
     maxLevel: nodes.maxLevel!.value,
-    chips: chipLabels(),
+    chips: getChipLabels(),
     toggle: nodes.filtersToggle!.textContent,
   };
 
@@ -359,7 +359,7 @@ if (scenario === "default") {
     nodes.onlineValue!.handlers[0]!();
     await new Promise((resolve) => setTimeout(resolve, 500));
   };
-  const threshold = () => ({
+  const getThreshold = () => ({
     value: nodes.thresholdSelect!.value,
     options: (nodes.thresholdSelect!.innerHTML.match(/<option/g) ?? []).length,
   });
@@ -370,16 +370,16 @@ if (scenario === "default") {
   nodes.thresholdSelect!.value = "30d";
   nodes.thresholdSelect!.handlers[0]!();
   await new Promise((resolve) => setTimeout(resolve, 400));
-  const picked = threshold();
+  const picked = getThreshold();
 
   // Narrowing: "≤ 30 dni" stops being reachable, but we must fall to the widest threshold
   // that still means something, not to the narrowest on the list.
   await setOnline("14");
-  const narrowed = threshold();
+  const narrowed = getThreshold();
 
   // Widening back: the list returns to three options, and the choice is to stay.
   await setOnline("");
-  const widened = threshold();
+  const widened = getThreshold();
 
   // A filter narrower than every threshold — the actives chart has nothing to show.
   await setOnline("3");
@@ -388,7 +388,7 @@ if (scenario === "default") {
   result.afterActivityFilter = {
     thresholdOptions: (nodes.thresholdSelect!.innerHTML.match(/<option/g) ?? []).length,
     noteHidden: nodes.thresholdNote!.hidden,
-    note: text("thresholdNote"),
+    note: getText("thresholdNote"),
     actHidden: nodes.actChartBox!.hidden,
   };
 
@@ -400,7 +400,7 @@ if (scenario === "default") {
   // every scrape round, and the fetch that never happens cannot fail.
   result.budgetInput = { bytesPerSnapshot: BRUTAL_BYTES };
   const brutalFiles = JSON.parse(await Bun.file("public/manifest.json").text()).worlds.find(
-    (w: { name: string }) => w.name === "brutal",
+    (world: { name: string }) => world.name === "brutal",
   ).files as { filters: string }[];
   failUrls.add(brutalFiles.at(-2)!.filters);
 
@@ -429,12 +429,12 @@ if (scenario === "default") {
   result.partialHistory = {
     status: nodes.historyStatus!.textContent,
     noteHidden: nodes.partialNote!.hidden,
-    note: text("partialNote"),
+    note: getText("partialNote"),
     budgetNoteHidden: nodes.budgetNote!.hidden,
-    budgetNote: text("budgetNoteText"),
+    budgetNote: getText("budgetNoteText"),
     loadRestLabel: nodes.loadRestBtn!.textContent,
     points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
-    axis: axis("popChart"),
+    axis: getAxis("popChart"),
     error: nodes.error!.textContent,
   };
 
@@ -447,7 +447,7 @@ if (scenario === "default") {
     status: nodes.historyStatus!.textContent,
     budgetNoteHidden: nodes.budgetNote!.hidden,
     points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
-    axis: axis("popChart"),
+    axis: getAxis("popChart"),
   };
 
   // Back to the default filter: the history comes from the complete aggregate again, so the
@@ -459,7 +459,7 @@ if (scenario === "default") {
     noteHidden: nodes.partialNote!.hidden,
     budgetNoteHidden: nodes.budgetNote!.hidden,
     points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
-    axis: axis("popChart"),
+    axis: getAxis("popChart"),
   };
 
   // A snapshot that failed does not enter memory, so the next filter change retries it on
@@ -467,8 +467,8 @@ if (scenario === "default") {
   const snapshotFetches = [...fetchCounts].filter(([url]) => url.endsWith(".f.json") && !failUrls.has(url));
   result.fetches = {
     files: snapshotFetches.length,
-    maxPerFile: Math.max(...snapshotFetches.map(([, n]) => n)),
-    duplicated: snapshotFetches.filter(([, n]) => n > 1).map(([url]) => url),
+    maxPerFile: Math.max(...snapshotFetches.map(([, node]) => node)),
+    duplicated: snapshotFetches.filter(([, node]) => node > 1).map(([url]) => url),
   };
 }
 

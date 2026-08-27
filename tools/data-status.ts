@@ -24,11 +24,11 @@ import { FILTER_SUFFIX } from "@/src/snapshot.ts";
 /** GitHub Pages refuses to publish an artefact past this. Not ours to raise. */
 const PAGES_LIMIT_BYTES = BYTES_IN_GIGABYTE;
 
-async function getDirectorySizeBytes(dir: string): Promise<number> {
+async function getDirectorySizeBytes(directory: string): Promise<number> {
   let total = 0;
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    total += entry.isDirectory() ? await getDirectorySizeBytes(full) : (await stat(full)).size;
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const fullPath = path.join(directory, entry.name);
+    total += entry.isDirectory() ? await getDirectorySizeBytes(fullPath) : (await stat(fullPath)).size;
   }
   return total;
 }
@@ -47,7 +47,7 @@ const trends = trendsReading.value as Trends;
 const worldNames = Object.keys(trends.worlds).sort(getTextOrder);
 let snapshots = 0;
 for (const world of worldNames) {
-  snapshots += (await readdir(path.join(WORLDS_DIR, world))).filter((f) => f.endsWith(FILTER_SUFFIX)).length;
+  snapshots += (await readdir(path.join(WORLDS_DIR, world))).filter((file) => file.endsWith(FILTER_SUFFIX)).length;
 }
 
 // The number of rounds is the longest history, not an average: a world that joined late
@@ -57,20 +57,20 @@ const rounds = Math.max(...worldNames.map((world) => trends.worlds[world]?.id.le
 const artefactBytes = await getDirectorySizeBytes(PUBLIC_DIR);
 const trendsGzipBytes = Bun.gzipSync(await Bun.file(TRENDS_FILE).bytes()).length;
 
-const out = process.stdout;
-out.write(`\nData in ${PUBLIC_DIR}/ — measured just now, not remembered\n\n`);
-out.write(`  worlds     ${worldNames.length}\n`);
-out.write(`  snapshots  ${snapshots}\n`);
-out.write(`  rounds     ${rounds}  (the longest history; a world that joined late has fewer)\n`);
-out.write(
+const output = process.stdout;
+output.write(`\nData in ${PUBLIC_DIR}/ — measured just now, not remembered\n\n`);
+output.write(`  worlds     ${worldNames.length}\n`);
+output.write(`  snapshots  ${snapshots}\n`);
+output.write(`  rounds     ${rounds}  (the longest history; a world that joined late has fewer)\n`);
+output.write(
   `  artefact   ${formatBytes(artefactBytes)} of ${formatBytes(PAGES_LIMIT_BYTES)}` +
     ` — ${((artefactBytes / PAGES_LIMIT_BYTES) * 100).toFixed(1)}% of the Pages limit\n`,
 );
-out.write(`  trends     ${formatBytes(trendsGzipBytes)} gzipped — what every visitor downloads\n`);
+output.write(`  trends     ${formatBytes(trendsGzipBytes)} gzipped — what every visitor downloads\n`);
 
-out.write(`\nWhat one snapshot costs a visitor, and how far a filtered history reaches\n`);
-out.write(`(the transfer budget is ${formatBytes(HISTORY_BUDGET_BYTES)} — AGENTS.md §9.9)\n\n`);
-out.write(`  world      snapshot     held   of   reach\n`);
+output.write(`\nWhat one snapshot costs a visitor, and how far a filtered history reaches\n`);
+output.write(`(the transfer budget is ${formatBytes(HISTORY_BUDGET_BYTES)} — AGENTS.md §9.9)\n\n`);
+output.write(`  world      snapshot     held   of   reach\n`);
 
 const rows = worldNames
   .map((world) => {
@@ -81,11 +81,11 @@ const rows = worldNames
     const held = trend.bytes > 0 ? Math.floor(HISTORY_BUDGET_BYTES / trend.bytes) : trend.id.length;
     return { world, bytes: trend.bytes, held: Math.min(held, trend.id.length), of: trend.id.length };
   })
-  .sort((a, b) => b.bytes - a.bytes);
+  .sort((left, right) => right.bytes - left.bytes);
 
 for (const row of rows) {
   const trimmed = row.held < row.of;
-  out.write(
+  output.write(
     `  ${row.world.padEnd(9)} ${formatBytes(row.bytes).padStart(9)}` +
       ` ${String(row.held).padStart(6)} ${String(row.of).padStart(4)}` +
       `   ${trimmed ? "trimmed by the budget" : "whole history"}\n`,
@@ -93,7 +93,7 @@ for (const row of rows) {
 }
 
 const trimmedWorlds = rows.filter((row) => row.held < row.of);
-out.write(
+output.write(
   `\n  ${trimmedWorlds.length} of ${rows.length} worlds meet the ceiling` +
-    `${trimmedWorlds.length > 0 ? `: ${trimmedWorlds.map((r) => r.world).join(", ")}` : ""}\n\n`,
+    `${trimmedWorlds.length > 0 ? `: ${trimmedWorlds.map((row) => row.world).join(", ")}` : ""}\n\n`,
 );

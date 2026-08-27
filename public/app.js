@@ -122,7 +122,7 @@ function getThemeTokens() {
   };
 }
 
-function setupView() {
+function startView() {
   /**
    * A node `index.html` is expected to hold.
    *
@@ -149,7 +149,7 @@ function setupView() {
    * @param {string} id
    * @returns {HTMLInputElement | HTMLSelectElement}
    */
-  const field = (id) => /** @type {HTMLInputElement | HTMLSelectElement} */ (getElement(id));
+  const getField = (id) => /** @type {HTMLInputElement | HTMLSelectElement} */ (getElement(id));
 
   /**
    * The checkable inputs inside a container — the profession checkboxes.
@@ -158,7 +158,7 @@ function setupView() {
    * @param {string} [selector]
    * @returns {HTMLInputElement[]}
    */
-  const checkboxes = (id, selector = "input") =>
+  const getCheckboxes = (id, selector = "input") =>
     /** @type {HTMLInputElement[]} */ ([...getElement(id).querySelectorAll(selector)]);
 
   /** @type {Manifest | null} */
@@ -210,16 +210,16 @@ function setupView() {
     const container = getElement("profCheckboxes");
     getProfessionEntries().forEach(([id, name]) => {
       const color = assertDefined(PROFESSION_COLORS[id], `profession ${id} has a colour`);
-      const lbl = document.createElement("label");
-      lbl.style.color = color;
-      const cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.value = String(id);
-      cb.checked = true;
-      cb.style.accentColor = color;
-      lbl.appendChild(cb);
-      lbl.appendChild(document.createTextNode(name));
-      container.appendChild(lbl);
+      const label = document.createElement("label");
+      label.style.color = color;
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = String(id);
+      checkbox.checked = true;
+      checkbox.style.accentColor = color;
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(name));
+      container.appendChild(label);
     });
   })();
 
@@ -230,8 +230,8 @@ function setupView() {
    * @param {number} fallback
    * @returns {number}
    */
-  function numberOr(id, fallback) {
-    const value = field(id).value;
+  function readFieldNumber(id, fallback) {
+    const value = getField(id).value;
     if (value === "") return fallback;
     // A field left holding something unreadable falls back rather than becoming a number:
     // `Number("")` is 0, and a "0" in `minLevel` is a filter somebody could have meant.
@@ -248,60 +248,60 @@ function setupView() {
    * @param {string | number} value
    * @returns {number}
    */
-  function professionId(value) {
+  function requireProfessionId(value) {
     const id = assertDefined(getIntegerFromText(String(value)), `a profession id is a whole number, got "${value}"`);
     assert(id >= 1 && id <= 6, `a profession id is 1-6, got ${id}`);
     return id;
   }
 
   function readFilters() {
-    const maxDays = numberOr("onlineValue", Infinity);
+    const maxDays = readFieldNumber("onlineValue", Infinity);
     return {
-      minLevel: numberOr("minLevel", -Infinity),
-      maxLevel: numberOr("maxLevel", Infinity),
-      minHonor: numberOr("minHonor", -Infinity),
-      maxHonor: numberOr("maxHonor", Infinity),
+      minLevel: readFieldNumber("minLevel", -Infinity),
+      maxLevel: readFieldNumber("maxLevel", Infinity),
+      minHonor: readFieldNumber("minHonor", -Infinity),
+      maxHonor: readFieldNumber("maxHonor", Infinity),
       maxDays: maxDays < 0 ? Infinity : maxDays,
       professions: new Set(
-        checkboxes("profCheckboxes", "input:checked").map((cb) => professionId(cb.value)),
+        getCheckboxes("profCheckboxes", "input:checked").map((checkbox) => requireProfessionId(checkbox.value)),
       ),
     };
   }
 
   function readView() {
     return {
-      world: field("worldSelect").value,
-      date: field("snapshotSelect").value,
-      threshold: field("thresholdSelect").value,
-      share: field("modeSelect").value === "udzial",
+      world: getField("worldSelect").value,
+      date: getField("snapshotSelect").value,
+      threshold: getField("thresholdSelect").value,
+      share: getField("modeSelect").value === "udzial",
     };
   }
 
   /** The inverse of readFilters — puts the state from the URL back into the form fields. */
   /**
-   * @param {Filters} f
+   * @param {Filters} filters
    */
-  function applyFilters(f) {
-    const put = (/** @type {string} */ id, /** @type {number} */ value) => {
-      field(id).value = Number.isFinite(value) ? String(value) : "";
+  function applyFilters(filters) {
+    const setFieldValue = (/** @type {string} */ id, /** @type {number} */ value) => {
+      getField(id).value = Number.isFinite(value) ? String(value) : "";
     };
-    put("minLevel", f.minLevel);
-    put("maxLevel", f.maxLevel);
-    put("minHonor", f.minHonor);
-    put("maxHonor", f.maxHonor);
-    put("onlineValue", f.maxDays);
-    field("onlinePreset").value = Number.isFinite(f.maxDays) ? String(f.maxDays) : "all";
-    for (const cb of checkboxes("profCheckboxes")) {
-      cb.checked = f.professions.has(professionId(cb.value));
+    setFieldValue("minLevel", filters.minLevel);
+    setFieldValue("maxLevel", filters.maxLevel);
+    setFieldValue("minHonor", filters.minHonor);
+    setFieldValue("maxHonor", filters.maxHonor);
+    setFieldValue("onlineValue", filters.maxDays);
+    getField("onlinePreset").value = Number.isFinite(filters.maxDays) ? String(filters.maxDays) : "all";
+    for (const checkbox of getCheckboxes("profCheckboxes")) {
+      checkbox.checked = filters.professions.has(requireProfessionId(checkbox.value));
     }
   }
 
   function resetFilters() {
     for (const id of ["minLevel", "maxLevel", "minHonor", "maxHonor", "onlineValue"]) {
-      field(id).value = "";
+      getField(id).value = "";
     }
-    field("onlinePreset").value = "all";
-    for (const cb of checkboxes("profCheckboxes")) cb.checked = true;
+    getField("onlinePreset").value = "all";
+    for (const checkbox of getCheckboxes("profCheckboxes")) checkbox.checked = true;
   }
 
   function writeUrlState() {
@@ -323,28 +323,28 @@ function setupView() {
   // ── Data ──────────────────────────────────────────────────────────────────
 
   const getWorlds = () => manifest?.worlds || [];
-  const currentWorld = () => field("worldSelect").value;
-  const currentWorldEntries = () => getWorlds().find((w) => w.name === currentWorld())?.files || [];
-  const selectedEntry = () => currentWorldEntries().find((f) => f.id === field("snapshotSelect").value);
-  const baseTrend = () => trends?.worlds[currentWorld()] ?? null;
-  const currentSnapshot = () => getCachedSnapshots(currentWorld()).get(field("snapshotSelect").value) ?? null;
+  const getCurrentWorld = () => getField("worldSelect").value;
+  const getCurrentWorldEntries = () => getWorlds().find((world) => world.name === getCurrentWorld())?.files || [];
+  const getSelectedEntry = () => getCurrentWorldEntries().find((filters) => filters.id === getField("snapshotSelect").value);
+  const getBaseTrend = () => trends?.worlds[getCurrentWorld()] ?? null;
+  const getCurrentSnapshot = () => getCachedSnapshots(getCurrentWorld()).get(getField("snapshotSelect").value) ?? null;
 
   /** Every snapshot of this world that has a date, i.e. a place on the time axis. */
-  function datedEntries() {
-    const base = baseTrend();
+  function getDatedEntries() {
+    const base = getBaseTrend();
     if (!base) return [];
     const dated = new Set(base.id);
-    return currentWorldEntries().filter((e) => dated.has(e.id));
+    return getCurrentWorldEntries().filter((entry) => dated.has(entry.id));
   }
 
   /**
    * The snapshots the filtered history is willing to fetch: the newest that fit into the
    * transfer budget, or all of them once the user has lifted it for this world.
    */
-  function plannedEntries() {
-    const entries = datedEntries();
-    if (lifted.has(currentWorld())) return entries;
-    return getBudgetedEntries(entries, baseTrend()?.bytes ?? 0);
+  function getPlannedEntries() {
+    const entries = getDatedEntries();
+    if (lifted.has(getCurrentWorld())) return entries;
+    return getBudgetedEntries(entries, getBaseTrend()?.bytes ?? 0);
   }
 
   /**
@@ -352,26 +352,26 @@ function setupView() {
    * memory. A snapshot somebody has already paid for keeps its point — otherwise lifting the
    * budget and then touching a filter would take the extra points away again.
    */
-  function drawableEntries() {
-    const store = getCachedSnapshots(currentWorld());
-    const planned = new Set(plannedEntries().map((e) => e.id));
-    return datedEntries().filter((e) => planned.has(e.id) || store.has(e.id));
+  function getDrawableEntries() {
+    const store = getCachedSnapshots(getCurrentWorld());
+    const planned = new Set(getPlannedEntries().map((entry) => entry.id));
+    return getDatedEntries().filter((entry) => planned.has(entry.id) || store.has(entry.id));
   }
 
   // ── Formatting numbers ────────────────────────────────────────────────────
 
-  const formatNumber = (/** @type {number} */ n) => n.toLocaleString(POLISH_LOCALE);
+  const formatNumber = (/** @type {number} */ value) => value.toLocaleString(POLISH_LOCALE);
   // Fractions in Polish too — "−5,3%" next to "23 719" rather than "−5.3%", two
   // conventions at once.
-  const formatDecimal = (/** @type {number} */ n, digits = 1) =>
-    n.toLocaleString(POLISH_LOCALE, { minimumFractionDigits: digits, maximumFractionDigits: digits });
-  const signed = (/** @type {number} */ n, format = formatNumber) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${format(Math.abs(n))}`;
+  const formatDecimal = (/** @type {number} */ value, digits = 1) =>
+    value.toLocaleString(POLISH_LOCALE, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  const formatSigned = (/** @type {number} */ value, format = formatNumber) => `${value > 0 ? "+" : value < 0 ? "−" : ""}${format(Math.abs(value))}`;
   // A transfer, as the person paying for it reads it. Under a megabyte in whole kilobytes:
   // "0,4 MB" says less than "360 KB" to somebody deciding whether to press the button.
-  const formatBytes = (/** @type {number} */ n) =>
-    n >= BYTES_IN_MEGABYTE
-      ? `${formatDecimal(n / BYTES_IN_MEGABYTE)} MB`
-      : `${formatNumber(Math.round(n / BYTES_IN_KILOBYTE))} KB`;
+  const formatBytes = (/** @type {number} */ value) =>
+    value >= BYTES_IN_MEGABYTE
+      ? `${formatDecimal(value / BYTES_IN_MEGABYTE)} MB`
+      : `${formatNumber(Math.round(value / BYTES_IN_KILOBYTE))} KB`;
 
   /**
    * An exception turned into a message for a person. The error bar used to carry the raw
@@ -389,24 +389,24 @@ function setupView() {
    */
   /**
    * @param {unknown} error
-   * @param {string} what what could not be fetched, in Polish, for the sentence
+   * @param {string} subject what could not be fetched, in Polish, for the sentence
    * @returns {string}
    */
-  function describeFailure(error, what) {
+  function describeFailure(error, subject) {
     if (error instanceof ResourceFetchError) {
-      return `Nie udało się pobrać ${what}: serwer odpowiedział kodem ${error.status}.`;
+      return `Nie udało się pobrać ${subject}: serwer odpowiedział kodem ${error.status}.`;
     }
     if (error instanceof MargoStatError) {
       if (error.code === "ResourceParse") {
-        return `Nie udało się odczytać ${what}: plik nie jest poprawnym JSON-em.`;
+        return `Nie udało się odczytać ${subject}: plik nie jest poprawnym JSON-em.`;
       }
     }
-    return `Nie udało się pobrać ${what} — wygląda na brak połączenia. Odśwież stronę i spróbuj ponownie.`;
+    return `Nie udało się pobrać ${subject} — wygląda na brak połączenia. Odśwież stronę i spróbuj ponownie.`;
   }
 
   // ── The cross-section chart: levels by profession ─────────────────────────
 
-  function levelChartOptions() {
+  function composeLevelChartOptions() {
     return {
       responsive: true,
       maintainAspectRatio: false,
@@ -446,19 +446,19 @@ function setupView() {
       return;
     }
 
-    const total = chart.data.datasets.reduce((/** @type {number} */ sum, /** @type {any} */ ds) => sum + (ds.data[dataIndex] || 0), 0);
+    const total = chart.data.datasets.reduce((/** @type {number} */ sum, /** @type {any} */ dataset) => sum + (dataset.data[dataIndex] || 0), 0);
     const level = chart.data.labels[dataIndex];
     const rows = chart.data.datasets
-      .map((/** @type {any} */ ds) => ({ label: ds.label, color: ds.backgroundColor, value: ds.data[dataIndex] || 0 }))
-      .filter((/** @type {{ value: number }} */ e) => e.value > 0)
-      .sort((/** @type {{ value: number }} */ a, /** @type {{ value: number }} */ b) => b.value - a.value)
-      .map((/** @type {{ label: string, color: string, value: number }} */ e) => {
+      .map((/** @type {any} */ dataset) => ({ label: dataset.label, color: dataset.backgroundColor, value: dataset.data[dataIndex] || 0 }))
+      .filter((/** @type {{ value: number }} */ row) => row.value > 0)
+      .sort((/** @type {{ value: number }} */ left, /** @type {{ value: number }} */ right) => right.value - left.value)
+      .map((/** @type {{ label: string, color: string, value: number }} */ row) => {
         // The same notation as in the bar and the table: "12,3%" and "1 234", not "12.3%".
-        const percentText = total ? formatDecimal((e.value / total) * 100, 1) : formatDecimal(0, 1);
+        const percentText = total ? formatDecimal((row.value / total) * 100, 1) : formatDecimal(0, 1);
         return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
-          <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${e.color};flex-shrink:0"></span>
-          <span style="flex:1">${e.label}</span>
-          <span style="color:var(--muted);margin-left:8px">${formatNumber(e.value)}</span>
+          <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${row.color};flex-shrink:0"></span>
+          <span style="flex:1">${row.label}</span>
+          <span style="color:var(--muted);margin-left:8px">${formatNumber(row.value)}</span>
           <span style="color:var(--accent);min-width:48px;text-align:right">${percentText}%</span>
         </div>`;
       })
@@ -470,7 +470,7 @@ function setupView() {
       <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:var(--muted)">Razem: <b style="color:var(--text)">${formatNumber(total)}</b></div>
     `;
 
-    const pos = chart.canvas.getBoundingClientRect();
+    const canvasBox = chart.canvas.getBoundingClientRect();
     node.style.opacity = "1";
 
     // The gap the tooltip keeps from the cursor, and the one it keeps from every edge it
@@ -479,9 +479,9 @@ function setupView() {
     const CURSOR_GAP = 12;
     const EDGE_GAP = 8;
 
-    let x = pos.left + tooltip.caretX + CURSOR_GAP;
-    let y = pos.top + tooltip.caretY - 10;
-    if (x + node.offsetWidth > window.innerWidth - EDGE_GAP) x = pos.left + tooltip.caretX - node.offsetWidth - CURSOR_GAP;
+    let x = canvasBox.left + tooltip.caretX + CURSOR_GAP;
+    let y = canvasBox.top + tooltip.caretY - 10;
+    if (x + node.offsetWidth > window.innerWidth - EDGE_GAP) x = canvasBox.left + tooltip.caretX - node.offsetWidth - CURSOR_GAP;
     if (y + node.offsetHeight > window.innerHeight - EDGE_GAP) y = window.innerHeight - node.offsetHeight - EDGE_GAP;
     // The filter bar is sticky and has a higher z-index than the tooltip, so the upper
     // clamp has to end below it rather than 8 px from the window's edge.
@@ -496,7 +496,7 @@ function setupView() {
    * @param {Map<number, number[]>} counts
    */
   function renderLevelChart(counts) {
-    const labels = [...counts.keys()].sort((a, b) => a - b);
+    const labels = [...counts.keys()].sort((left, right) => left - right);
     const datasets = getProfessionEntries().map(([id, name]) => ({
       label: name,
       data: labels.map((level) => counts.get(level)?.[id - 1] || 0),
@@ -512,7 +512,7 @@ function setupView() {
       charts.professionChart = new Chart(getElement("professionChart"), {
         type: "bar",
         data: { labels, datasets },
-        options: levelChartOptions(),
+        options: composeLevelChartOptions(),
       });
       return;
     }
@@ -531,7 +531,7 @@ function setupView() {
    * @param {{ percent?: boolean }} [options]
    * @returns {any} Chart.js's own options shape — §9.3
    */
-  function timeChartOptions(title, { percent = false } = {}) {
+  function composeTimeChartOptions(title, { percent = false } = {}) {
     return {
       responsive: true,
       maintainAspectRatio: false,
@@ -556,7 +556,7 @@ function setupView() {
       scales: {
         y: {
           beginAtZero: percent,
-          ticks: { precision: percent ? 1 : 0, callback: (/** @type {number} */ v) => (percent ? `${formatDecimal(v)}%` : formatNumber(v)) },
+          ticks: { precision: percent ? 1 : 0, callback: (/** @type {number} */ value) => (percent ? `${formatDecimal(value)}%` : formatNumber(value)) },
           grid: { color: theme.grid },
         },
         x: {
@@ -565,7 +565,7 @@ function setupView() {
           afterBuildTicks: (/** @type {any} */ axis) => {
             axis.ticks = tickValues.map((value) => ({ value }));
           },
-          ticks: { callback: (/** @type {number} */ v) => formatShortDate(v), maxRotation: 45, autoSkip: false },
+          ticks: { callback: (/** @type {number} */ value) => formatShortDate(value), maxRotation: 45, autoSkip: false },
           grid: { color: theme.gridSoft },
         },
       },
@@ -577,12 +577,12 @@ function setupView() {
    * @param {WorldTrend} trend
    * @param {string} color
    */
-  function pointStyle(trend, color) {
+  function composePointStyle(trend, color) {
     return {
-      pointBackgroundColor: trend.suspect.map((/** @type {number} */ s) => (s ? "transparent" : color)),
-      pointBorderColor: trend.suspect.map((/** @type {number} */ s) => (s ? theme.warn : color)),
-      pointBorderWidth: trend.suspect.map((/** @type {number} */ s) => (s ? 2 : 1)),
-      pointRadius: trend.suspect.map((/** @type {number} */ s) => (s ? 6 : 3)),
+      pointBackgroundColor: trend.suspect.map((/** @type {number} */ suspect) => (suspect ? "transparent" : color)),
+      pointBorderColor: trend.suspect.map((/** @type {number} */ suspect) => (suspect ? theme.warn : color)),
+      pointBorderWidth: trend.suspect.map((/** @type {number} */ suspect) => (suspect ? 2 : 1)),
+      pointRadius: trend.suspect.map((/** @type {number} */ suspect) => (suspect ? 6 : 3)),
       pointHoverRadius: 6,
     };
   }
@@ -591,11 +591,11 @@ function setupView() {
    * @param {WorldTrend} trend
    * @param {number[]} values
    */
-  function series(trend, values) {
+  function composeSeries(trend, values) {
     // A point whose date cannot be read is dropped rather than placed at NaN, where
     // Chart.js draws nothing and the series silently loses a snapshot without saying so.
     return values
-      .map((/** @type {number} */ y, /** @type {number} */ i) => ({ x: getMillisecondsFromIsoText(trend.startedAt[i]), y }))
+      .map((/** @type {number} */ y, /** @type {number} */ index) => ({ x: getMillisecondsFromIsoText(trend.startedAt[index]), y }))
       .filter((/** @type {{ x: number | null }} */ point) => point.x !== null);
   }
 
@@ -631,14 +631,14 @@ function setupView() {
       [
         {
           label: filtered ? "Pasujących" : "Populacja",
-          data: series(trend, popShare ? getShareSeries(trend.total, population) : trend.total),
+          data: composeSeries(trend, popShare ? getShareSeries(trend.total, population) : trend.total),
           borderColor: theme.accent,
           backgroundColor: theme.accent,
           tension: 0.15,
-          ...pointStyle(trend, theme.accent),
+          ...composePointStyle(trend, theme.accent),
         },
       ],
-      timeChartOptions(
+      composeTimeChartOptions(
         popShare
           ? "Udział pasujących w populacji"
           : filtered
@@ -648,7 +648,7 @@ function setupView() {
       ),
     );
 
-    const threshold = getThresholdByKey(field("thresholdSelect").value, filters.maxDays);
+    const threshold = getThresholdByKey(getField("thresholdSelect").value, filters.maxDays);
     if (threshold) {
       const counts = getActiveCounts(trend, threshold.key, filters.maxDays);
       drawChart(
@@ -656,26 +656,26 @@ function setupView() {
         [
           {
             label: `Aktywni ${threshold.label}`,
-            data: series(trend, share ? getShareSeries(counts, population) : counts),
+            data: composeSeries(trend, share ? getShareSeries(counts, population) : counts),
             borderColor: theme.ok,
             backgroundColor: theme.ok,
             tension: 0.15,
-            ...pointStyle(trend, theme.ok),
+            ...composePointStyle(trend, theme.ok),
           },
         ],
-        timeChartOptions(
+        composeTimeChartOptions(
           share ? `Udział aktywnych ${threshold.label} w populacji` : `Aktywni ${threshold.label} w czasie`,
           { percent: share },
         ),
       );
     }
 
-    const profOptions = timeChartOptions(share ? "Udział profesji w populacji" : "Profesje w czasie", {
+    const professionOptions = composeTimeChartOptions(share ? "Udział profesji w populacji" : "Profesje w czasie", {
       percent: share,
     });
     // The only chart with six series, so the only one that needs a legend. The options
     // object is Chart.js's own shape, which carries no types here (§9.3).
-    /** @type {any} */ (profOptions.plugins).legend = {
+    /** @type {any} */ (professionOptions.plugins).legend = {
       display: true,
       position: "bottom",
       labels: { boxWidth: 12, usePointStyle: true },
@@ -689,7 +689,7 @@ function setupView() {
           const values = assertDefined(trend.byProf[id - 1], `profession ${id} has a series`);
           return {
             label: name,
-            data: series(trend, share ? getShareSeries(values, population) : values),
+            data: composeSeries(trend, share ? getShareSeries(values, population) : values),
             borderColor: PROFESSION_COLORS[id],
             backgroundColor: PROFESSION_COLORS[id],
             tension: 0.15,
@@ -697,7 +697,7 @@ function setupView() {
             pointHoverRadius: 6,
           };
         }),
-      profOptions,
+      professionOptions,
     );
   }
 
@@ -714,10 +714,10 @@ function setupView() {
   /** @param {string} key one of `FILTER_GROUPS`'s keys, or "prof" */
   function clearFilterGroup(key) {
     if (key === "prof") {
-      for (const cb of checkboxes("profCheckboxes")) cb.checked = true;
+      for (const checkbox of getCheckboxes("profCheckboxes")) checkbox.checked = true;
     } else {
-      for (const id of FILTER_GROUPS[/** @type {keyof typeof FILTER_GROUPS} */ (key)] ?? []) field(id).value = "";
-      if (key === "days") field("onlinePreset").value = "all";
+      for (const id of FILTER_GROUPS[/** @type {keyof typeof FILTER_GROUPS} */ (key)] ?? []) getField(id).value = "";
+      if (key === "days") getField("onlinePreset").value = "all";
     }
     scheduleRender();
   }
@@ -757,7 +757,7 @@ function setupView() {
     const buttons = [...box.querySelectorAll("button")];
     // The same chip if it survived; otherwise the first one left; and when the last one is
     // gone — the button the chips grow out from.
-    const next = buttons.find((b) => b.dataset?.clear === hadFocus) ?? buttons[0] ?? getElement("filtersToggle");
+    const next = buttons.find((button) => button.dataset?.clear === hadFocus) ?? buttons[0] ?? getElement("filtersToggle");
     next.focus?.();
   }
 
@@ -801,7 +801,7 @@ function setupView() {
     // Zero isMatch is not a distribution made of zeros: six professions and five activity
     // buckets printed as "0" read like broken data, not like the answer "nobody isMatch".
     // The same principle as `getVisibleActivityBuckets`.
-    if (perProfession.every((n) => n === 0)) {
+    if (perProfession.every((count) => count === 0)) {
       getElement("stats").innerHTML =
         `<div class="stats-line">Żaden gracz w tej migawce nie spełnia filtrów — rozkładu nie ma z czego złożyć.</div>`;
       return;
@@ -817,7 +817,7 @@ function setupView() {
         color: PROFESSION_COLORS[id],
         count: assertDefined(perProfession[id - 1], `profession ${id} has a count`),
       }))
-      .sort((a, b) => b.count - a.count)
+      .sort((left, right) => right.count - left.count)
       .map(
         ({ name, color, count }) =>
           `<span style="color:${color};white-space:nowrap">${name}: <b>${formatNumber(count)}</b></span>`,
@@ -863,13 +863,13 @@ function setupView() {
    * @param {WorldTrend} base the aggregate, which owns the time axis — §9.6
    */
   function renderSummary(trend, base) {
-    const s = summarize(trend);
-    if (!s) {
+    const summary = summarize(trend);
+    if (!summary) {
       getElement("summary").textContent = "—";
       return;
     }
-    const color = s.delta < 0 ? "var(--danger)" : s.delta > 0 ? "var(--ok)" : "var(--muted)";
-    const span = s.days === null ? "—" : `${Math.round(s.days)} dni`;
+    const color = summary.delta < 0 ? "var(--danger)" : summary.delta > 0 ? "var(--ok)" : "var(--muted)";
+    const span = summary.days === null ? "—" : `${Math.round(summary.days)} dni`;
     // "Od pierwszej migawki" is a lie the moment the budget leaves the oldest ones unfetched:
     // the axis still reaches April while the number counts from June. Then it says from when.
     const from =
@@ -878,11 +878,11 @@ function setupView() {
         : formatShortDate(assertDefined(getMillisecondsFromIsoText(trend.startedAt[0]), "a drawn snapshot has a readable startedAt"));
 
     getElement("summary").innerHTML = `
-      <div style="margin-bottom:6px">Ostatnia migawka: <b style="color:var(--text)">${formatNumber(s.total)}</b></div>
+      <div style="margin-bottom:6px">Ostatnia migawka: <b style="color:var(--text)">${formatNumber(summary.total)}</b></div>
       <div class="stats-line">
-        <span>Zmiana od ${from}: <b style="color:${color}">${signed(s.delta)}</b>
-          <span style="color:${color}">(${signed(s.percent, formatDecimal)}%)</span></span>
-        <span>Migawek: <b style="color:var(--text)">${s.snapshots}</b></span>
+        <span>Zmiana od ${from}: <b style="color:${color}">${formatSigned(summary.delta)}</b>
+          <span style="color:${color}">(${formatSigned(summary.percent, formatDecimal)}%)</span></span>
+        <span>Migawek: <b style="color:var(--text)">${summary.snapshots}</b></span>
         <span>Okres: <b style="color:var(--text)">${span}</b></span>
       </div>
     `;
@@ -911,8 +911,8 @@ function setupView() {
           <td>${formatSnapshotDate(entry ?? null)}${entry?.suspect ? ' <span title="migawka może być obcięta" style="color:var(--warn)">⚠</span>' : ""}</td>
           <td class="number">${days === null ? "—" : formatDecimal(days)}</td>
           <td class="number">${formatNumber(total)}</td>
-          <td class="number" style="color:${color}">${signed(delta)}</td>
-          <td class="number" style="color:${color}">${perDay === null ? "—" : signed(perDay, formatDecimal)}</td>
+          <td class="number" style="color:${color}">${formatSigned(delta)}</td>
+          <td class="number" style="color:${color}">${perDay === null ? "—" : formatSigned(perDay, formatDecimal)}</td>
         </tr>`;
       })
       .join("");
@@ -936,21 +936,21 @@ function setupView() {
    */
   function fillThresholdSelect(maxDays, preferred) {
     const usable = getUsableThresholds(maxDays);
-    const keys = usable.map((t) => t.key).join(",");
+    const keys = usable.map((threshold) => threshold.key).join(",");
     // The choice is read BEFORE the options are replaced. `innerHTML` on a `<select>`
     // resets the value to the first option, so reading it afterwards would always give
     // "< 24h" — dropping the user onto a series that swings by 14.7% and freezing that
     // into the link.
-    const wanted = preferred ?? field("thresholdSelect").value;
+    const wanted = preferred ?? getField("thresholdSelect").value;
 
     if (keys !== thresholdKeys) {
       thresholdKeys = keys;
-      getElement("thresholdSelect").innerHTML = usable.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
+      getElement("thresholdSelect").innerHTML = usable.map((threshold) => `<option value="${threshold.key}">${threshold.label}</option>`).join("");
     }
     const chosen = getThresholdByKey(wanted, maxDays);
-    if (chosen) field("thresholdSelect").value = chosen.key;
+    if (chosen) getField("thresholdSelect").value = chosen.key;
 
-    field("thresholdSelect").disabled = usable.length === 0;
+    getField("thresholdSelect").disabled = usable.length === 0;
     getElement("actChartBox").hidden = usable.length === 0;
     getElement("thresholdNote").hidden = usable.length === getUsableThresholds(Infinity).length;
     if (!getElement("thresholdNote").hidden) {
@@ -1055,8 +1055,8 @@ function setupView() {
    * @param {Filters} filters
    */
   function renderCrossSection(filters) {
-    const data = currentSnapshot();
-    const base = baseTrend();
+    const data = getCurrentSnapshot();
+    const base = getBaseTrend();
     if (!data) {
       getElement("stats").textContent = "Ładowanie…";
       getElement("matchLine").textContent = "Ładowanie…";
@@ -1071,11 +1071,11 @@ function setupView() {
 
     const counts = countByLevel(data, filters);
     const matched = getTotalsFromCounts(counts).total;
-    const i = base ? base.id.indexOf(field("snapshotSelect").value) : -1;
+    const index = base ? base.id.indexOf(getField("snapshotSelect").value) : -1;
 
     // The unfiltered population of this very snapshot where the aggregate knows it, and
     // the snapshot's own row count otherwise — never a count from a different snapshot.
-    const population = base && i > -1 ? base.total[i] : undefined;
+    const population = base && index > -1 ? base.total[index] : undefined;
     renderMatchLine(matched, population ?? data.count);
     renderLevelChart(counts);
     renderStats(counts, countByActivity(data, filters), filters.maxDays, filters.professions);
@@ -1085,7 +1085,7 @@ function setupView() {
    * @param {Filters} filters
    */
   function renderHistory(filters) {
-    const base = baseTrend();
+    const base = getBaseTrend();
     if (!base) {
       getElement("historyStatus").textContent = "brak historii dla tego świata";
       getElement("summary").textContent = "—";
@@ -1093,11 +1093,11 @@ function setupView() {
       return;
     }
 
-    const allowed = new Set(drawableEntries().map((e) => e.id));
-    const available = datedEntries().length;
+    const allowed = new Set(getDrawableEntries().map((entry) => entry.id));
+    const available = getDatedEntries().length;
     const { trend, population, loaded, expected } = buildFilteredTrend(
       base,
-      getCachedSnapshots(currentWorld()),
+      getCachedSnapshots(getCurrentWorld()),
       filters,
       allowed,
     );
@@ -1121,11 +1121,11 @@ function setupView() {
     }
 
     const usable = fillThresholdSelect(filters.maxDays);
-    const share = field("modeSelect").value === "udzial";
+    const share = getField("modeSelect").value === "udzial";
 
     // One point is a valid state, not an error — luvia joined in the last round.
     getElement("singlePoint").hidden = trend.id.length !== 1 || expected !== 1;
-    getElement("suspectNote").hidden = !trend.suspect.some((s) => s === 1);
+    getElement("suspectNote").hidden = !trend.suspect.some((suspect) => suspect === 1);
     getElement("onlineNote").hidden = usable.length === 0;
 
     if (trend.id.length === 0) {
@@ -1140,17 +1140,17 @@ function setupView() {
     // Every snapshot in the aggregate carries a `startedAt` — one without it never enters
     // `trends.json`, because there is nowhere to put it on a time axis (§9.2). An
     // unreadable one here is therefore a broken aggregate, not a case to draw around.
-    tickValues = base.startedAt.flatMap((t) => {
-      const at = getMillisecondsFromIsoText(t);
-      return at === null ? [] : [at];
+    tickValues = base.startedAt.flatMap((isoText) => {
+      const milliseconds = getMillisecondsFromIsoText(isoText);
+      return milliseconds === null ? [] : [milliseconds];
     });
     const first = tickValues[0];
     const last = tickValues[tickValues.length - 1];
     axisRange = first !== undefined && last !== undefined && tickValues.length > 1 ? { min: first, max: last } : null;
     entriesByTime = new Map(
-      getSnapshotEntries(base).flatMap((e) => {
-        const at = getMillisecondsFromIsoText(e.startedAt);
-        return at === null ? [] : [/** @type {[number, SnapshotEntry]} */ ([at, e])];
+      getSnapshotEntries(base).flatMap((entry) => {
+        const milliseconds = getMillisecondsFromIsoText(entry.startedAt);
+        return milliseconds === null ? [] : [/** @type {[number, SnapshotEntry]} */ ([milliseconds, entry])];
       }),
     );
     renderHistoryCharts(trend, population, filters, share);
@@ -1199,7 +1199,7 @@ function setupView() {
   async function loadSnapshot(entry) {
     if (!entry) return;
     const token = ++snapshotToken;
-    const world = currentWorld();
+    const world = getCurrentWorld();
     const store = getCachedSnapshots(world);
 
     getElement("sourceInfo").textContent = entry.filters;
@@ -1228,11 +1228,11 @@ function setupView() {
       store.set(entry.id, snapshot);
       showSuspect(snapshot.suspect ?? null);
       render();
-    } catch (e) {
+    } catch (error) {
       // The same guard as on success: a rejected abandoned request must not wipe out a
       // correctly rendered cross-section of another snapshot.
       if (token !== snapshotToken) return;
-      getElement("error").textContent = describeFailure(e, "migawki przekroju");
+      getElement("error").textContent = describeFailure(error, "migawki przekroju");
       getElement("stats").textContent = "—";
       // Without this the bar stayed on the previous snapshot's numbers or on "Ładowanie…",
       // i.e. a result with nothing behind it stood next to a red error.
@@ -1256,8 +1256,8 @@ function setupView() {
     }
     if (!manifest || !trends) return;
 
-    const world = currentWorld();
-    const entries = plannedEntries();
+    const world = getCurrentWorld();
+    const entries = getPlannedEntries();
     const store = getCachedSnapshots(world);
     if (entries.length === 0 || getLoadedCount(store, entries) === entries.length) return;
 
@@ -1286,7 +1286,7 @@ function setupView() {
     // "dociągnij resztę" mid-fetch would hide the note and quietly fetch nothing. Comparing
     // lengths — not "is anything still missing" — is what makes it terminate: a snapshot
     // that failed stays missing, and the plan only grows when the user lifts the budget.
-    if (plannedEntries().length > entries.length) void ensureHistory();
+    if (getPlannedEntries().length > entries.length) void ensureHistory();
   }
 
   // ── The selects ───────────────────────────────────────────────────────────
@@ -1296,25 +1296,25 @@ function setupView() {
    */
   function fillWorldSelect(selected) {
     getElement("worldSelect").innerHTML = getWorlds()
-      .map((w) => `<option value="${w.name}">${capitalize(w.name)}</option>`)
+      .map((world) => `<option value="${world.name}">${capitalize(world.name)}</option>`)
       .join("");
-    if (selected && getWorlds().some((w) => w.name === selected)) field("worldSelect").value = selected;
+    if (selected && getWorlds().some((world) => world.name === selected)) getField("worldSelect").value = selected;
   }
 
   /**
    * @param {string | null} [selected] the id to keep chosen, where one is to be kept
    */
   function fillSnapshotSelect(selected) {
-    const files = [...currentWorldEntries()].reverse(); // the newest at the top
+    const files = [...getCurrentWorldEntries()].reverse(); // the newest at the top
     getElement("snapshotSelect").innerHTML = files
-      .map((f) => `<option value="${f.id}">${formatSnapshotDate(f)}</option>`)
+      .map((filters) => `<option value="${filters.id}">${formatSnapshotDate(filters)}</option>`)
       .join("");
-    if (selected && files.some((f) => f.id === selected)) field("snapshotSelect").value = selected;
+    if (selected && files.some((filters) => filters.id === selected)) getField("snapshotSelect").value = selected;
   }
 
   async function selectAndLoad() {
     writeUrlState();
-    await loadSnapshot(selectedEntry());
+    await loadSnapshot(getSelectedEntry());
     await ensureHistory();
   }
 
@@ -1338,7 +1338,7 @@ function setupView() {
     return /** @type {Trends} */ (json);
   }
 
-  async function init() {
+  async function loadInitialView() {
     try {
       const [manifestJson, trendsJson] = await Promise.all([
         getJsonFromUrl("manifest.json"),
@@ -1357,14 +1357,14 @@ function setupView() {
       fillSnapshotSelect(view.date);
       applyFilters(readFiltersFromParams(params));
       fillThresholdSelect(readFilters().maxDays, view.threshold);
-      field("modeSelect").value = view.share ? "udzial" : "liczba";
+      getField("modeSelect").value = view.share ? "udzial" : "liczba";
 
 
       // A link carrying filters is to work straight away — the history starts without
       // waiting for a mouse move.
       await selectAndLoad();
-    } catch (e) {
-      getElement("error").textContent = describeFailure(e, "indeksu migawek");
+    } catch (error) {
+      getElement("error").textContent = describeFailure(error, "indeksu migawek");
       getElement("stats").textContent = "—";
       getElement("matchLine").textContent = "—";
       // `#summary` stayed on "Ładowanie…" forever — so a line promising data that will
@@ -1390,8 +1390,8 @@ function setupView() {
   getElement("snapshotSelect").addEventListener("change", selectAndLoad);
 
   getElement("onlinePreset").addEventListener("change", () => {
-    const value = field("onlinePreset").value;
-    field("onlineValue").value = value === "all" ? "" : value;
+    const value = getField("onlinePreset").value;
+    getField("onlineValue").value = value === "all" ? "" : value;
     renderNow();
   });
 
@@ -1417,7 +1417,7 @@ function setupView() {
   // Lifting the budget is the one place where megabytes are bought on purpose, so it is a
   // press of a button and nothing else — no filter change, no reload.
   getElement("loadRestBtn").addEventListener("click", () => {
-    lifted.add(currentWorld());
+    lifted.add(getCurrentWorld());
     renderNow();
   });
 
@@ -1444,15 +1444,15 @@ function setupView() {
     if (key) clearFilterGroup(key);
   });
 
-  init();
+  loadInitialView();
 }
 
 // Modules are deferred, so the document is already parsed — but should this file ever
 // arrive earlier, we wait for the DOM instead of failing on a missing #id.
 if (typeof document !== "undefined") {
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", setupView);
+    document.addEventListener("DOMContentLoaded", startView);
   } else {
-    setupView();
+    startView();
   }
 }

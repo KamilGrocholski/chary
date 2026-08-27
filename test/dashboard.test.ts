@@ -35,22 +35,22 @@ const { filters: data, names } = splitNormalized(normalizeLegacyRows(legacy), {
   timestamp: "2026-07-21T22-04-12",
 });
 
-function legacyDays(text: string): number | null {
-  const t = String(text);
-  if (t.includes("24h")) return 0;
-  const n = Number(t.match(/(\d+)/)?.[1]);
-  return n >= 10_000 ? null : n;
+function getLegacyDays(text: string): number | null {
+  const threshold = String(text);
+  if (threshold.includes("24h")) return 0;
+  const count = Number(threshold.match(/(\d+)/)?.[1]);
+  return count >= 10_000 ? null : count;
 }
 
-function filters(overrides: Record<string, unknown> = {}) {
+function composeFilters(overrides: Record<string, unknown> = {}) {
   return { ...getEmptyFilters(), ...overrides };
 }
 
-function total(counts: Map<number, number[]>) {
+function getTotal(counts: Map<number, number[]>) {
   return getTotalsFromCounts(counts).total;
 }
 
-function legacyCount(predicate: (row: any[]) => boolean) {
+function countLegacyRows(predicate: (row: any[]) => boolean) {
   return legacy.rows.filter(predicate).length;
 }
 
@@ -64,73 +64,73 @@ describe("migration to the split format", () => {
   });
 
   test("every row keeps all of its values", () => {
-    for (let i = 0; i < legacy.rows.length; i++) {
-      const r = legacy.rows[i];
-      expect(names.name[i]).toBe(r[1]);
-      expect(data.level[i]).toBe(r[2]);
-      expect(data.profession[i]).toBe(r[3]);
-      expect(data.honor[i]).toBe(r[4]);
-      expect(data.days[i]).toBe(legacyDays(r[5]));
+    for (let index = 0; index < legacy.rows.length; index++) {
+      const row = legacy.rows[index];
+      expect(names.name[index]).toBe(row[1]);
+      expect(data.level[index]).toBe(row[2]);
+      expect(data.profession[index]).toBe(row[3]);
+      expect(data.honor[index]).toBe(row[4]);
+      expect(data.days[index]).toBe(getLegacyDays(row[5]));
     }
   });
 
   test("accounts never used carry null instead of a date in 1969", () => {
-    const never = data.days.filter((d) => d === null).length;
+    const never = data.days.filter((days) => days === null).length;
     expect(never).toBeGreaterThan(0);
-    expect(never).toBe(legacyCount((r) => Number(String(r[5]).match(/(\d+)/)?.[1]) >= 10_000));
+    expect(never).toBe(countLegacyRows((row) => Number(String(row[5]).match(/(\d+)/)?.[1]) >= 10_000));
   });
 });
 
 describe("filtering — always exact", () => {
   test("with no filters the whole population is visible", () => {
-    expect(total(countByLevel(data, filters()))).toBe(legacy.rows.length);
+    expect(getTotal(countByLevel(data, composeFilters()))).toBe(legacy.rows.length);
   });
 
   test("the distribution across professions", () => {
-    const perProfession = getTotalsFromCounts(countByLevel(data, filters())).perProfession;
-    for (let p = 1; p <= 6; p++) {
-      expect(perProfession[p - 1]).toBe(legacyCount((r) => r[3] === p));
+    const perProfession = getTotalsFromCounts(countByLevel(data, composeFilters())).perProfession;
+    for (let profession = 1; profession <= 6; profession++) {
+      expect(perProfession[profession - 1]).toBe(countLegacyRows((row) => row[3] === profession));
     }
   });
 
   test("a range of levels", () => {
-    const counts = countByLevel(data, filters({ minLevel: 200, maxLevel: 250 }));
-    expect(total(counts)).toBe(legacyCount((r) => r[2] >= 200 && r[2] <= 250));
-    expect([...counts.keys()].every((l) => l >= 200 && l <= 250)).toBe(true);
+    const counts = countByLevel(data, composeFilters({ minLevel: 200, maxLevel: 250 }));
+    expect(getTotal(counts)).toBe(countLegacyRows((row) => row[2] >= 200 && row[2] <= 250));
+    expect([...counts.keys()].every((level) => level >= 200 && level <= 250)).toBe(true);
   });
 
   test("a range of honor — exact, no buckets", () => {
-    expect(total(countByLevel(data, filters({ minHonor: 100_000 })))).toBe(legacyCount((r) => r[4] >= 100_000));
-    expect(total(countByLevel(data, filters({ minHonor: 1, maxHonor: 999 })))).toBe(
-      legacyCount((r) => r[4] >= 1 && r[4] <= 999),
+    expect(getTotal(countByLevel(data, composeFilters({ minHonor: 100_000 })))).toBe(countLegacyRows((row) => row[4] >= 100_000));
+    expect(getTotal(countByLevel(data, composeFilters({ minHonor: 1, maxHonor: 999 })))).toBe(
+      countLegacyRows((row) => row[4] >= 1 && row[4] <= 999),
     );
     // a value that sits on no bucket boundary
-    expect(total(countByLevel(data, filters({ minHonor: 4137 })))).toBe(legacyCount((r) => r[4] >= 4137));
+    expect(getTotal(countByLevel(data, composeFilters({ minHonor: 4137 })))).toBe(countLegacyRows((row) => row[4] >= 4137));
   });
 
   test("the activity threshold — any number of days, not only a preset", () => {
     for (const maxDays of [0, 1, 5, 13, 47, 365]) {
-      const expected = legacyCount((r) => {
-        const d = legacyDays(r[5]);
-        return d !== null && d <= maxDays;
+      const expected = countLegacyRows((row) => {
+        const days = getLegacyDays(row[5]);
+        return days !== null && days <= maxDays;
       });
-      expect(total(countByLevel(data, filters({ maxDays })))).toBe(expected);
+      expect(getTotal(countByLevel(data, composeFilters({ maxDays })))).toBe(expected);
     }
   });
 
   test("the filters compose", () => {
-    const f = filters({ minLevel: 250, maxLevel: 320, minHonor: 100, maxDays: 30, professions: new Set([1, 4]) });
-    const expected = legacyCount((r) => {
-      const d = legacyDays(r[5]);
-      return r[2] >= 250 && r[2] <= 320 && r[4] >= 100 && d !== null && d <= 30 && (r[3] === 1 || r[3] === 4);
+    const filterFile = composeFilters({ minLevel: 250, maxLevel: 320, minHonor: 100, maxDays: 30, professions: new Set([1, 4]) });
+    const expected = countLegacyRows((row) => {
+      const days = getLegacyDays(row[5]);
+      return row[2] >= 250 && row[2] <= 320 && row[4] >= 100 && days !== null && days <= 30 && (row[3] === 1 || row[3] === 4);
     });
-    expect(total(countByLevel(data, f))).toBe(expected);
+    expect(getTotal(countByLevel(data, filterFile))).toBe(expected);
     expect(expected).toBeGreaterThan(0);
   });
 
   test("mutually exclusive filters give emptiness, not a crash", () => {
-    expect(total(countByLevel(data, filters({ minLevel: 9000 })))).toBe(0);
-    expect(total(countByLevel(data, filters({ professions: new Set() })))).toBe(0);
+    expect(getTotal(countByLevel(data, composeFilters({ minLevel: 9000 })))).toBe(0);
+    expect(getTotal(countByLevel(data, composeFilters({ professions: new Set() })))).toBe(0);
   });
 });
 
@@ -157,17 +157,17 @@ describe("an account never used falls out of every threshold", () => {
 
   test("the −1 sentinel does not pass a threshold, even though it is below every one", () => {
     for (const maxDays of [0, 1, 7, 30, 365, 100_000]) {
-      expect(total(countByLevel(withSentinel, filters({ maxDays })))).toBe(
-        [0, 5, 40].filter((d) => d <= maxDays).length,
+      expect(getTotal(countByLevel(withSentinel, composeFilters({ maxDays })))).toBe(
+        [0, 5, 40].filter((days) => days <= maxDays).length,
       );
     }
     // with no threshold everyone gets in, the account never used included
-    expect(total(countByLevel(withSentinel, filters()))).toBe(4);
+    expect(getTotal(countByLevel(withSentinel, composeFilters()))).toBe(4);
   });
 
   test("an account never used sits in the \"never\" bucket, not among > 30 days", () => {
     const buckets = new Map<number, number>(
-      countByActivity(withSentinel, filters()).map(([b, c]: number[]) => [b as number, c as number]),
+      countByActivity(withSentinel, composeFilters()).map(([bucket, chip]: number[]) => [bucket as number, chip as number]),
     );
     expect(buckets.get(4)).toBe(1);
     expect(buckets.get(3)).toBe(1);
@@ -176,18 +176,18 @@ describe("an account never used falls out of every threshold", () => {
 
 describe("the activity distribution", () => {
   test("agrees with the raw data and sums to the population", () => {
-    const buckets = countByActivity(data, filters());
-    expect(buckets.reduce((s, [, c]) => s + c, 0)).toBe(legacy.rows.length);
+    const buckets = countByActivity(data, composeFilters());
+    expect(buckets.reduce((text, [, chip]) => text + chip, 0)).toBe(legacy.rows.length);
 
     for (const [bucket, count] of buckets) {
-      expect(count).toBe(legacyCount((r) => getActivityBucket(legacyDays(r[5])) === bucket));
+      expect(count).toBe(countLegacyRows((row) => getActivityBucket(getLegacyDays(row[5])) === bucket));
     }
   });
 
   test("stays exact under a level filter too (the aggregate could not)", () => {
-    const f = filters({ minLevel: 100, maxLevel: 200 });
-    const buckets = countByActivity(data, f);
-    expect(buckets.reduce((s, [, c]) => s + c, 0)).toBe(legacyCount((r) => r[2] >= 100 && r[2] <= 200));
+    const filterFile = composeFilters({ minLevel: 100, maxLevel: 200 });
+    const buckets = countByActivity(data, filterFile);
+    expect(buckets.reduce((text, [, chip]) => text + chip, 0)).toBe(countLegacyRows((row) => row[2] >= 100 && row[2] <= 200));
   });
 
   test.each([
@@ -219,30 +219,30 @@ describe("the published data", () => {
   test("each world's newest snapshot is internally consistent", async () => {
     for (const world of manifest.worlds) {
       const entry = world.files.at(-1);
-      const f = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.filters)).text());
+      const filterFile = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.filters)).text());
 
-      expect(f.world).toBe(world.name);
-      expect(f.count).toBeGreaterThan(0);
-      expect(f.level).toHaveLength(f.count);
-      expect(f.profession).toHaveLength(f.count);
-      expect(f.honor).toHaveLength(f.count);
-      expect(f.days).toHaveLength(f.count);
-      expect(f.level.every((l: number) => Number.isInteger(l) && l > 0)).toBe(true);
-      expect(f.profession.every((p: number) => p >= 1 && p <= 6)).toBe(true);
+      expect(filterFile.world).toBe(world.name);
+      expect(filterFile.count).toBeGreaterThan(0);
+      expect(filterFile.level).toHaveLength(filterFile.count);
+      expect(filterFile.profession).toHaveLength(filterFile.count);
+      expect(filterFile.honor).toHaveLength(filterFile.count);
+      expect(filterFile.days).toHaveLength(filterFile.count);
+      expect(filterFile.level.every((level: number) => Number.isInteger(level) && level > 0)).toBe(true);
+      expect(filterFile.profession.every((profession: number) => profession >= 1 && profession <= 6)).toBe(true);
       // honor can be negative — confirmed against the live ranking (zorza, "lape", PH -20)
-      expect(f.honor.every((h: number) => Number.isInteger(h))).toBe(true);
-      expect(f.days.every((d: number | null) => d === null || (Number.isInteger(d) && d >= 0))).toBe(true);
+      expect(filterFile.honor.every((honor: number) => Number.isInteger(honor))).toBe(true);
+      expect(filterFile.days.every((days: number | null) => days === null || (Number.isInteger(days) && days >= 0))).toBe(true);
 
-      const n = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.names)).text());
-      expect(n.count).toBe(f.count);
-      expect(n.name).toHaveLength(f.count);
-      expect(n.name.every((name: string) => name.length > 0)).toBe(true);
+      const count = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.names)).text());
+      expect(count.count).toBe(filterFile.count);
+      expect(count.name).toHaveLength(filterFile.count);
+      expect(count.name.every((name: string) => name.length > 0)).toBe(true);
     }
   });
 });
 
 const html = await Bun.file(path.join(PUBLIC_DIR, "index.html")).text();
-const js = await Bun.file(path.join(PUBLIC_DIR, "app.js")).text();
+const appSource = await Bun.file(path.join(PUBLIC_DIR, "app.js")).text();
 const sharedJs = await Bun.file(path.join(PUBLIC_DIR, "shared.js")).text();
 const filtersJs = await Bun.file(path.join(PUBLIC_DIR, "filters.js")).text();
 const historyJs = await Bun.file(path.join(PUBLIC_DIR, "history.js")).text();
@@ -250,7 +250,7 @@ const trendsHtml = await Bun.file(path.join(PUBLIC_DIR, "trends.html")).text();
 
 describe("app.js agrees with index.html", () => {
   test("every element fetched through getElement() exists in the markup", () => {
-    const ids = [...js.matchAll(/\bgetElement\("([^"]+)"\)/g)].map((m) => m[1]);
+    const ids = [...appSource.matchAll(/\bgetElement\("([^"]+)"\)/g)].map((match) => match[1]);
     expect(ids.length).toBeGreaterThan(10);
     for (const id of new Set(ids)) {
       expect(html).toContain(`id="${id}"`);
@@ -265,7 +265,7 @@ describe("app.js agrees with index.html", () => {
     // "cdn" — a CDN address may appear in a comment explaining how to update.
     for (const markup of [html, trendsHtml]) {
       const external = [...markup.matchAll(/<(?:script|link)[^>]*\s(?:src|href)="([^"]+)"/g)]
-        .map((m) => m[1]!)
+        .map((match) => match[1]!)
         .filter((url) => /^(https?:)?\/\//.test(url));
       expect(external).toEqual([]);
     }
@@ -274,8 +274,8 @@ describe("app.js agrees with index.html", () => {
   test("the view does not reach for the nicknames", () => {
     // `.n.json` has no consumer today, and until a player search exists, fetching it
     // would be two thirds of the transfer for nothing.
-    expect(js).toContain("entry.filters");
-    expect(js).not.toContain("entry.names");
+    expect(appSource).toContain("entry.filters");
+    expect(appSource).not.toContain("entry.names");
   });
 
   test("fetches the aggregate and the snapshots, and nothing from outside the directory", () => {
@@ -283,29 +283,29 @@ describe("app.js agrees with index.html", () => {
     // second aggregate. Every fetch goes through `getJsonFromUrl`, so this reads the calls
     // to it rather than the calls to `fetch` — the reason the wrapper exists is that the
     // four call sites were doing the same three steps four ways (§9.5).
-    const literals = [...js.matchAll(/getJsonFromUrl\(\s*["'`]([^"'`]+)/g)].map((m) => m[1]);
+    const literals = [...appSource.matchAll(/getJsonFromUrl\(\s*["'`]([^"'`]+)/g)].map((match) => match[1]);
     expect(literals.sort()).toEqual(["manifest.json", "trends.json"]);
 
     // The remaining URLs come from the manifest, not from the code.
     expect(historyJs).toContain("getJsonFromUrl(entry.filters)");
-    expect(js).toContain("getJsonFromUrl(entry.filters)");
+    expect(appSource).toContain("getJsonFromUrl(entry.filters)");
 
     // And `fetch` itself is spelled in exactly one place, which is what makes the line
     // above a complete list rather than a sample of one.
-    const fetchJs = readFileSync(path.join(repo, "public/fetch-json.js"), "utf8");
+    const fetchJs = readFileSync(path.join(repositoryRoot, "public/fetch-json.js"), "utf8");
     expect(stripComments(fetchJs)).toContain("await fetch(url)");
-    for (const module of [js, historyJs, filtersJs, sharedJs]) {
+    for (const module of [appSource, historyJs, filtersJs, sharedJs]) {
       expect(stripComments(module)).not.toMatch(/[^.\w]fetch\(/);
     }
   });
 });
 
 describe("app.js asks index.html for the right kind of node", () => {
-  // `field()` answers an HTMLInputElement | HTMLSelectElement, and app.js says in its
+  // `getField()` answers an HTMLInputElement | HTMLSelectElement, and app.js says in its
   // docblock that the pairing is proved here rather than asserted at every call. That
   // sentence is only true while this test exists — asking a `<div>` for `.value` is silent
   // in a browser and would have been silent under checkJs too, since the cast is ours.
-  const ids = [...js.matchAll(/\bfield\(\s*"([^"]+)"\s*\)/g)].map((m) => m[1]!);
+  const ids = [...appSource.matchAll(/\bgetField\(\s*"([^"]+)"\s*\)/g)].map((match) => match[1]!);
 
   test("the view really reads form controls through it", () => {
     expect(new Set(ids).size).toBeGreaterThan(5);
@@ -338,7 +338,7 @@ describe("app.js asks index.html for the right kind of node", () => {
 
   test("no module spells a colour that the stylesheet already names", () => {
     const offenders: string[] = [];
-    for (const [name, source] of [["app.js", js], ["filters.js", filtersJs], ["history.js", historyJs]] as const) {
+    for (const [name, source] of [["app.js", appSource], ["filters.js", filtersJs], ["history.js", historyJs]] as const) {
       for (const [literal] of stripComments(source).matchAll(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\([^)]*\)/g)) {
         offenders.push(`${name}: ${literal}`);
       }
@@ -347,7 +347,7 @@ describe("app.js asks index.html for the right kind of node", () => {
   });
 
   test("every token a module reads is a token the stylesheet defines", () => {
-    const asked = [...js.matchAll(/var\((--[\w-]+)\)|requireToken\("(--[\w-]+)"\)/g)].map((m) => m[1] ?? m[2]!);
+    const asked = [...appSource.matchAll(/var\((--[\w-]+)\)|requireToken\("(--[\w-]+)"\)/g)].map((match) => match[1] ?? match[2]!);
     expect(asked.length).toBeGreaterThan(10);
     for (const name of new Set(asked)) expect([...tokens.keys()]).toContain(name);
   });
@@ -363,31 +363,31 @@ describe("app.js asks index.html for the right kind of node", () => {
     // `class="num"` became `class="formatNumber"` in a rename, and the change table lost its
     // right alignment and tabular numerals in silence: the markup is written in JS and the
     // rule that styles it lives in the HTML, so nothing connected the two.
-    const written = [...js.matchAll(/class="([^"${}]+)"/g)].flatMap((m) => m[1]!.split(/\s+/));
+    const written = [...appSource.matchAll(/class="([^"${}]+)"/g)].flatMap((match) => match[1]!.split(/\s+/));
     expect(written.length).toBeGreaterThan(3);
     for (const name of new Set(written)) expect(html).toMatch(new RegExp(`\\.${name}\\b`));
   });
 
   test("getElement() is not used for a value — that is what the split is for", () => {
-    expect(stripComments(js)).not.toMatch(/\bgetElement\([^)]*\)\.(value|checked|disabled)\b/);
+    expect(stripComments(appSource)).not.toMatch(/\bgetElement\([^)]*\)\.(value|checked|disabled)\b/);
   });
 });
 
 describe("the pure modules must not run anything", () => {
   // Comments are stripped, because the test is to hold the code and not the prose: the
   // paragraph explaining why a module does not reach for `document` contains that word.
-  const code = stripComments;
+  const getCode = stripComments;
 
   test("the counting logic does not touch the DOM", () => {
     // app.js starts the view as soon as it loads, so if a pure module imported anything
     // from it, the tests could not be run outside a browser.
     for (const module of [sharedJs, filtersJs, historyJs]) {
-      expect(code(module)).not.toMatch(/\bdocument\b|\bwindow\b/);
+      expect(getCode(module)).not.toMatch(/\bdocument\b|\bwindow\b/);
       expect(module).not.toContain('from "./app.js"');
     }
-    expect(js).toContain('from "./shared.js"');
-    expect(js).toContain('from "./filters.js"');
-    expect(js).toContain('from "./history.js"');
+    expect(appSource).toContain('from "./shared.js"');
+    expect(appSource).toContain('from "./filters.js"');
+    expect(appSource).toContain('from "./history.js"');
   });
 });
 
@@ -401,12 +401,12 @@ describe("snapshot time", () => {
   test("the date comes from startedAt, not from the filename", () => {
     // 20:19 UTC is 22:19 in Warsaw — for the old snapshot the name and the date coincide
     // only by accident, for the new one they diverge by 2 h.
-    const asDate = (e: { startedAt: string }) => new Date(e.startedAt);
+    const getDate = (error: { startedAt: string }) => new Date(error.startedAt);
     expect(formatSnapshotDate(old)).toBe(
-      `21.07.2026 ${String(asDate(old).getHours()).padStart(2, "0")}:19`,
+      `21.07.2026 ${String(getDate(old).getHours()).padStart(2, "0")}:19`,
     );
     expect(formatSnapshotDate(recent)).toBe(
-      `01.08.2026 ${String(asDate(recent).getHours()).padStart(2, "0")}:48`,
+      `01.08.2026 ${String(getDate(recent).getHours()).padStart(2, "0")}:48`,
     );
   });
 
@@ -432,7 +432,7 @@ describe("the filter state in the URL", () => {
   });
 
   test("a full set of filters survives the round trip", () => {
-    const f = {
+    const filterFile = {
       minLevel: 250,
       maxLevel: 320,
       minHonor: -30,
@@ -440,8 +440,8 @@ describe("the filter state in the URL", () => {
       maxDays: 14,
       professions: new Set([1, 4]),
     };
-    const restored = readFiltersFromParams(new URLSearchParams(composeFiltersParams(f).toString()));
-    expect(restored).toEqual(f);
+    const restored = readFiltersFromParams(new URLSearchParams(composeFiltersParams(filterFile).toString()));
+    expect(restored).toEqual(filterFile);
   });
 
   test("an empty URL gives the default filters", () => {
@@ -449,16 +449,16 @@ describe("the filter state in the URL", () => {
   });
 
   test("junk in the URL does not break the view", () => {
-    const f = readFiltersFromParams(new URLSearchParams("minLevel=abc&maxDays=-5&prof=9,x"));
-    expect(f).toEqual(getEmptyFilters());
+    const filterFile = readFiltersFromParams(new URLSearchParams("minLevel=abc&maxDays=-5&prof=9,x"));
+    expect(filterFile).toEqual(getEmptyFilters());
   });
 
   test("filters from the URL give the same result as filters set by hand", () => {
-    const f = readFiltersFromParams(new URLSearchParams("minLevel=200&maxLevel=250&prof=1,4"));
-    const expected = legacyCount(
-      (r) => r[2] >= 200 && r[2] <= 250 && (r[3] === 1 || r[3] === 4),
+    const filterFile = readFiltersFromParams(new URLSearchParams("minLevel=200&maxLevel=250&prof=1,4"));
+    const expected = countLegacyRows(
+      (row) => row[2] >= 200 && row[2] <= 250 && (row[3] === 1 || row[3] === 4),
     );
-    expect(total(countByLevel(data, f))).toBe(expected);
+    expect(getTotal(countByLevel(data, filterFile))).toBe(expected);
     expect(expected).toBeGreaterThan(0);
   });
 
@@ -469,50 +469,50 @@ describe("the filter state in the URL", () => {
     expect(isDefaultFilters(readFiltersFromParams(new URLSearchParams()))).toBe(true);
     expect(isDefaultFilters(readFiltersFromParams(new URLSearchParams("prof=1,2,3,4,5,6")))).toBe(true);
 
-    expect(isDefaultFilters(filters({ minLevel: 1 }))).toBe(false);
-    expect(isDefaultFilters(filters({ maxDays: 30 }))).toBe(false);
-    expect(isDefaultFilters(filters({ minHonor: 0 }))).toBe(false);
-    expect(isDefaultFilters(filters({ professions: new Set([1, 2, 3, 4, 5]) }))).toBe(false);
+    expect(isDefaultFilters(composeFilters({ minLevel: 1 }))).toBe(false);
+    expect(isDefaultFilters(composeFilters({ maxDays: 30 }))).toBe(false);
+    expect(isDefaultFilters(composeFilters({ minHonor: 0 }))).toBe(false);
+    expect(isDefaultFilters(composeFilters({ professions: new Set([1, 2, 3, 4, 5]) }))).toBe(false);
   });
 });
 
 describe("describing the active filters", () => {
   // The pl-PL thousands separator is a non-breaking space — we compare without whitespace.
-  const flat = (s: string) => s.replace(/\s/g, "");
-  const labels = (overrides: Record<string, unknown>) => describeFilters(filters(overrides)).map((c) => flat(c.label));
-  const keys = (overrides: Record<string, unknown>) => describeFilters(filters(overrides)).map((c) => c.key);
+  const removeSpaces = (text: string) => text.replace(/\s/g, "");
+  const getLabels = (overrides: Record<string, unknown>) => describeFilters(composeFilters(overrides)).map((chip) => removeSpaces(chip.label));
+  const getKeys = (overrides: Record<string, unknown>) => describeFilters(composeFilters(overrides)).map((chip) => chip.key);
 
   test("the default filter has nothing to describe", () => {
     expect(describeFilters(getEmptyFilters())).toEqual([]);
   });
 
   test("open and closed ranges read differently", () => {
-    expect(labels({ minLevel: 250 })).toEqual(["Poziom≥250"]);
-    expect(labels({ maxLevel: 400 })).toEqual(["Poziom≤400"]);
-    expect(labels({ minLevel: 250, maxLevel: 400 })).toEqual(["Poziom250-400"]);
-    expect(labels({ maxHonor: 50_000 })).toEqual(["Honor≤50000"]);
+    expect(getLabels({ minLevel: 250 })).toEqual(["Poziom≥250"]);
+    expect(getLabels({ maxLevel: 400 })).toEqual(["Poziom≤400"]);
+    expect(getLabels({ minLevel: 250, maxLevel: 400 })).toEqual(["Poziom250-400"]);
+    expect(getLabels({ maxHonor: 50_000 })).toEqual(["Honor≤50000"]);
     // honor can be negative — the label must not lose that
-    expect(labels({ minHonor: -35 })).toEqual(["Honor≥-35"]);
+    expect(getLabels({ minHonor: -35 })).toEqual(["Honor≥-35"]);
   });
 
   test("the activity threshold inflects and knows \"< 24h\"", () => {
-    expect(labels({ maxDays: 0 })).toEqual(["Online<24h"]);
-    expect(labels({ maxDays: 1 })).toEqual(["Online≤1dzień"]);
-    expect(labels({ maxDays: 14 })).toEqual(["Online≤14dni"]);
+    expect(getLabels({ maxDays: 0 })).toEqual(["Online<24h"]);
+    expect(getLabels({ maxDays: 1 })).toEqual(["Online≤1dzień"]);
+    expect(getLabels({ maxDays: 14 })).toEqual(["Online≤14dni"]);
   });
 
   test("professions: names up to two, then just the count", () => {
-    expect(labels({ professions: new Set([2, 3]) })).toEqual(["Mag,Paladyn"]);
-    expect(labels({ professions: new Set([1, 2, 3, 4]) })).toEqual(["4z6profesji"]);
-    expect(labels({ professions: new Set() })).toEqual(["Żadnaprofesja"]);
+    expect(getLabels({ professions: new Set([2, 3]) })).toEqual(["Mag,Paladyn"]);
+    expect(getLabels({ professions: new Set([1, 2, 3, 4]) })).toEqual(["4z6profesji"]);
+    expect(getLabels({ professions: new Set() })).toEqual(["Żadnaprofesja"]);
     // all six professions is no filter at all, not a "6 of 6" chip
-    expect(labels({ professions: new Set([1, 2, 3, 4, 5, 6]) })).toEqual([]);
+    expect(getLabels({ professions: new Set([1, 2, 3, 4, 5, 6]) })).toEqual([]);
   });
 
   test("a chip's key names a group of fields, not a single field", () => {
     // "Poziom 250-400" is one thing to the reader, though two <input>s to the code.
-    expect(keys({ minLevel: 250, maxLevel: 400 })).toEqual(["level"]);
-    expect(keys({ minHonor: 1, maxHonor: 2, maxDays: 7, professions: new Set([1]) })).toEqual([
+    expect(getKeys({ minLevel: 250, maxLevel: 400 })).toEqual(["level"]);
+    expect(getKeys({ minHonor: 1, maxHonor: 2, maxDays: 7, professions: new Set([1]) })).toEqual([
       "honor",
       "days",
       "prof",
@@ -521,9 +521,9 @@ describe("describing the active filters", () => {
 
   test("the number of chips agrees with what makes a filter non-default", () => {
     // The "Filtry (N)" counter in the bar rests on this equivalence.
-    const f = filters({ minLevel: 250, maxHonor: 50_000, maxDays: 14, professions: new Set([2, 3]) });
-    expect(describeFilters(f)).toHaveLength(4);
-    expect(isDefaultFilters(f)).toBe(false);
+    const filterFile = composeFilters({ minLevel: 250, maxHonor: 50_000, maxDays: 14, professions: new Set([2, 3]) });
+    expect(describeFilters(filterFile)).toHaveLength(4);
+    expect(isDefaultFilters(filterFile)).toBe(false);
     expect(describeFilters(getEmptyFilters()).length === 0).toBe(isDefaultFilters(getEmptyFilters()));
   });
 });
@@ -531,7 +531,7 @@ describe("describing the active filters", () => {
 describe("the activity distribution labels", () => {
   test("with no filter they describe disjoint ranges, not running totals", () => {
     // "≤ 7 dni" over the 1-7 bucket suggested it was everyone from the last week.
-    expect(getVisibleActivityBuckets(Infinity).map((b) => getActivityLabel(b))).toEqual([
+    expect(getVisibleActivityBuckets(Infinity).map((bucket) => getActivityLabel(bucket))).toEqual([
       "< 24h",
       "1-7 dni",
       "8-30 dni",
@@ -541,9 +541,9 @@ describe("the activity distribution labels", () => {
   });
 
   test("the threshold trims the label of the bucket it falls in", () => {
-    expect(getVisibleActivityBuckets(14).map((b) => getActivityLabel(b, 14))).toEqual(["< 24h", "1-7 dni", "8-14 dni"]);
-    expect(getVisibleActivityBuckets(3).map((b) => getActivityLabel(b, 3))).toEqual(["< 24h", "1-3 dni"]);
-    expect(getVisibleActivityBuckets(60).map((b) => getActivityLabel(b, 60))).toEqual([
+    expect(getVisibleActivityBuckets(14).map((bucket) => getActivityLabel(bucket, 14))).toEqual(["< 24h", "1-7 dni", "8-14 dni"]);
+    expect(getVisibleActivityBuckets(3).map((bucket) => getActivityLabel(bucket, 3))).toEqual(["< 24h", "1-3 dni"]);
+    expect(getVisibleActivityBuckets(60).map((bucket) => getActivityLabel(bucket, 60))).toEqual([
       "< 24h",
       "1-7 dni",
       "8-30 dni",
@@ -560,23 +560,23 @@ describe("the activity distribution labels", () => {
   });
 
   test("the numbers under the labels match the range those labels describe", () => {
-    const f = filters({ maxDays: 14 });
+    const filterFile = composeFilters({ maxDays: 14 });
     const buckets = new Map<number, number>(
-      countByActivity(data, f).map(([bucket, count]: number[]) => [bucket as number, count as number]),
+      countByActivity(data, filterFile).map(([bucket, count]: number[]) => [bucket as number, count as number]),
     );
     const visible = getVisibleActivityBuckets(14);
     // Read once with an assertion rather than three times with a `!`: the length is checked
     // at the end of this test, so a short list is a failure of the subject, not of indexing.
     const [first, second, third] = visible as [number, number, number];
 
-    expect(buckets.get(first)).toBe(legacyCount((r) => legacyDays(r[5]) === 0));
-    expect(buckets.get(second)).toBe(legacyCount((r) => {
-      const d = legacyDays(r[5]);
-      return d !== null && d >= 1 && d <= 7;
+    expect(buckets.get(first)).toBe(countLegacyRows((row) => getLegacyDays(row[5]) === 0));
+    expect(buckets.get(second)).toBe(countLegacyRows((row) => {
+      const days = getLegacyDays(row[5]);
+      return days !== null && days >= 1 && days <= 7;
     }));
-    expect(buckets.get(third)).toBe(legacyCount((r) => {
-      const d = legacyDays(r[5]);
-      return d !== null && d >= 8 && d <= 14;
+    expect(buckets.get(third)).toBe(countLegacyRows((row) => {
+      const days = getLegacyDays(row[5]);
+      return days !== null && days >= 8 && days <= 14;
     }));
     expect(visible).toHaveLength(3);
   });
@@ -593,21 +593,21 @@ describe("the activity distribution labels", () => {
 // both: the default filter (history from trends.json) and a filter set (history from
 // `.f.json`).
 
-const repo = path.resolve(import.meta.dir, "..");
-const smoke = (scenario: string) => {
-  const proc = Bun.spawnSync(["bun", path.join(repo, "test/dom-smoke.ts"), scenario], { cwd: repo });
+const repositoryRoot = path.resolve(import.meta.dir, "..");
+const runSmoke = (scenario: string) => {
+  const result = Bun.spawnSync(["bun", path.join(repositoryRoot, "test/dom-smoke.ts"), scenario], { cwd: repositoryRoot });
   return {
-    proc,
-    out: proc.exitCode === 0 && proc.stdout.length > 0 ? JSON.parse(proc.stdout.toString()) : null,
+    result,
+    out: result.exitCode === 0 && result.stdout.length > 0 ? JSON.parse(result.stdout.toString()) : null,
   };
 };
 
 describe("the view comes together — the default filter", () => {
-  const { proc, out } = smoke("default");
+  const { result, out } = runSmoke("default");
 
   test("the render goes through without an exception", () => {
-    expect(proc.stderr.toString()).toBe("");
-    expect(proc.exitCode).toBe(0);
+    expect(result.stderr.toString()).toBe("");
+    expect(result.exitCode).toBe(0);
     expect(out.error).toBe("");
     expect(out.professionCheckboxes).toBe(6);
   });
@@ -642,13 +642,13 @@ describe("the view comes together — the default filter", () => {
     // red CI on a data commit.
     const fobos = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.fobos;
     const percent = ((fobos.total.at(-1) - fobos.total[0]) / fobos.total[0]) * 100;
-    const sign = percent > 0 ? "+" : percent < 0 ? "−" : "";
+    const signText = percent > 0 ? "+" : percent < 0 ? "−" : "";
     const formatted = Math.abs(percent).toLocaleString("pl-PL", {
       minimumFractionDigits: 1,
       maximumFractionDigits: 1,
     });
 
-    expect(out.summary).toContain(`${sign}${formatted}%`);
+    expect(out.summary).toContain(`${signText}${formatted}%`);
     expect(percent).toBeLessThan(0); // fobos empties fastest of them all
     expect(out.tableRows).toBe(out.charts.popChart.points); // the header + n-1 change rows
     expect(out.tableHidden).toBe(false); // it is hidden only when there are no rows
@@ -658,16 +658,16 @@ describe("the view comes together — the default filter", () => {
 
   test("the numbers are Polish, with no mixing of comma and full stop", () => {
     // Dates carry full stops by definition — we check fractions, not 04.08.2026.
-    const fractions = (s: string) => s.replace(/\d{2}\.\d{2}\.\d{4}/g, "");
-    expect(fractions(out.summary)).not.toMatch(/\d\.\d/);
-    expect(fractions(out.table)).not.toMatch(/\d\.\d/);
+    const removeDates = (text: string) => text.replace(/\d{2}\.\d{2}\.\d{4}/g, "");
+    expect(removeDates(out.summary)).not.toMatch(/\d\.\d/);
+    expect(removeDates(out.table)).not.toMatch(/\d\.\d/);
     expect(out.table).toMatch(/\d,\d/);
   });
 
   test("switching the threshold and the scale recomputes the chart rather than making a new one", () => {
     expect(out.afterToggle.title).toBe("Udział aktywnych < 24h w populacji");
     expect(out.afterToggle.updates).toBe(1);
-    expect(out.afterToggle.values.every((v: number) => v > 0 && v < 100)).toBe(true);
+    expect(out.afterToggle.values.every((value: number) => value > 0 && value < 100)).toBe(true);
   });
 
   test("the population's share of the population is not a metric", () => {
@@ -689,24 +689,24 @@ describe("the view comes together — the default filter", () => {
 });
 
 describe("the view comes together — a filter set", () => {
-  const { proc, out } = smoke("filtered");
+  const { result, out } = runSmoke("filtered");
 
   test("the render goes through without an exception", () => {
-    expect(proc.stderr.toString()).toBe("");
-    expect(proc.exitCode).toBe(0);
+    expect(result.stderr.toString()).toBe("");
+    expect(result.exitCode).toBe(0);
     expect(out.error).toBe("");
   });
 
   test("filters from the URL put on the histogram what actually sits in the snapshot", async () => {
-    const latest = manifest.worlds.find((w: { name: string }) => w.name === "aether").files.at(-1);
+    const latest = manifest.worlds.find((world: { name: string }) => world.name === "aether").files.at(-1);
     expect(out.source).toBe(latest.filters);
 
-    const f = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, latest.filters)).text());
+    const filterFile = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, latest.filters)).text());
     let expected = 0;
-    for (let i = 0; i < f.count; i++) {
-      const level = f.level[i];
-      const prof = f.profession[i];
-      if (level >= 200 && level <= 250 && (prof === 1 || prof === 4)) expected += 1;
+    for (let index = 0; index < filterFile.count; index++) {
+      const level = filterFile.level[index];
+      const profession = filterFile.profession[index];
+      if (level >= 200 && level <= 250 && (profession === 1 || profession === 4)) expected += 1;
     }
 
     expect(out.matched).toBe(expected);
@@ -781,7 +781,7 @@ describe("the view comes together — a filter set", () => {
     // The snapshot count of world "brutal" grows with every scrape — taken from trends.json
     // rather than hard-coded, otherwise the next `bun run scrape` gives red CI.
     // dom-smoke.ts breaks the fetch of exactly one snapshot of that world.
-    const total = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.brutal
+    const getTotal = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.brutal
       .total.length;
 
     // The stub prices a brutal snapshot at 300 KB, so exactly 6 of them fit into the 2 MiB
@@ -797,7 +797,7 @@ describe("the view comes together — a filter set", () => {
     // HISTORIA section, not in the error bar 1500 px higher, which is about the snapshot
     // being cross-sectioned.
     expect(out.partialHistory.status).toBe(
-      `${planned - 1} z ${total} migawek · limit transferu 2,0 MB · 1 nie wczytano`,
+      `${planned - 1} z ${getTotal} migawek · limit transferu 2,0 MB · 1 nie wczytano`,
     );
     expect(out.partialHistory.points).toBe(planned - 1);
     expect(out.partialHistory.noteHidden).toBe(false);
@@ -807,15 +807,15 @@ describe("the view comes together — a filter set", () => {
     // The budget names what it left out and what the rest costs — a trimmed chart is
     // indistinguishable from a world with a shorter history.
     expect(out.partialHistory.budgetNoteHidden).toBe(false);
-    expect(out.partialHistory.budgetNote).toContain(`sięga ${planned} najnowszych migawek z ${total}`);
+    expect(out.partialHistory.budgetNote).toContain(`sięga ${planned} najnowszych migawek z ${getTotal}`);
     expect(out.partialHistory.loadRestLabel).toMatch(/^Dociągnij resztę historii \(\+[\d, ]+ MB\)$/);
 
     // Pressing the button buys the rest: every snapshot is fetched, the note has nothing
     // left to say, and the one that answers 503 is still the only point missing.
     expect(out.afterLoadRest).toEqual({
-      status: `${total - 1} z ${total} migawek · 1 nie wczytano`,
+      status: `${getTotal - 1} z ${getTotal} migawek · 1 nie wczytano`,
       budgetNoteHidden: true,
-      points: total - 1,
+      points: getTotal - 1,
       axis: out.partialHistory.axis,
     });
 
@@ -833,10 +833,10 @@ describe("the view comes together — a filter set", () => {
     // of it, budget or no budget. The failure counter and the budget note from the previous
     // filter have no business still describing it.
     expect(out.afterReset).toEqual({
-      status: `${total} migawek`,
+      status: `${getTotal} migawek`,
       noteHidden: true,
       budgetNoteHidden: true,
-      points: total,
+      points: getTotal,
       axis: out.partialHistory.axis,
     });
   });
@@ -871,19 +871,19 @@ describe("the suspect-snapshot warning", () => {
   test("the view reads the flag from the snapshot and has somewhere to show it", () => {
     // Without this the scraper would write `suspect` for nobody — exactly the pattern the
     // audit deleted the aggregate module for.
-    expect(js).toMatch(/showSuspect\(\w+\.suspect/);
-    expect(js).toContain("Ta migawka może być niekompletna");
+    expect(appSource).toMatch(/showSuspect\(\w+\.suspect/);
+    expect(appSource).toContain("Ta migawka może być niekompletna");
     expect(html).toContain('id="suspect"');
   });
 
   test("the warning disappears when switching to another snapshot", () => {
-    const load = js.slice(js.indexOf("async function loadSnapshot"));
-    const reset = load.indexOf("showSuspect(null)");
+    const loadSnapshotSource = appSource.slice(appSource.indexOf("async function loadSnapshot"));
+    const resetAt = loadSnapshotSource.indexOf("showSuspect(null)");
     // The freshly fetched snapshot, not the one already in memory — that branch returns
     // before this point, so a match on it would prove nothing about the order here.
-    const set = load.search(/showSuspect\(snapshot\.suspect/);
-    expect(reset).toBeGreaterThan(-1);
-    expect(set).toBeGreaterThan(-1);
-    expect(reset).toBeLessThan(set); // cleared before the new data arrives
+    const setPosition = loadSnapshotSource.search(/showSuspect\(snapshot\.suspect/);
+    expect(resetAt).toBeGreaterThan(-1);
+    expect(setPosition).toBeGreaterThan(-1);
+    expect(resetAt).toBeLessThan(setPosition); // cleared before the new data arrives
   });
 });

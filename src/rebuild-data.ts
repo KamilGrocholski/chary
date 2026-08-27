@@ -45,21 +45,21 @@ function readLegacySnapshot(value: unknown): LegacySnapshot | null {
   if (!Array.isArray(candidate.rows)) return null;
   if (!candidate.rows.every((row) => Array.isArray(row))) return null;
 
-  const text = (field: unknown) => (typeof field === "string" && field !== "" ? field : undefined);
-  const count = (field: unknown) => getIntegerFromValue(field) ?? undefined;
+  const readOptionalText = (field: unknown) => (typeof field === "string" && field !== "" ? field : undefined);
+  const readOptionalCount = (field: unknown) => getIntegerFromValue(field) ?? undefined;
 
   return {
     ...(getIntegerFromValue(candidate.schema) === null ? {} : { schema: getIntegerFromValue(candidate.schema) ?? undefined }),
     rows: candidate.rows as unknown[][],
-    startedAt: text(candidate.startedAt),
-    finishedAt: text(candidate.finishedAt),
-    pages: count(candidate.pages),
-    skippedRows: count(candidate.skippedRows),
+    startedAt: readOptionalText(candidate.startedAt),
+    finishedAt: readOptionalText(candidate.finishedAt),
+    pages: readOptionalCount(candidate.pages),
+    skippedRows: readOptionalCount(candidate.skippedRows),
   };
 }
 
-const args = process.argv.slice(2);
-const keepLegacy = args.includes("--keep-legacy");
+const argumentTexts = process.argv.slice(2);
+const keepLegacy = argumentTexts.includes("--keep-legacy");
 
 function formatMegabytes(bytes: number) {
   return `${(bytes / BYTES_IN_MEGABYTE).toFixed(1)} MB`;
@@ -70,17 +70,17 @@ let after = 0;
 let migrated = 0;
 
 const worldDirs = (await readdir(WORLDS_DIR, { withFileTypes: true }))
-  .filter((d) => d.isDirectory())
-  .map((d) => d.name)
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
   .sort();
 
 for (const world of worldDirs) {
-  const dir = path.join(WORLDS_DIR, world);
-  const files = (await readdir(dir)).sort();
+  const directory = path.join(WORLDS_DIR, world);
+  const files = (await readdir(directory)).sort();
   const legacy = files.filter(isLegacySnapshot);
 
   for (const name of legacy) {
-    const file = path.join(dir, name);
+    const file = path.join(directory, name);
     const timestamp = getTimestampFromFileName(name);
     before += (await stat(file)).size;
 
@@ -106,8 +106,8 @@ for (const world of worldDirs) {
       ...(payload.skippedRows === undefined ? {} : { skippedRows: payload.skippedRows }),
     });
 
-    const filterFile = composeFilterPath(dir, timestamp);
-    const namesFile = composeNamesPath(dir, timestamp);
+    const filterFile = composeFilterPath(directory, timestamp);
+    const namesFile = composeNamesPath(directory, timestamp);
     await writeAtomic(filterFile, JSON.stringify(filters));
     await writeAtomic(namesFile, JSON.stringify(names));
     after += (await stat(filterFile)).size + (await stat(namesFile)).size;
@@ -129,7 +129,7 @@ if (migrated > 0) {
 }
 process.stdout.write(`Manifest: ${manifest.worlds.length} worlds\n`);
 
-const points = Object.values(trends.worlds).reduce((sum, w) => sum + w.id.length, 0);
+const points = Object.values(trends.worlds).reduce((sum, world) => sum + world.id.length, 0);
 process.stdout.write(`Trends: ${Object.keys(trends.worlds).length} worlds, ${points} snapshots\n`);
 if (skipped > 0) {
   // A snapshot without `startedAt` has nowhere to stand on a time axis — but it has to be

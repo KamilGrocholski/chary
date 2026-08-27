@@ -138,7 +138,7 @@ describe("parseTable against a real ranking page", () => {
   });
 
   test("reconstructs ranks 1-3, which carry a portrait instead of a number", () => {
-    expect(rows.map((r) => r[0]).slice(0, 5)).toEqual([1, 2, 3, 4, 5]);
+    expect(rows.map((row) => row[0]).slice(0, 5)).toEqual([1, 2, 3, 4, 5]);
     expect(rows[99]?.[0]).toBe(100);
   });
 
@@ -167,8 +167,8 @@ describe("parseTable against a real ranking page", () => {
   });
 
   test("nicknames and character ids are unique", () => {
-    expect(new Set(rows.map((r) => r[1])).size).toBe(rows.length);
-    expect(new Set(rows.map((r) => r[2])).size).toBe(rows.length);
+    expect(new Set(rows.map((row) => row[1])).size).toBe(rows.length);
+    expect(new Set(rows.map((row) => row[2])).size).toBe(rows.length);
   });
 });
 
@@ -228,7 +228,7 @@ describe("the profession vocabulary", () => {
 
     // Every profession, spelled exactly as the ranking spells it — the dashboard renders
     // these strings to a player verbatim.
-    expect([...found.entries()].sort(([a], [b]) => a - b)).toEqual(getProfessionEntries());
+    expect([...found.entries()].sort(([left], [right]) => left - right)).toEqual(getProfessionEntries());
   });
 
   test("the letter code covers the same six professions and nothing else", () => {

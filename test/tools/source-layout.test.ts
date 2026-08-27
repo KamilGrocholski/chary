@@ -32,62 +32,62 @@ for (const pattern of SOURCE_GLOBS) {
  * `""`, and a template keeps exactly what its `${…}` holds — braces counted, so an object
  * literal inside an interpolation does not end it early.
  */
-function code(src: string): string {
-  const text = stripComments(src);
+function getCode(source: string): string {
+  const text = stripComments(source);
   let out = "";
-  let i = 0;
+  let index = 0;
 
-  while (i < text.length) {
-    const ch = text[i];
+  while (index < text.length) {
+    const character = text[index];
 
-    if (ch === '"' || ch === "'") {
-      i += 1;
-      while (i < text.length && text[i] !== ch) i += text[i] === "\\" ? 2 : 1;
+    if (character === '"' || character === "'") {
+      index += 1;
+      while (index < text.length && text[index] !== character) index += text[index] === "\\" ? 2 : 1;
       out += '""';
-      i += 1;
+      index += 1;
       continue;
     }
 
-    if (ch === "`") {
-      i += 1;
+    if (character === "`") {
+      index += 1;
       let depth = 0;
-      while (i < text.length) {
-        const inner = text[i];
+      while (index < text.length) {
+        const inner = text[index];
         if (inner === "\\") {
-          i += 2;
+          index += 2;
           continue;
         }
-        if (depth === 0 && inner === "$" && text[i + 1] === "{") {
+        if (depth === 0 && inner === "$" && text[index + 1] === "{") {
           depth = 1;
-          i += 2;
+          index += 2;
           out += ";";
           continue;
         }
         if (depth === 0) {
           if (inner === "`") {
-            i += 1;
+            index += 1;
             break;
           }
-          i += 1;
+          index += 1;
           continue;
         }
         if (inner === "{") depth += 1;
         if (inner === "}") {
           depth -= 1;
           if (depth === 0) {
-            i += 1;
+            index += 1;
             out += ";";
             continue;
           }
         }
         out += inner;
-        i += 1;
+        index += 1;
       }
       continue;
     }
 
-    out += ch;
-    i += 1;
+    out += character;
+    index += 1;
   }
 
   return out;
@@ -102,12 +102,12 @@ function code(src: string): string {
  * deliberate `./manifest.ts` planted in it: green, over nothing at all. The counts asserted
  * further down are what stops that from happening again quietly.
  */
-function imports(src: string): string[] {
+function getImports(source: string): string[] {
   // Anchored on the `import` keyword at the start of a line, not on `from "…"` anywhere:
   // `dashboard.test.ts` asserts on the text of the dashboard's own imports, and a loose
   // pattern read four of its assertions as imports of this file's.
-  return [...stripComments(src).matchAll(/(?:^|\n)import\s[\s\S]*?from\s+"([^"]+)"/g)].map(
-    ([, spec]) => spec ?? "",
+  return [...stripComments(source).matchAll(/(?:^|\n)import\s[\s\S]*?from\s+"([^"]+)"/g)].map(
+    ([, specification]) => specification ?? "",
   );
 }
 
@@ -147,18 +147,18 @@ describe("§9.5 — every error we throw carries a brand and a code", () => {
 
   test("no bare `new Error(...)` outside the bases", () => {
     const offenders: string[] = [];
-    for (const [file, src] of shipped) {
+    for (const [file, source] of shipped) {
       if (BASE_FILES.includes(file)) continue;
-      if (/new Error\s*\(/.test(code(src))) offenders.push(file);
+      if (/new Error\s*\(/.test(getCode(source))) offenders.push(file);
     }
     expect(offenders).toEqual([]);
   });
 
   test("`extends Error` appears only in the bases", () => {
     const offenders: string[] = [];
-    for (const [file, src] of sources) {
+    for (const [file, source] of sources) {
       if (BASE_FILES.includes(file)) continue;
-      if (/extends\s+Error\b/.test(code(src))) offenders.push(file);
+      if (/extends\s+Error\b/.test(getCode(source))) offenders.push(file);
     }
     expect(offenders).toEqual([]);
   });
@@ -167,10 +167,10 @@ describe("§9.5 — every error we throw carries a brand and a code", () => {
     let browserReaders = 0;
     let terminalReaders = 0;
 
-    for (const [file, src] of sources) {
-      const specs = imports(src);
-      const importsBrowser = specs.some((spec) => spec.endsWith("margostat-error.js"));
-      const importsTool = specs.some((spec) => spec.endsWith("margostat-tool-error.ts"));
+    for (const [file, source] of sources) {
+      const specs = getImports(source);
+      const importsBrowser = specs.some((specification) => specification.endsWith("margostat-error.js"));
+      const importsTool = specs.some((specification) => specification.endsWith("margostat-tool-error.ts"));
       if (importsBrowser) browserReaders += 1;
       if (importsTool) terminalReaders += 1;
       expect(`${file}: ${importsBrowser && importsTool}`).toBe(`${file}: false`);
@@ -183,8 +183,8 @@ describe("§9.5 — every error we throw carries a brand and a code", () => {
   });
 
   test("every subclass names a code, so nobody matches on message text", () => {
-    for (const [file, src] of sources) {
-      for (const [, base] of code(src).matchAll(/extends\s+(MargoStatError|MargoStatToolError)\b/g)) {
+    for (const [file, source] of sources) {
+      for (const [, base] of getCode(source).matchAll(/extends\s+(MargoStatError|MargoStatToolError)\b/g)) {
         // The `super(...)` in that class has to open with a code, i.e. a bare identifier or
         // a quoted name — never a template string built out of a message.
         expect(`${file} extends ${base} and calls super with a code`).toBe(
@@ -207,7 +207,7 @@ describe("§9.5 — every error we throw carries a brand and a code", () => {
   });
 
   test("an assertion carries no code — nobody handles a broken invariant", () => {
-    const assertSource = code(sources.get("public/lib/assert.js") ?? "");
+    const assertSource = getCode(sources.get("public/lib/assert.js") ?? "");
     expect(assertSource).not.toMatch(/\bcode\b/);
   });
 });
@@ -219,8 +219,8 @@ describe("§9.5 — no `!` outside tests", () => {
 
   test("shipped code narrows with assertDefined, never with `!`", () => {
     const offenders: string[] = [];
-    for (const [file, src] of shipped) {
-      for (const line of code(src).split("\n")) {
+    for (const [file, source] of shipped) {
+      for (const line of getCode(source).split("\n")) {
         // `!=` and `!==` are comparisons; a leading `!` is negation. Only a `!` directly
         // after a value and before a member access, a call or a terminator is the assertion.
         const stripped = line.replace(/!==?/g, "");
@@ -235,8 +235,8 @@ describe("§9.5 — no `!` outside tests", () => {
 describe("§9.5 — nothing is cast off JSON.parse", () => {
   test("`JSON.parse(...) as T` appears nowhere", () => {
     const offenders: string[] = [];
-    for (const [file, src] of sources) {
-      if (/JSON\.parse\s*\([^)]*\)\s*as\s+\w/.test(code(src))) offenders.push(file);
+    for (const [file, source] of sources) {
+      if (/JSON\.parse\s*\([^)]*\)\s*as\s+\w/.test(getCode(source))) offenders.push(file);
     }
     expect(offenders).toEqual([]);
   });
@@ -245,36 +245,36 @@ describe("§9.5 — nothing is cast off JSON.parse", () => {
 describe("§9.5 — one way to read a value, and it lives in public/lib/", () => {
   // The register from AGENTS.md §9.5. Each construct has more than one spelling in
   // JavaScript, or can answer with a value nobody wrote — so exactly one file spells it.
-  const REGISTER: { construct: RegExp; owner: string; what: string; spelled: boolean }[] = [
-    { construct: /\bNumber\s*\(/, owner: "public/lib/number.js", what: "Number()", spelled: true },
-    { construct: /\bJSON\.parse\s*\(/, owner: "public/lib/json.js", what: "JSON.parse", spelled: true },
-    { construct: /\bDate\.parse\s*\(/, owner: "public/lib/timestamp.js", what: "Date.parse", spelled: true },
+  const REGISTER: { construct: RegExp; owner: string; subject: string; spelled: boolean }[] = [
+    { construct: /\bNumber\s*\(/, owner: "public/lib/number.js", subject: "Number()", spelled: true },
+    { construct: /\bJSON\.parse\s*\(/, owner: "public/lib/json.js", subject: "JSON.parse", spelled: true },
+    { construct: /\bDate\.parse\s*\(/, owner: "public/lib/timestamp.js", subject: "Date.parse", spelled: true },
 
     // Three constructs are spelled nowhere at all, and that is their register entry. Each
     // owner reads by a pattern instead — `number.js` matches the digits before converting,
     // `text-order.js` compares with `<` — so there is no call to point at. The row still
     // binds: it says where the construct would go if something ever needed it, and it is
     // what makes "nowhere" a decision rather than an accident.
-    { construct: /\bparseInt\s*\(/, owner: "public/lib/number.js", what: "parseInt", spelled: false },
-    { construct: /\bparseFloat\s*\(/, owner: "public/lib/number.js", what: "parseFloat", spelled: false },
-    { construct: /\.localeCompare\s*\(/, owner: "public/lib/text-order.js", what: "localeCompare", spelled: false },
+    { construct: /\bparseInt\s*\(/, owner: "public/lib/number.js", subject: "parseInt", spelled: false },
+    { construct: /\bparseFloat\s*\(/, owner: "public/lib/number.js", subject: "parseFloat", spelled: false },
+    { construct: /\.localeCompare\s*\(/, owner: "public/lib/text-order.js", subject: "localeCompare", spelled: false },
   ];
 
   // Tests restate what they check on purpose (§9.3): a test asserting that a reader refuses
   // "0x10" has to be able to write `Number("0x10")` to say what it is refusing.
-  for (const { construct, owner, what, spelled } of REGISTER) {
-    test(`${what} is spelled only by ${owner}`, () => {
+  for (const { construct, owner, subject, spelled } of REGISTER) {
+    test(`${subject} is spelled only by ${owner}`, () => {
       const offenders = shipped
         .filter(([file]) => file !== owner)
-        .filter(([, src]) => construct.test(code(src)))
+        .filter(([, source]) => construct.test(getCode(source)))
         .map(([file]) => file);
       expect(offenders).toEqual([]);
     });
 
-    test(`${what} is${spelled ? "" : " not"} spelled by ${owner}, as the register says`, () => {
+    test(`${subject} is${spelled ? "" : " not"} spelled by ${owner}, as the register says`, () => {
       // Both directions. An owner that has stopped spelling its construct guards nothing,
       // and a row claiming "nowhere" while the owner uses it is a row nobody can read.
-      expect(construct.test(code(sources.get(owner) ?? ""))).toBe(spelled);
+      expect(construct.test(getCode(sources.get(owner) ?? ""))).toBe(spelled);
     });
   }
 
@@ -288,8 +288,8 @@ describe("§9.5 — one way to read a value, and it lives in public/lib/", () =>
       ["src/world-scraper.ts", 3], // the round's own clock: the log stamp, the start, the end
       ["src/trends.ts", 1], // builtAt
     ]);
-    for (const [file, src] of shipped) {
-      const uses = [...code(src).matchAll(/new Date\s*\(/g)].length;
+    for (const [file, source] of shipped) {
+      const uses = [...getCode(source).matchAll(/new Date\s*\(/g)].length;
       if (uses === 0) continue;
       expect(`${file}: ${uses}`).toBe(`${file}: ${allowed.get(file) ?? 0}`);
     }
@@ -300,11 +300,11 @@ describe("§9.3 — imports are written from the repository root", () => {
   test("src/, tools/ and test/ import through @/", () => {
     const offenders: string[] = [];
     let checked = 0;
-    for (const [file, src] of sources) {
+    for (const [file, source] of sources) {
       if (file.startsWith("public/")) continue;
-      for (const spec of imports(src)) {
+      for (const specification of getImports(source)) {
         checked += 1;
-        if (spec.startsWith(".")) offenders.push(`${file}: ${spec}`);
+        if (specification.startsWith(".")) offenders.push(`${file}: ${specification}`);
       }
     }
     expect(offenders).toEqual([]);
@@ -316,11 +316,11 @@ describe("§9.3 — imports are written from the repository root", () => {
     // A `<script type="module">` resolves relative URLs and knows nothing of tsconfig, so
     // `@/` in public/ would be a path no browser can fetch.
     let checked = 0;
-    for (const [file, src] of sources) {
+    for (const [file, source] of sources) {
       if (!file.startsWith("public/")) continue;
-      for (const spec of imports(src)) {
+      for (const specification of getImports(source)) {
         checked += 1;
-        expect(`${file}: ${spec}`).toBe(`${file}: ${spec.startsWith(".") ? spec : "a relative path"}`);
+        expect(`${file}: ${specification}`).toBe(`${file}: ${specification.startsWith(".") ? specification : "a relative path"}`);
       }
     }
     expect(checked).toBeGreaterThan(5);

@@ -49,11 +49,11 @@ export function getActivityLabel(bucket, maxDays = Infinity) {
   if (bucket === NEVER_ONLINE_BUCKET) return "nigdy";
 
   const [from, to] = assertDefined(ACTIVITY_BUCKET_BOUNDS[bucket], "an activity bucket outside 0-4 has no bounds");
-  const hi = Math.min(to, maxDays);
+  const upperBound = Math.min(to, maxDays);
   if (from === 0) return "< 24h";
-  if (hi === Infinity) return `> ${from - 1} dni`;
-  if (from === hi) return from === 1 ? "1 dzień" : `${from} dni`;
-  return `${from}-${hi} dni`;
+  if (upperBound === Infinity) return `> ${from - 1} dni`;
+  if (from === upperBound) return from === 1 ? "1 dzień" : `${from} dni`;
+  return `${from}-${upperBound} dni`;
 }
 
 /**
@@ -87,17 +87,17 @@ export function getEmptyFilters() {
  * history view takes the ready-made `trends.json` (9 KB) instead of fetching one world's
  * snapshots (up to 1.9 MB). The whole lazy fetching path hangs on this function.
  *
- * @param {Filters} f
+ * @param {Filters} filters
  * @returns {boolean}
  */
-export function isDefaultFilters(f) {
+export function isDefaultFilters(filters) {
   return (
-    f.minLevel === -Infinity &&
-    f.maxLevel === Infinity &&
-    f.minHonor === -Infinity &&
-    f.maxHonor === Infinity &&
-    f.maxDays === Infinity &&
-    f.professions.size === 6
+    filters.minLevel === -Infinity &&
+    filters.maxLevel === Infinity &&
+    filters.minHonor === -Infinity &&
+    filters.maxHonor === Infinity &&
+    filters.maxDays === Infinity &&
+    filters.professions.size === 6
   );
 }
 
@@ -111,36 +111,36 @@ export function isDefaultFilters(f) {
  * The chips are a view of `readFilters()`, not separate state — otherwise they would be a
  * second place able to drift from the form.
  *
- * @param {Filters} f
+ * @param {Filters} filters
  * @returns {FilterChip[]}
  */
-export function describeFilters(f) {
-  const n = (/** @type {number} */ value) => value.toLocaleString(POLISH_LOCALE);
+export function describeFilters(filters) {
+  const formatNumber = (/** @type {number} */ value) => value.toLocaleString(POLISH_LOCALE);
   /** @type {FilterChip[]} */
   const chips = [];
 
-  const range = (/** @type {string} */ key, /** @type {string} */ name, /** @type {number} */ min, /** @type {number} */ max) => {
-    const hasMin = Number.isFinite(min);
-    const hasMax = Number.isFinite(max);
+  const addRangeChip = (/** @type {string} */ key, /** @type {string} */ name, /** @type {number} */ minimum, /** @type {number} */ maximum) => {
+    const hasMin = Number.isFinite(minimum);
+    const hasMax = Number.isFinite(maximum);
     if (!hasMin && !hasMax) return;
     chips.push({
       key,
-      label: hasMin && hasMax ? `${name} ${n(min)}-${n(max)}` : hasMin ? `${name} ≥ ${n(min)}` : `${name} ≤ ${n(max)}`,
+      label: hasMin && hasMax ? `${name} ${formatNumber(minimum)}-${formatNumber(maximum)}` : hasMin ? `${name} ≥ ${formatNumber(minimum)}` : `${name} ≤ ${formatNumber(maximum)}`,
     });
   };
 
-  range("level", "Poziom", f.minLevel, f.maxLevel);
-  range("honor", "Honor", f.minHonor, f.maxHonor);
+  addRangeChip("level", "Poziom", filters.minLevel, filters.maxLevel);
+  addRangeChip("honor", "Honor", filters.minHonor, filters.maxHonor);
 
-  if (Number.isFinite(f.maxDays)) {
-    const days = f.maxDays === 1 ? "1 dzień" : `${n(f.maxDays)} dni`;
-    chips.push({ key: "days", label: f.maxDays === 0 ? "Online < 24h" : `Online ≤ ${days}` });
+  if (Number.isFinite(filters.maxDays)) {
+    const days = filters.maxDays === 1 ? "1 dzień" : `${formatNumber(filters.maxDays)} dni`;
+    chips.push({ key: "days", label: filters.maxDays === 0 ? "Online < 24h" : `Online ≤ ${days}` });
   }
 
-  if (f.professions.size !== 6) {
-    const names = [...f.professions]
-      .sort((a, b) => a - b)
-      .map((p) => assertDefined(PROFESSION_NAMES[/** @type {1|2|3|4|5|6} */ (p)], `profession ${p} has a name`));
+  if (filters.professions.size !== 6) {
+    const names = [...filters.professions]
+      .sort((left, right) => left - right)
+      .map((profession) => assertDefined(PROFESSION_NAMES[/** @type {1|2|3|4|5|6} */ (profession)], `profession ${profession} has a name`));
     chips.push({
       key: "prof",
       // Past two names the label pushes the bar beyond one line, and nobody reads it whole
@@ -154,26 +154,26 @@ export function describeFilters(f) {
 
 /**
  * @param {Snapshot} data
- * @param {number} i
- * @param {Filters} f
+ * @param {number} index
+ * @param {Filters} filters
  * @returns {boolean}
  */
-export function isMatch(data, i, f) {
+export function isMatch(data, index, filters) {
   // A row past the end is not a row: `count` is the length of every column (§9.2), so
   // this only fires on a file that broke that promise, and it must not read as a match.
-  const level = data.level[i];
-  const profession = data.profession[i];
-  const honor = data.honor[i];
+  const level = data.level[index];
+  const profession = data.profession[index];
+  const honor = data.honor[index];
   if (level === undefined || profession === undefined || honor === undefined) return false;
 
-  if (!level || level < f.minLevel || level > f.maxLevel) return false;
-  if (!f.professions.has(profession)) return false;
-  if (honor < f.minHonor || honor > f.maxHonor) return false;
+  if (!level || level < filters.minLevel || level > filters.maxLevel) return false;
+  if (!filters.professions.has(profession)) return false;
+  if (honor < filters.minHonor || honor > filters.maxHonor) return false;
 
   // "never online" falls out under every activity threshold — and it has to be checked
   // before the threshold, because the −1 sentinel passes every `>` comparison.
-  const days = data.days[i];
-  if (f.maxDays !== Infinity && (isNeverOnline(days) || /** @type {number} */ (days) > f.maxDays)) return false;
+  const days = data.days[index];
+  if (filters.maxDays !== Infinity && (isNeverOnline(days) || /** @type {number} */ (days) > filters.maxDays)) return false;
   return true;
 }
 
@@ -183,18 +183,18 @@ export function isMatch(data, i, f) {
  * A map level → [count for professions 1..6]. Needed only by the single-snapshot view.
  *
  * @param {Snapshot} data
- * @param {Filters} f
+ * @param {Filters} filters
  * @returns {Map<number, number[]>}
  */
-export function countByLevel(data, f) {
+export function countByLevel(data, filters) {
   /** @type {Map<number, number[]>} */
   const counts = new Map();
-  for (let i = 0; i < data.count; i++) {
-    if (!isMatch(data, i, f)) continue;
+  for (let index = 0; index < data.count; index++) {
+    if (!isMatch(data, index, filters)) continue;
 
     // `isMatch` above has already refused a row any column is short of.
-    const level = assertDefined(data.level[i], "a matched row has a level");
-    const profession = assertDefined(data.profession[i], "a matched row has a profession");
+    const level = assertDefined(data.level[index], "a matched row has a level");
+    const profession = assertDefined(data.profession[index], "a matched row has a profession");
     let bucket = counts.get(level);
     if (!bucket) {
       bucket = composeProfessionCounts();
@@ -207,14 +207,14 @@ export function countByLevel(data, f) {
 
 /**
  * @param {Snapshot} data
- * @param {Filters} f
+ * @param {Filters} filters
  * @returns {[number, number][]}
  */
-export function countByActivity(data, f) {
+export function countByActivity(data, filters) {
   const buckets = composeActivityCounts();
-  for (let i = 0; i < data.count; i++) {
-    if (!isMatch(data, i, f)) continue;
-    const bucket = getActivityBucket(data.days[i]);
+  for (let index = 0; index < data.count; index++) {
+    if (!isMatch(data, index, filters)) continue;
+    const bucket = getActivityBucket(data.days[index]);
     buckets[bucket] = assertDefined(buckets[bucket], "getActivityBucket answers 0-4") + 1;
   }
   return buckets.map((count, bucket) => /** @type {[number, number]} */ ([bucket, count]));
@@ -228,9 +228,9 @@ export function getTotalsFromCounts(counts) {
   const perProfession = composeProfessionCounts();
   let total = 0;
   for (const row of counts.values()) {
-    for (let p = 0; p < PROFESSION_COUNT; p++) {
-      const count = assertDefined(row[p], "a level bucket holds six counts");
-      perProfession[p] = assertDefined(perProfession[p], "six professions") + count;
+    for (let profession = 0; profession < PROFESSION_COUNT; profession++) {
+      const count = assertDefined(row[profession], "a level bucket holds six counts");
+      perProfession[profession] = assertDefined(perProfession[profession], "six professions") + count;
       total += count;
     }
   }
@@ -250,18 +250,18 @@ export function getTotalsFromCounts(counts) {
  * `src/trends.ts` computed on the server — a test over every snapshot holds this.
  *
  * @param {Snapshot} data
- * @param {Filters} f
+ * @param {Filters} filters
  * @returns {SnapshotSummary}
  */
-export function summarizeFiltered(data, f) {
+export function summarizeFiltered(data, filters) {
   const act = composeActivityCounts();
   const byProf = composeProfessionCounts();
   let total = 0;
 
-  for (let i = 0; i < data.count; i++) {
-    if (!isMatch(data, i, f)) continue;
-    const bucket = getActivityBucket(data.days[i]);
-    const profession = assertDefined(data.profession[i], "a matched row has a profession");
+  for (let index = 0; index < data.count; index++) {
+    if (!isMatch(data, index, filters)) continue;
+    const bucket = getActivityBucket(data.days[index]);
+    const profession = assertDefined(data.profession[index], "a matched row has a profession");
     total += 1;
     act[bucket] = assertDefined(act[bucket], "getActivityBucket answers 0-4") + 1;
     byProf[profession - 1] = assertDefined(byProf[profession - 1], "professions are 1-6") + 1;
@@ -276,22 +276,22 @@ export function summarizeFiltered(data, f) {
 // after copying the address or reloading the page.
 
 /**
- * @param {Filters} f
+ * @param {Filters} filters
  * @returns {URLSearchParams}
  */
-export function composeFiltersParams(f) {
+export function composeFiltersParams(filters) {
   const params = new URLSearchParams();
-  const put = (/** @type {string} */ key, /** @type {number} */ value) => {
+  const setParam = (/** @type {string} */ key, /** @type {number} */ value) => {
     if (Number.isFinite(value)) params.set(key, String(value));
   };
 
-  put("minLevel", f.minLevel);
-  put("maxLevel", f.maxLevel);
-  put("minHonor", f.minHonor);
-  put("maxHonor", f.maxHonor);
-  put("maxDays", f.maxDays);
+  setParam("minLevel", filters.minLevel);
+  setParam("maxLevel", filters.maxLevel);
+  setParam("minHonor", filters.minHonor);
+  setParam("maxHonor", filters.maxHonor);
+  setParam("maxDays", filters.maxDays);
 
-  const profs = [...f.professions].sort((a, b) => a - b);
+  const profs = [...filters.professions].sort((left, right) => left - right);
   if (profs.length !== 6) params.set("prof", profs.join(","));
 
   return params;
@@ -306,15 +306,15 @@ export function readFiltersFromParams(params) {
   // failure falls back to the default rather than to a number nobody typed: `Number("")`
   // is 0, which would read as a deliberate "minimum level 0".
   const getNumberFromParam = (/** @type {string} */ key, /** @type {number} */ fallback) => {
-    const raw = params.get(key);
-    if (raw === null || raw === "") return fallback;
-    return getFiniteNumberFromText(raw.trim()) ?? fallback;
+    const rawValue = params.get(key);
+    if (rawValue === null || rawValue === "") return fallback;
+    return getFiniteNumberFromText(rawValue.trim()) ?? fallback;
   };
 
-  const rawProf = params.get("prof");
+  const rawProfessions = params.get("prof");
   // Read and kept in one step: a `.map` then `.filter` leaves the reader's `null` in the
   // element type, and the only way back out of it is a cast (§9.5).
-  const parsed = (rawProf ?? "").split(",").flatMap((part) => {
+  const parsed = (rawProfessions ?? "").split(",").flatMap((part) => {
     const profession = getIntegerFromText(part.trim());
     return profession !== null && profession >= 1 && profession <= 6 ? [profession] : [];
   });

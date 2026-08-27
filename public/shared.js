@@ -250,11 +250,11 @@ export function getProfessionEntries() {
 }
 
 /**
- * @param {string} s
+ * @param {string} text
  * @returns {string}
  */
-export function capitalize(s) {
-  return s ? s[0]?.toUpperCase() + s.slice(1) : s;
+export function capitalize(text) {
+  return text ? text[0]?.toUpperCase() + text.slice(1) : text;
 }
 
 /**
@@ -269,14 +269,14 @@ export function capitalize(s) {
  * @returns {string}
  */
 export function formatSnapshotDate(entry) {
-  const d = getDateFromIsoText(entry?.startedAt);
-  if (d !== null) {
-    const p = (/** @type {number} */ n) => String(n).padStart(2, "0");
-    return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  const date = getDateFromIsoText(entry?.startedAt);
+  if (date !== null) {
+    const padTwoDigits = (/** @type {number} */ value) => String(value).padStart(2, "0");
+    return `${padTwoDigits(date.getDate())}.${padTwoDigits(date.getMonth() + 1)}.${date.getFullYear()} ${padTwoDigits(date.getHours())}:${padTwoDigits(date.getMinutes())}`;
   }
 
-  const m = String(entry?.id ?? "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})/);
-  return m ? `${m[3]}.${m[2]}.${m[1]} ${m[4]}:${m[5]} (?)` : String(entry?.id ?? "—");
+  const match = String(entry?.id ?? "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})/);
+  return match ? `${match[3]}.${match[2]}.${match[1]} ${match[4]}:${match[5]} (?)` : String(entry?.id ?? "—");
 }
 
 /**
@@ -285,12 +285,12 @@ export function formatSnapshotDate(entry) {
  * Takes milliseconds rather than text on purpose: by this point the number came from
  * `getMillisecondsFromIsoText`, so it is ours and there is nothing left to refuse.
  *
- * @param {number} ms
+ * @param {number} milliseconds
  * @returns {string}
  */
-export function formatShortDate(ms) {
-  const d = new Date(ms);
-  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`;
+export function formatShortDate(milliseconds) {
+  const date = new Date(milliseconds);
+  return `${String(date.getDate()).padStart(2, "0")}.${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 /**
@@ -302,8 +302,8 @@ export function formatShortDate(ms) {
  * @returns {string | null}
  */
 export function formatUtcTime(startedAt) {
-  const d = getDateFromIsoText(startedAt);
-  return d === null ? null : d.toISOString().slice(11, 16);
+  const date = getDateFromIsoText(startedAt);
+  return date === null ? null : date.toISOString().slice(11, 16);
 }
 
 const MILLISECONDS_IN_DAY = 86_400_000;
@@ -311,13 +311,13 @@ const MILLISECONDS_IN_DAY = 86_400_000;
 /**
  * The interval between snapshots in days — computed from `startedAt` and nothing else.
  *
- * @param {SnapshotEntry | null | undefined} a
- * @param {SnapshotEntry | null | undefined} b
+ * @param {SnapshotEntry | null | undefined} earlier
+ * @param {SnapshotEntry | null | undefined} later
  * @returns {number | null}
  */
-export function getDaysBetween(a, b) {
-  const from = getMillisecondsFromIsoText(a?.startedAt);
-  const to = getMillisecondsFromIsoText(b?.startedAt);
+export function getDaysBetween(earlier, later) {
+  const from = getMillisecondsFromIsoText(earlier?.startedAt);
+  const to = getMillisecondsFromIsoText(later?.startedAt);
   // Either end unreadable means there is no interval — not an interval of zero, which
   // would divide a change by no time at all and report it as an infinite rate.
   if (from === null || to === null) return null;

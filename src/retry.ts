@@ -22,8 +22,8 @@ export function parseRetryAfter(header: string | null, now = Date.now()): number
   const seconds = getIntegerFromText(header.trim());
   if (seconds !== null) return seconds >= 0 ? seconds * 1000 : undefined;
 
-  const at = getMillisecondsFromIsoText(header);
-  return at === null ? undefined : Math.max(0, at - now);
+  const retryAtMs = getMillisecondsFromIsoText(header);
+  return retryAtMs === null ? undefined : Math.max(0, retryAtMs - now);
 }
 
 /**
@@ -35,6 +35,6 @@ export function parseRetryAfter(header: string | null, now = Date.now()): number
  * straight against "respect the service".
  */
 export function getBackoffMs(attempt: number, suggested?: number): number {
-  const own = BACKOFF_BASE_MS * 2 ** (attempt - 1);
-  return Math.min(Math.max(suggested ?? 0, own), MAX_BACKOFF_MS);
+  const ownDelayMs = BACKOFF_BASE_MS * 2 ** (attempt - 1);
+  return Math.min(Math.max(suggested ?? 0, ownDelayMs), MAX_BACKOFF_MS);
 }

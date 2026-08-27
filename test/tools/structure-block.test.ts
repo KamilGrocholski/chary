@@ -46,13 +46,13 @@ function readListedPaths(): { files: string[]; directories: string[] } {
 
     while (stack.length > 0 && indent <= (stack[stack.length - 1]?.[0] ?? -1)) stack.pop();
     const prefix = stack[stack.length - 1]?.[1] ?? "";
-    const full = prefix + name;
+    const fullPath = prefix + name;
 
     if (name.endsWith("/")) {
-      directories.push(full);
-      stack.push([indent, full]);
+      directories.push(fullPath);
+      stack.push([indent, fullPath]);
     } else {
-      files.push(full);
+      files.push(fullPath);
     }
   }
   return { files, directories };

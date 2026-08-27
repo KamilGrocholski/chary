@@ -56,14 +56,14 @@ type LogLevel = keyof typeof LOG_LEVELS;
 const LOG_LEVEL_ENV = (process.env.LOG_LEVEL ?? "WARN").toUpperCase() as LogLevel;
 const MIN_LEVEL = LOG_LEVELS[LOG_LEVEL_ENV] ?? LOG_LEVELS.WARN;
 
-function formatLogLine(level: LogLevel, msg: string, extra?: object) {
-  const base = `[${new Date().toISOString()}] [${level}] ${msg}`;
+function formatLogLine(level: LogLevel, message: string, extra?: object) {
+  const base = `[${new Date().toISOString()}] [${level}] ${message}`;
   return extra ? `${base} ${JSON.stringify(extra)}` : base;
 }
 
-async function log(level: LogLevel, msg: string, extra?: object) {
+async function log(level: LogLevel, message: string, extra?: object) {
   if (LOG_LEVELS[level] < MIN_LEVEL) return;
-  const line = formatLogLine(level, msg, extra) + "\n";
+  const line = formatLogLine(level, message, extra) + "\n";
   process.stdout.write(line);
   try {
     await mkdir(LOG_DIR, { recursive: true });
@@ -73,16 +73,16 @@ async function log(level: LogLevel, msg: string, extra?: object) {
   }
 }
 
-function logError(err: unknown, context?: object) {
+function logError(thrown: unknown, context?: object) {
   // Nothing is constructed here. Wrapping a non-Error in `new Error` to get a `.stack`
   // would put an unbranded failure of our own making into the log, next to the real one —
   // and §9.5 has no place for an error that describes nothing (there is nothing to handle).
   // What a thrown non-Error can say is what it stringifies to, and that is what it says.
-  const error = err instanceof Error ? err : null;
-  return log("ERROR", error?.message ?? String(err), {
+  const error = thrown instanceof Error ? thrown : null;
+  return log("ERROR", error?.message ?? String(thrown), {
     // A failure of ours carries its code; anything else is somebody else's and says so.
-    code: err instanceof MargoStatToolError ? err.code : "Unbranded",
-    error: error?.stack ?? String(err),
+    code: error instanceof MargoStatToolError ? error.code : "Unbranded",
+    error: error?.stack ?? String(thrown),
     ...context,
   });
 }
@@ -110,13 +110,13 @@ function buildUrl(world: string, page: number) {
   return `${BASE}/ladder/${world}?page=${page}`;
 }
 
-function formatStamp(d: Date) {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}T${p(d.getUTCHours())}-${p(d.getUTCMinutes())}-${p(d.getUTCSeconds())}`;
+function formatStamp(date: Date) {
+  const padTwoDigits = (value: number) => String(value).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${padTwoDigits(date.getUTCMonth() + 1)}-${padTwoDigits(date.getUTCDate())}T${padTwoDigits(date.getUTCHours())}-${padTwoDigits(date.getUTCMinutes())}-${padTwoDigits(date.getUTCSeconds())}`;
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function sleep(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 // ── Fetching a page ───────────────────────────────────────────────────────────
@@ -124,27 +124,27 @@ function sleep(ms: number) {
 async function getPage(world: string, page: number): Promise<string> {
   const url = buildUrl(world, page);
 
-  let res: Response;
+  let response: Response;
   try {
-    res = await fetch(url, {
+    response = await fetch(url, {
       headers: { "user-agent": USER_AGENT, accept: "text/html,application/xhtml+xml" },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-  } catch (e) {
-    throw new LadderFetchError(e instanceof Error ? e.message : String(e), url, { cause: e });
+  } catch (error) {
+    throw new LadderFetchError(error instanceof Error ? error.message : String(error), url, { cause: error });
   }
 
-  if (!res.ok) {
-    throw new LadderHttpError(res.status, url, parseRetryAfter(res.headers.get("retry-after")));
+  if (!response.ok) {
+    throw new LadderHttpError(response.status, url, parseRetryAfter(response.headers.get("retry-after")));
   }
 
   // A redirect that lost the page number means we would fetch the same thing over and
   // over — better to fail loudly than to write 400 copies of page 1.
-  if (page > 1 && !res.url.includes(`page=${page}`)) {
-    throw new LadderFetchError(`redirect lost the pagination (${res.url})`, url);
+  if (page > 1 && !response.url.includes(`page=${page}`)) {
+    throw new LadderFetchError(`redirect lost the pagination (${response.url})`, url);
   }
 
-  return res.text();
+  return response.text();
 }
 
 type PageResult = { rows: PlayerRow[]; totalPages: number; badRows: string[] };
@@ -172,18 +172,18 @@ async function scrapePageWithRetry(world: string, page: number): Promise<PageRes
   while (true) {
     try {
       return await scrapePage(world, page);
-    } catch (e) {
+    } catch (error) {
       attempt++;
-      await logError(e, { world, page, attempt });
-      if (attempt > MAX_PAGE_RETRIES) throw e;
+      await logError(error, { world, page, attempt });
+      if (attempt > MAX_PAGE_RETRIES) throw error;
 
-      const suggested = e instanceof LadderHttpError ? e.retryAfterMs : undefined;
+      const suggested = error instanceof LadderHttpError ? error.retryAfterMs : undefined;
       const backoff = getBackoffMs(attempt, suggested);
       await log("WARN", `attempt ${attempt}/${MAX_PAGE_RETRIES} failed (${world} p.${page}), retrying in ${backoff}ms`, {
         world,
         page,
         backoffMs: backoff,
-        error: e instanceof Error ? e.message : String(e),
+        error: error instanceof Error ? error.message : String(error),
       });
       await sleep(backoff);
     }
@@ -211,7 +211,7 @@ async function scrapeWorld(
     if (page === 1) maxPages = result.totalPages;
 
     allRows.push(...result.rows);
-    badRows.push(...result.badRows.map((e) => `p.${page}: ${e}`));
+    badRows.push(...result.badRows.map((error) => `p.${page}: ${error}`));
 
     await log("DEBUG", `page ${page}/${maxPages}: ${result.rows.length} rows`, { world });
     process.stdout.write(`\r  ${world}: page ${page}/${maxPages} (${allRows.length} players)`);
@@ -220,9 +220,9 @@ async function scrapeWorld(
     if (page <= maxPages) await sleep(interval);
   }
 
-  const dir = path.join(WORLDS_DIR, world);
+  const directory = path.join(WORLDS_DIR, world);
   const timestamp = formatStamp(startedAt);
-  const suspect = checkPopulationDrop(allRows.length, await getLatestSnapshotCount(dir), dropThreshold);
+  const suspect = checkPopulationDrop(allRows.length, await getLatestSnapshotCount(directory), dropThreshold);
 
   const { filters, names } = splitSnapshot(allRows, {
     world,
@@ -235,13 +235,13 @@ async function scrapeWorld(
   });
 
   try {
-    await mkdir(dir, { recursive: true });
-    await writeAtomic(composeFilterPath(dir, timestamp), JSON.stringify(filters));
-    await writeAtomic(composeNamesPath(dir, timestamp), JSON.stringify(names));
-  } catch (e) {
+    await mkdir(directory, { recursive: true });
+    await writeAtomic(composeFilterPath(directory, timestamp), JSON.stringify(filters));
+    await writeAtomic(composeNamesPath(directory, timestamp), JSON.stringify(names));
+  } catch (error) {
     throw new SnapshotWriteError(
-      `could not write the ${world} snapshot: ${e instanceof Error ? e.message : String(e)}`,
-      { cause: e },
+      `could not write the ${world} snapshot: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
     );
   }
 
@@ -260,7 +260,7 @@ async function scrapeWorld(
     rows: allRows.length,
     pages: maxPages,
     skippedRows: badRows.length,
-    file: composeFilterPath(dir, timestamp),
+    file: composeFilterPath(directory, timestamp),
   });
 
   return suspect;
@@ -297,9 +297,9 @@ async function dryRunWorld(world: string, interval: number): Promise<boolean> {
     let result: PageResult;
     try {
       result = await scrapePage(world, page);
-    } catch (e) {
+    } catch (error) {
       process.stdout.write(
-        `✗ ${world.padEnd(9)} p.${page} ${e instanceof Error ? e.message : String(e)}\n`,
+        `✗ ${world.padEnd(9)} p.${page} ${error instanceof Error ? error.message : String(error)}\n`,
       );
       return false;
     }
@@ -337,17 +337,17 @@ if (!reading.ok) {
   console.error(reading.message);
   process.exit(1);
 }
-const { worlds, intervalMs, dropThreshold, dryRun } = reading.command;
+const { worlds, intervalMs, dropThreshold, isDryRun } = reading.command;
 
-if (dryRun) {
+if (isDryRun) {
   process.stdout.write(
     `Dry run: checking the parser on the first ${DRY_RUN_PAGES} pages ` +
       `(${worlds.length} worlds), writing nothing.\n\n`,
   );
   let failed = 0;
-  for (const [i, world] of worlds.entries()) {
+  for (const [index, world] of worlds.entries()) {
     if (!(await dryRunWorld(world, intervalMs))) failed++;
-    if (i < worlds.length - 1) await sleep(intervalMs);
+    if (index < worlds.length - 1) await sleep(intervalMs);
   }
   process.stdout.write(`\n${worlds.length - failed}/${worlds.length} worlds OK\n`);
   process.exit(failed > 0 ? 1 : 0);
@@ -360,13 +360,13 @@ for (const world of worlds) {
   try {
     const suspect = await scrapeWorld(world, intervalMs, dropThreshold);
     if (suspect) suspects.push({ world, reason: suspect.reason });
-  } catch (e) {
+  } catch (error) {
     // The boundary with the ranking and with the filesystem: whatever comes back, this
     // world is over and the next one still has to run (§9.5).
-    const message = e instanceof Error ? e.message : String(e);
-    const code = e instanceof MargoStatToolError ? e.code : "Unbranded";
+    const message = error instanceof Error ? error.message : String(error);
+    const code = error instanceof MargoStatToolError ? error.code : "Unbranded";
     failures.push({ world, code, error: message });
-    await logError(e, { world });
+    await logError(error, { world });
     process.stdout.write(`\r✗ ${world}: ${message}\n`);
   }
 }
@@ -383,12 +383,12 @@ if (skipped > 0) {
 if (suspects.length > 0) {
   // The snapshots are written — this is a warning to look into, not a failed run.
   process.stdout.write(`\n⚠ ${suspects.length} snapshots need checking:\n`);
-  for (const s of suspects) process.stdout.write(`  ⚠ ${s.world}: ${s.reason}\n`);
+  for (const suspect of suspects) process.stdout.write(`  ⚠ ${suspect.world}: ${suspect.reason}\n`);
 }
 
 if (failures.length > 0) {
   process.stdout.write(`\n${failures.length}/${worlds.length} worlds were not fetched:\n`);
-  for (const f of failures) process.stdout.write(`  ✗ ${f.world} [${f.code}]: ${f.error}\n`);
+  for (const failure of failures) process.stdout.write(`  ✗ ${failure.world} [${failure.code}]: ${failure.error}\n`);
   process.exit(1);
 }
 

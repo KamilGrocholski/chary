@@ -14,8 +14,8 @@ const BLOCK = /\/\*[\s\S]*?\*\//g;
 const LINE = /(^|[^:])\/\/.*$/gm;
 
 /** The source with every comment removed. */
-export function stripComments(src: string): string {
-  return src.replace(BLOCK, "").replace(LINE, "$1");
+export function stripComments(source: string): string {
+  return source.replace(BLOCK, "").replace(LINE, "$1");
 }
 
 /**
@@ -24,21 +24,21 @@ export function stripComments(src: string): string {
  * The joining matters: a sentence quoting the interface often wraps across several lines, and
  * a reader checking quote by quote would see half a quotation on each of them.
  */
-export function commentBlocks(src: string): string[] {
-  const blocks = src.match(BLOCK) ?? [];
+export function getCommentBlocks(source: string): string[] {
+  const blocks = source.match(BLOCK) ?? [];
   const lines: string[] = [];
 
-  let run: string[] = [];
-  for (const line of src.split("\n")) {
+  let currentRun: string[] = [];
+  for (const line of source.split("\n")) {
     const match = /(^|[^:])\/\/(.*)$/.exec(line);
     if (match) {
-      run.push(match[2]!);
-    } else if (run.length > 0) {
-      lines.push(run.join("\n"));
-      run = [];
+      currentRun.push(match[2]!);
+    } else if (currentRun.length > 0) {
+      lines.push(currentRun.join("\n"));
+      currentRun = [];
     }
   }
-  if (run.length > 0) lines.push(run.join("\n"));
+  if (currentRun.length > 0) lines.push(currentRun.join("\n"));
 
   return [...blocks, ...lines];
 }
@@ -55,16 +55,16 @@ export function commentBlocks(src: string): string[] {
  * approximates. It is deliberately narrow: a division misread as a pattern would let a file
  * claim a language it does not speak.
  */
-export function regexLiterals(src: string): string[] {
-  const code = stripComments(src);
+export function getRegexLiterals(source: string): string[] {
+  const code = stripComments(source);
   return [...code.matchAll(/(?<=[(=,:[!&|?{};]\s*)\/(?![*/])(?:[^/\\\n[]|\\.|\[(?:[^\]\\]|\\.)*\])+\/[dgimsuvy]*/g)].map(
     ([literal]) => literal,
   );
 }
 
 /** The string and template literals, comments removed first. */
-export function stringLiterals(src: string): string[] {
-  const code = stripComments(src);
+export function getStringLiterals(source: string): string[] {
+  const code = stripComments(source);
   return [
     ...(code.match(/"(?:[^"\\\n]|\\.)*"/g) ?? []),
     ...(code.match(/'(?:[^'\\\n]|\\.)*'/g) ?? []),

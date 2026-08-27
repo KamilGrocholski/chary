@@ -41,14 +41,14 @@ const { filters: sample } = splitNormalized(normalizeLegacyRows(legacy), {
   startedAt: "2026-07-21T20:04:12.489Z",
 });
 
-function legacyDays(text: string): number | null {
-  const t = String(text);
-  if (t.includes("24h")) return 0;
-  const n = Number(t.match(/(\d+)/)?.[1]);
-  return n >= 10_000 ? null : n;
+function getLegacyDays(text: string): number | null {
+  const threshold = String(text);
+  if (threshold.includes("24h")) return 0;
+  const count = Number(threshold.match(/(\d+)/)?.[1]);
+  return count >= 10_000 ? null : count;
 }
 
-function legacyCount(predicate: (row: any[]) => boolean) {
+function countLegacyRows(predicate: (row: any[]) => boolean) {
   return legacy.rows.filter(predicate).length;
 }
 
@@ -57,23 +57,23 @@ describe("the snapshot aggregate", () => {
 
   test("population and professions agree with the raw rows", () => {
     expect(summary.total).toBe(legacy.rows.length);
-    for (let p = 1; p <= 6; p++) {
-      expect(summary.byProf[p - 1]).toBe(legacyCount((r) => r[3] === p));
+    for (let profession = 1; profession <= 6; profession++) {
+      expect(summary.byProf[profession - 1]).toBe(countLegacyRows((row) => row[3] === profession));
     }
-    expect(summary.byProf.reduce((a, b) => a + b, 0)).toBe(summary.total);
+    expect(summary.byProf.reduce((sum, value) => sum + value, 0)).toBe(summary.total);
   });
 
   test("the activity buckets are disjoint and sum to the population", () => {
     for (let bucket = 0; bucket < ACTIVITY_BUCKET_COUNT; bucket++) {
-      expect(summary.act[bucket]).toBe(legacyCount((r) => getActivityBucket(legacyDays(r[5])) === bucket));
+      expect(summary.act[bucket]).toBe(countLegacyRows((row) => getActivityBucket(getLegacyDays(row[5])) === bucket));
     }
-    expect(summary.act.reduce((a, b) => a + b, 0)).toBe(summary.total);
+    expect(summary.act.reduce((sum, value) => sum + value, 0)).toBe(summary.total);
   });
 
   test("accounts never used sit in their own bucket, not among the inactive", () => {
     // `days === null` is an account never used (the ranking shows a date in 1969), not a
     // player absent for a long time — merging the two would inflate "> 30 days".
-    expect(summary.act[4]).toBe(legacyCount((r) => legacyDays(r[5]) === null));
+    expect(summary.act[4]).toBe(countLegacyRows((row) => getLegacyDays(row[5]) === null));
     expect(summary.act[4]).toBeGreaterThan(0);
   });
 
@@ -105,7 +105,7 @@ describe("the snapshot aggregate", () => {
     for (const threshold of ACTIVITY_THRESHOLDS) {
       const widest = threshold.buckets[threshold.buckets.length - 1]!;
       expect(threshold.bound).toBe(ACTIVITY_BUCKET_BOUNDS[widest]![1]);
-      expect(threshold.buckets).toEqual([...threshold.buckets].sort((a, b) => a - b));
+      expect(threshold.buckets).toEqual([...threshold.buckets].sort((left, right) => left - right));
       expect(threshold.buckets[0]).toBe(0);
     }
   });
@@ -118,7 +118,7 @@ describe("the snapshot aggregate", () => {
 });
 
 describe("a world's history", () => {
-  const filters = (startedAt: string | undefined, count: number, suspect = false): FilterFile => ({
+  const composeFilterFile = (startedAt: string | undefined, count: number, suspect = false): FilterFile => ({
     schema: 3,
     kind: "filter",
     world: "test",
@@ -136,8 +136,8 @@ describe("a world's history", () => {
     // Identifiers from before August 2026 carry local time in the name, so sorting by them
     // would place snapshots from the timezone seam 2 h away from the truth.
     const trend = buildWorldTrend([
-      { id: "2026-08-01T09-48-26", filters: filters("2026-08-01T07:48:26.000Z", 2) },
-      { id: "2026-07-21T22-04-12", filters: filters("2026-07-21T20:04:12.000Z", 1) },
+      { id: "2026-08-01T09-48-26", filters: composeFilterFile("2026-08-01T07:48:26.000Z", 2) },
+      { id: "2026-07-21T22-04-12", filters: composeFilterFile("2026-07-21T20:04:12.000Z", 1) },
     ]);
     expect(trend.id).toEqual(["2026-07-21T22-04-12", "2026-08-01T09-48-26"]);
     expect(trend.total).toEqual([1, 2]);
@@ -145,16 +145,16 @@ describe("a world's history", () => {
 
   test("a snapshot without startedAt drops out — there is nowhere to put it on the axis", () => {
     const trend = buildWorldTrend([
-      { id: "undated", filters: filters(undefined, 5) },
-      { id: "dated", filters: filters("2026-07-21T20:04:12.000Z", 1) },
+      { id: "undated", filters: composeFilterFile(undefined, 5) },
+      { id: "dated", filters: composeFilterFile("2026-07-21T20:04:12.000Z", 1) },
     ]);
     expect(trend.id).toEqual(["dated"]);
   });
 
   test("every column has the same length, and suspect carries through", () => {
     const trend = buildWorldTrend([
-      { id: "a", filters: filters("2026-07-21T20:04:12.000Z", 1) },
-      { id: "b", filters: filters("2026-08-01T07:48:26.000Z", 1, true) },
+      { id: "a", filters: composeFilterFile("2026-07-21T20:04:12.000Z", 1) },
+      { id: "b", filters: composeFilterFile("2026-08-01T07:48:26.000Z", 1, true) },
     ]);
     for (const column of [trend.id, trend.startedAt, trend.total, trend.suspect, ...trend.act, ...trend.byProf]) {
       expect(column).toHaveLength(2);
@@ -173,9 +173,9 @@ describe("the published trends.json", () => {
 
     for (const world of manifest.worlds) {
       const trend = trends.worlds[world.name];
-      const dated = world.files.filter((f: { startedAt?: string }) => f.startedAt);
-      expect(trend.id).toEqual(dated.map((f: { id: string }) => f.id));
-      expect(trend.startedAt).toEqual(dated.map((f: { startedAt: string }) => f.startedAt));
+      const dated = world.files.filter((filterFile: { startedAt?: string }) => filterFile.startedAt);
+      expect(trend.id).toEqual(dated.map((filterFile: { id: string }) => filterFile.id));
+      expect(trend.startedAt).toEqual(dated.map((filterFile: { startedAt: string }) => filterFile.startedAt));
     }
   });
 
@@ -185,18 +185,18 @@ describe("the published trends.json", () => {
     // compression the browser is served by GitHub Pages.
     for (const world of manifest.worlds) {
       const trend = trends.worlds[world.name];
-      const newest = world.files.filter((f: { startedAt?: string }) => f.startedAt).at(-1);
-      const raw = await Bun.file(path.join(PUBLIC_DIR, newest.filters)).arrayBuffer();
-      expect(trend.bytes).toBe(Bun.gzipSync(new Uint8Array(raw)).length);
+      const newest = world.files.filter((filterFile: { startedAt?: string }) => filterFile.startedAt).at(-1);
+      const rawTrend = await Bun.file(path.join(PUBLIC_DIR, newest.filters)).arrayBuffer();
+      expect(trend.bytes).toBe(Bun.gzipSync(new Uint8Array(rawTrend)).length);
       expect(trend.bytes).toBeGreaterThan(0);
     }
   });
 
   test("every column sums to the population of the same snapshot", () => {
     for (const trend of Object.values(trends.worlds) as any[]) {
-      for (let i = 0; i < trend.total.length; i++) {
-        expect(trend.act.reduce((s: number, b: number[]) => s + (b[i] ?? 0), 0)).toBe(trend.total[i]);
-        expect(trend.byProf.reduce((s: number, b: number[]) => s + (b[i] ?? 0), 0)).toBe(trend.total[i]);
+      for (let index = 0; index < trend.total.length; index++) {
+        expect(trend.act.reduce((summary: number, series: number[]) => summary + (series[index] ?? 0), 0)).toBe(trend.total[index]);
+        expect(trend.byProf.reduce((summary: number, series: number[]) => summary + (series[index] ?? 0), 0)).toBe(trend.total[index]);
       }
     }
   });
@@ -207,15 +207,15 @@ describe("the published trends.json", () => {
     // shows.
     for (const world of manifest.worlds) {
       const entry = world.files.at(-1);
-      const f = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.filters)).text());
+      const filterFile = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.filters)).text());
       const trend = trends.worlds[world.name];
-      const i = trend.id.indexOf(entry.id);
-      expect(i).toBeGreaterThan(-1);
+      const index = trend.id.indexOf(entry.id);
+      expect(index).toBeGreaterThan(-1);
 
-      const expected = summarizeSnapshot(f);
-      expect(trend.total[i]).toBe(expected.total);
-      expect(trend.act.map((b: number[]) => b[i])).toEqual(expected.act);
-      expect(trend.byProf.map((b: number[]) => b[i])).toEqual(expected.byProf);
+      const expected = summarizeSnapshot(filterFile);
+      expect(trend.total[index]).toBe(expected.total);
+      expect(trend.act.map((series: number[]) => series[index])).toEqual(expected.act);
+      expect(trend.byProf.map((series: number[]) => series[index])).toEqual(expected.byProf);
     }
   });
 
@@ -233,10 +233,10 @@ describe("the published trends.json", () => {
     // Drops only — `checkPopulationDrop` never flags growth, so a world genuinely gaining
     // players (e.g. `luvia`, +11% between two snapshots) has no invariant to check here.
     for (const [world, trend] of Object.entries(trends.worlds) as [string, any][]) {
-      for (let i = 1; i < trend.total.length; i++) {
-        const delta = (trend.total[i] - trend.total[i - 1]) / trend.total[i - 1];
+      for (let index = 1; index < trend.total.length; index++) {
+        const delta = (trend.total[index] - trend.total[index - 1]) / trend.total[index - 1];
         if (delta <= -0.05) {
-          expect(`${world}[${i}] suspect=${trend.suspect[i]}`).toBe(`${world}[${i}] suspect=1`);
+          expect(`${world}[${index}] suspect=${trend.suspect[index]}`).toBe(`${world}[${index}] suspect=1`);
         }
       }
     }
@@ -256,20 +256,20 @@ describe("under the default filter the client computes exactly what the server d
 
     for (const world of manifest.worlds) {
       for (const entry of world.files) {
-        const f = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.filters)).text());
-        expect(summarizeFiltered(f, noFilter)).toEqual(summarizeSnapshot(f));
+        const filterFile = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.filters)).text());
+        expect(summarizeFiltered(filterFile, noFilter)).toEqual(summarizeSnapshot(filterFile));
         // and the same after the conversion to typed arrays the browser performs
-        expect(summarizeFiltered(composeTypedSnapshot(f), noFilter)).toEqual(summarizeSnapshot(f));
+        expect(summarizeFiltered(composeTypedSnapshot(filterFile), noFilter)).toEqual(summarizeSnapshot(filterFile));
         checked += 1;
       }
     }
-    expect(checked).toBe(manifest.worlds.reduce((s: number, w: any) => s + w.files.length, 0));
+    expect(checked).toBe(manifest.worlds.reduce((summary: number, world: any) => summary + world.files.length, 0));
     expect(checked).toBeGreaterThan(200);
   });
 });
 
 describe("the conversion to typed arrays", () => {
-  const raw = {
+  const rawTrend = {
     count: 5,
     level: [1, 250, 500, 10, 10],
     profession: [1, 2, 3, 4, 6],
@@ -279,21 +279,21 @@ describe("the conversion to typed arrays", () => {
   };
 
   test("null becomes −1, not zero and not a huge number", () => {
-    const typed = composeTypedSnapshot(raw);
+    const typed = composeTypedSnapshot(rawTrend);
     expect([...typed.days]).toEqual([0, 7, -1, 6598, 31]);
     expect(typed.suspect).toEqual({ reason: "test" } as typeof typed.suspect);
   });
 
   test("no column loses a value to its type", () => {
-    const typed = composeTypedSnapshot(raw);
-    expect([...typed.level]).toEqual(raw.level);
-    expect([...typed.profession]).toEqual(raw.profession);
+    const typed = composeTypedSnapshot(rawTrend);
+    expect([...typed.level]).toEqual(rawTrend.level);
+    expect([...typed.profession]).toEqual(rawTrend.profession);
     // honor can be negative and reaches 1.2M — Int16 would clip it
-    expect([...typed.honor]).toEqual(raw.honor);
+    expect([...typed.honor]).toEqual(rawTrend.honor);
   });
 
   test("a missing suspect gives null, not undefined", () => {
-    expect(composeTypedSnapshot({ ...raw, suspect: undefined }).suspect).toBeNull();
+    expect(composeTypedSnapshot({ ...rawTrend, suspect: undefined }).suspect).toBeNull();
   });
 });
 
@@ -302,34 +302,34 @@ describe("the activity thresholds are cumulative", () => {
 
   test("\"≤ 7 days\" is the < 24h bucket together with 1-7 days", () => {
     const counts = getActiveCounts(aether, "7d");
-    for (let i = 0; i < counts.length; i++) {
-      expect(counts[i]).toBe(aether.act[0][i] + aether.act[1][i]);
+    for (let index = 0; index < counts.length; index++) {
+      expect(counts[index]).toBe(aether.act[0][index] + aether.act[1][index]);
     }
   });
 
   test("the numbers agree with the raw `.f.json`, not only with themselves", async () => {
-    const entry = manifest.worlds.find((w: { name: string }) => w.name === "aether").files.at(-1);
-    const f = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.filters)).text());
-    const i = aether.id.indexOf(entry.id);
+    const entry = manifest.worlds.find((world: { name: string }) => world.name === "aether").files.at(-1);
+    const filterFile = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.filters)).text());
+    const index = aether.id.indexOf(entry.id);
 
-    const raw = (maxDays: number) =>
-      f.days.filter((d: number | null, row: number) => {
-        if (d === null || d > maxDays) return false;
-        return f.level[row] >= 1 && f.profession[row] >= 1 && f.profession[row] <= 6;
+    const composeRawTrend = (maxDays: number) =>
+      filterFile.days.filter((date: number | null, row: number) => {
+        if (date === null || date > maxDays) return false;
+        return filterFile.level[row] >= 1 && filterFile.profession[row] >= 1 && filterFile.profession[row] <= 6;
       }).length;
 
-    expect(getActiveCounts(aether, "24h")[i]).toBe(raw(0));
-    expect(getActiveCounts(aether, "7d")[i]).toBe(raw(7));
-    expect(getActiveCounts(aether, "30d")[i]).toBe(raw(30));
+    expect(getActiveCounts(aether, "24h")[index]).toBe(composeRawTrend(0));
+    expect(getActiveCounts(aether, "7d")[index]).toBe(composeRawTrend(7));
+    expect(getActiveCounts(aether, "30d")[index]).toBe(composeRawTrend(30));
   });
 
   test("the thresholds grow monotonically and never exceed the population", () => {
-    const keys = ACTIVITY_THRESHOLDS.map((t) => t.key);
+    const keys = ACTIVITY_THRESHOLDS.map((threshold) => threshold.key);
     const series = keys.map((key) => getActiveCounts(aether, key));
-    for (let i = 0; i < aether.total.length; i++) {
-      expect(series[0]![i]).toBeLessThanOrEqual(series[1]![i]!);
-      expect(series[1]![i]).toBeLessThanOrEqual(series[2]![i]!);
-      expect(series[2]![i]).toBeLessThanOrEqual(aether.total[i]);
+    for (let index = 0; index < aether.total.length; index++) {
+      expect(series[0]![index]).toBeLessThanOrEqual(series[1]![index]!);
+      expect(series[1]![index]).toBeLessThanOrEqual(series[2]![index]!);
+      expect(series[2]![index]).toBeLessThanOrEqual(aether.total[index]);
     }
   });
 
@@ -341,7 +341,7 @@ describe("the activity thresholds are cumulative", () => {
     const counts = getActiveCounts(aether, "7d");
     const share = getShareSeries(counts, aether.total);
     expect(share[0]).toBeCloseTo((counts[0]! / aether.total[0]) * 100, 6);
-    expect(share.every((s: number) => s >= 0 && s <= 100)).toBe(true);
+    expect(share.every((summary: number) => summary >= 0 && summary <= 100)).toBe(true);
     // A population of 0 must not produce a NaN on the chart.
     expect(getShareSeries([0], [0])).toEqual([0]);
   });
@@ -351,11 +351,11 @@ describe("the activity filter removes the thresholds that go silent under it", (
   // Under an "online ≤ 7 days" filter the set holds nobody past seven days, so the
   // "≤ 7 days" threshold would equal the match count, and "≤ 30 days" likewise.
   test("only thresholds narrower than the filter survive", () => {
-    expect(getUsableThresholds(Infinity).map((t) => t.key)).toEqual(["24h", "7d", "30d"]);
-    expect(getUsableThresholds(30).map((t) => t.key)).toEqual(["24h", "7d"]);
-    expect(getUsableThresholds(14).map((t) => t.key)).toEqual(["24h", "7d"]);
-    expect(getUsableThresholds(7).map((t) => t.key)).toEqual(["24h"]);
-    expect(getUsableThresholds(3).map((t) => t.key)).toEqual(["24h"]);
+    expect(getUsableThresholds(Infinity).map((threshold) => threshold.key)).toEqual(["24h", "7d", "30d"]);
+    expect(getUsableThresholds(30).map((threshold) => threshold.key)).toEqual(["24h", "7d"]);
+    expect(getUsableThresholds(14).map((threshold) => threshold.key)).toEqual(["24h", "7d"]);
+    expect(getUsableThresholds(7).map((threshold) => threshold.key)).toEqual(["24h"]);
+    expect(getUsableThresholds(3).map((threshold) => threshold.key)).toEqual(["24h"]);
     expect(getUsableThresholds(0)).toEqual([]);
   });
 
@@ -385,7 +385,7 @@ describe("history under a filter", () => {
     bytes: 0,
   };
 
-  const snapshot = (levels: number[]) =>
+  const composeSnapshot = (levels: number[]) =>
     composeTypedSnapshot({
       count: levels.length,
       level: levels,
@@ -404,8 +404,8 @@ describe("history under a filter", () => {
 
   test("computes only from loaded snapshots and substitutes nothing for the rest", () => {
     const store = new Map([
-      ["a", snapshot([10, 300, 300])],
-      ["c", snapshot([300, 300])],
+      ["a", composeSnapshot([10, 300, 300])],
+      ["c", composeSnapshot([300, 300])],
     ]);
     const { trend, population, loaded, expected } = buildFilteredTrend(base, store, {
       ...getEmptyFilters(),
@@ -425,8 +425,8 @@ describe("history under a filter", () => {
 
   test("a hole in the history makes a longer interval, not a false jump", () => {
     const store = new Map([
-      ["a", snapshot([300])],
-      ["c", snapshot([300, 300, 300])],
+      ["a", composeSnapshot([300])],
+      ["c", composeSnapshot([300, 300, 300])],
     ]);
     const { trend } = buildFilteredTrend(base, store, { ...getEmptyFilters(), minLevel: 200 });
     const rows = getChangeRows(trend);
@@ -438,7 +438,7 @@ describe("history under a filter", () => {
   });
 
   test("the snapshot window narrows the history and says how much is left", () => {
-    const store = new Map([["b", snapshot([300])], ["c", snapshot([300])]]);
+    const store = new Map([["b", composeSnapshot([300])], ["c", composeSnapshot([300])]]);
     const { trend, expected } = buildFilteredTrend(
       base,
       store,
@@ -459,33 +459,33 @@ describe("history under a filter", () => {
 });
 
 describe("the snapshot window", () => {
-  const entries = Array.from({ length: 20 }, (_, i) => ({ id: `s${i}` }));
+  const composeEntries = Array.from({ length: 20 }, (_, index) => ({ id: `s${index}` }));
 
   test("takes the newest, because those answer \"what is happening now\"", () => {
-    const picked = getWindowedEntries(entries, 5);
-    expect(picked.map((e: { id: string }) => e.id)).toEqual(["s15", "s16", "s17", "s18", "s19"]);
+    const picked = getWindowedEntries(composeEntries, 5);
+    expect(picked.map((error: { id: string }) => error.id)).toEqual(["s15", "s16", "s17", "s18", "s19"]);
   });
 
   test("a shorter history passes through whole", () => {
-    expect(getWindowedEntries(entries.slice(0, 3), 5)).toHaveLength(3);
-    expect(getWindowedEntries(entries.slice(0, 5), 5)).toHaveLength(5);
+    expect(getWindowedEntries(composeEntries.slice(0, 3), 5)).toHaveLength(3);
+    expect(getWindowedEntries(composeEntries.slice(0, 5), 5)).toHaveLength(5);
   });
 
   test("an unknown size falls back to the count, rather than to everything", () => {
     // `trends.json` and `history.js` are separate files on Pages with separate cache
     // lifetimes, so a fresh script can meet an aggregate built before `bytes` existed.
     // Treating that as "free" would hand somebody gordion's whole history unasked.
-    expect(getBudgetedEntries(entries, 0)).toHaveLength(HISTORY_WINDOW);
-    expect(getBudgetedEntries(entries, undefined)).toHaveLength(HISTORY_WINDOW);
+    expect(getBudgetedEntries(composeEntries, 0)).toHaveLength(HISTORY_WINDOW);
+    expect(getBudgetedEntries(composeEntries, undefined)).toHaveLength(HISTORY_WINDOW);
   });
 });
 
 describe("the transfer budget", () => {
-  const entries = Array.from({ length: 20 }, (_, i) => ({ id: `s${i}` }));
+  const composeEntries = Array.from({ length: 20 }, (_, index) => ({ id: `s${index}` }));
 
   test("buys the newest snapshots it can afford", () => {
     // 200 KB apiece against 2 MiB: ten fit, and they are the ten newest.
-    const picked = getBudgetedEntries(entries, 200 * 1024);
+    const picked = getBudgetedEntries(composeEntries, 200 * 1024);
     expect(picked).toHaveLength(10);
     expect(picked.at(-1)).toEqual({ id: "s19" });
     expect(picked[0]).toEqual({ id: "s10" });
@@ -493,35 +493,35 @@ describe("the transfer budget", () => {
 
   test("a cheap world is never trimmed", () => {
     // Brutal, priced as it really is: the whole history costs less than the budget.
-    expect(getBudgetedEntries(entries, 20 * 1024)).toHaveLength(20);
+    expect(getBudgetedEntries(composeEntries, 20 * 1024)).toHaveLength(20);
   });
 
   test("two points at the minimum, even when they do not fit", () => {
     // One dot is not a trend, and the snapshot view above already answers "how many are
     // there now". A single snapshot too big for the budget would leave the chart saying
     // nothing at all.
-    expect(getBudgetedEntries(entries, 5 * 1024 * 1024)).toHaveLength(2);
+    expect(getBudgetedEntries(composeEntries, 5 * 1024 * 1024)).toHaveLength(2);
   });
 
   test("the ceiling falls on the world that actually costs something", () => {
     // The point of the whole thing, against real sizes: gordion is trimmed, brutal is not,
     // even though brutal has MORE snapshots. A count-based window did the exact opposite.
-    const fits = (world: string) =>
+    const getBudgetedCount = (world: string) =>
       getBudgetedEntries(
         trends.worlds[world].id.map((id: string) => ({ id })),
         trends.worlds[world].bytes,
       ).length;
 
     expect(trends.worlds.brutal.id.length).toBeGreaterThanOrEqual(trends.worlds.gordion.id.length);
-    expect(fits("gordion")).toBeLessThan(trends.worlds.gordion.id.length);
-    expect(fits("brutal")).toBe(trends.worlds.brutal.id.length);
-    expect(trends.worlds.gordion.bytes * fits("gordion")).toBeLessThanOrEqual(HISTORY_BUDGET_BYTES);
+    expect(getBudgetedCount("gordion")).toBeLessThan(trends.worlds.gordion.id.length);
+    expect(getBudgetedCount("brutal")).toBe(trends.worlds.brutal.id.length);
+    expect(trends.worlds.gordion.bytes * getBudgetedCount("gordion")).toBeLessThanOrEqual(HISTORY_BUDGET_BYTES);
   });
 });
 
 describe("fetching the history", () => {
-  const entries = (world: string, n: number) =>
-    Array.from({ length: n }, (_, i) => ({ id: `${world}-${i}`, filters: `worlds/${world}/${i}.f.json` }));
+  const composeEntries = (world: string, count: number) =>
+    Array.from({ length: count }, (_, index) => ({ id: `${world}-${index}`, filters: `worlds/${world}/${index}.f.json` }));
 
   const fakeSnapshot = { count: 1, level: [10], profession: [1], honor: [0], days: [0] };
 
@@ -533,7 +533,7 @@ describe("fetching the history", () => {
    * before parsing it, every one of them reported a failure the browser does not have.
    * AGENTS.md §9.6: a stub gentler or narrower than a browser holds nothing about one.
    */
-  const answer = (status: number, body: unknown) => {
+  const composeResponse = (status: number, body: unknown) => {
     const text = JSON.stringify(body);
     return {
       ok: status >= 200 && status < 300,
@@ -543,11 +543,11 @@ describe("fetching the history", () => {
     };
   };
 
-  async function withFetch(impl: (url: string) => Promise<any>, run: () => Promise<void>) {
+  async function runWithFetch(impl: (url: string) => Promise<any>, scenario: () => Promise<void>) {
     const original = globalThis.fetch;
     globalThis.fetch = impl as any;
     try {
-      await run();
+      await scenario();
     } finally {
       globalThis.fetch = original;
     }
@@ -555,10 +555,10 @@ describe("fetching the history", () => {
 
   test("fetches the full set and reports progress after every snapshot", async () => {
     const seen: number[] = [];
-    await withFetch(
-      async () => answer(200, fakeSnapshot),
+    await runWithFetch(
+      async () => composeResponse(200, fakeSnapshot),
       async () => {
-        const list = entries("w1", 7);
+        const list = composeEntries("w1", 7);
         const { failed } = await loadHistory("w1", list, {
           onProgress: (loaded: number) => seen.push(loaded),
         });
@@ -572,13 +572,13 @@ describe("fetching the history", () => {
 
   test("a second call fetches nothing — the snapshots are already in memory", async () => {
     let calls = 0;
-    await withFetch(
+    await runWithFetch(
       async () => {
         calls += 1;
-        return answer(200, fakeSnapshot);
+        return composeResponse(200, fakeSnapshot);
       },
       async () => {
-        const list = entries("w2", 4);
+        const list = composeEntries("w2", 4);
         await loadHistory("w2", list, {});
         expect(calls).toBe(4);
         await loadHistory("w2", list, {});
@@ -588,13 +588,13 @@ describe("fetching the history", () => {
   });
 
   test("one broken response does not take down the whole history", async () => {
-    await withFetch(
+    await runWithFetch(
       async (url: string) =>
         url.endsWith("2.f.json")
-          ? answer(500, {})
-          : answer(200, fakeSnapshot),
+          ? composeResponse(500, {})
+          : composeResponse(200, fakeSnapshot),
       async () => {
-        const list = entries("w3", 5);
+        const list = composeEntries("w3", 5);
         const { failed } = await loadHistory("w3", list, {});
         expect(failed).toEqual(["w3-2"]);
         expect(getLoadedCount(getCachedSnapshots("w3"), list)).toBe(4);
@@ -603,10 +603,10 @@ describe("fetching the history", () => {
   });
 
   test("switching worlds abandons the work instead of feeding a dead view", async () => {
-    await withFetch(
-      async () => answer(200, fakeSnapshot),
+    await runWithFetch(
+      async () => composeResponse(200, fakeSnapshot),
       async () => {
-        const list = entries("w4", 8);
+        const list = composeEntries("w4", 8);
         let stale = false;
         await loadHistory("w4", list, {
           concurrency: 1,
@@ -640,17 +640,17 @@ describe("changes between snapshots", () => {
     const rows = getChangeRows(aether);
     expect(rows).toHaveLength(aether.id.length - 1);
 
-    for (const [i, row] of rows.entries()) {
-      expect(row.delta).toBe(aether.total[i + 1] - aether.total[i]);
+    for (const [index, row] of rows.entries()) {
+      expect(row.delta).toBe(aether.total[index + 1] - aether.total[index]);
       const expectedDays =
-        (new Date(aether.startedAt[i + 1]).getTime() - new Date(aether.startedAt[i]).getTime()) / 86_400_000;
+        (new Date(aether.startedAt[index + 1]).getTime() - new Date(aether.startedAt[index]).getTime()) / 86_400_000;
       expect(row.days).toBeCloseTo(expectedDays, 6);
       expect(row.perDay).toBeCloseTo(row.delta / expectedDays, 6);
     }
   });
 
   test("the intervals in this data really are uneven", () => {
-    const days = getChangeRows(aether).map((r) => r.days!);
+    const days = getChangeRows(aether).map((row) => row.days!);
     expect(Math.max(...days) - Math.min(...days)).toBeGreaterThan(3);
   });
 
@@ -672,13 +672,13 @@ describe("changes between snapshots", () => {
 describe("the history summary", () => {
   test("measures the change from the first snapshot to the last", () => {
     const fobos = trends.worlds.fobos;
-    const s = summarize(fobos)!;
-    expect(s.total).toBe(fobos.total.at(-1));
-    expect(s.delta).toBe(fobos.total.at(-1) - fobos.total[0]);
-    expect(s.percent).toBeCloseTo((s.delta / fobos.total[0]) * 100, 6);
-    expect(s.snapshots).toBe(fobos.total.length);
+    const summary = summarize(fobos)!;
+    expect(summary.total).toBe(fobos.total.at(-1));
+    expect(summary.delta).toBe(fobos.total.at(-1) - fobos.total[0]);
+    expect(summary.percent).toBeCloseTo((summary.delta / fobos.total[0]) * 100, 6);
+    expect(summary.snapshots).toBe(fobos.total.length);
     // fobos is the fastest-emptying world — the signal this view was built for
-    expect(s.delta).toBeLessThan(0);
+    expect(summary.delta).toBeLessThan(0);
   });
 });
 

@@ -106,16 +106,16 @@ export function getProfessionId(title: string, levelText: string): number | null
  * Returns undefined for a format we do not recognise — a signal to report it.
  */
 export function parseLastOnlineDays(text: string): number | null | undefined {
-  const t = normalize(text);
+  const normalized = normalize(text);
 
-  if (t.includes("mniej") && t.includes("24h")) return 0;
+  if (normalized.includes("mniej") && normalized.includes("24h")) return 0;
 
-  const m = t.match(/(\d+)\s+(?:dni?|dzien)\s+temu/);
-  if (!m) return undefined;
+  const match = normalized.match(/(\d+)\s+(?:dni?|dzien)\s+temu/);
+  if (!match) return undefined;
 
   // The capture proves the shape; it says nothing about the magnitude, and the reader is
   // what turns a run of digits past 2^53 into `null` rather than into a neighbour of itself.
-  const days = getIntegerFromText(m[1] ?? "");
+  const days = getIntegerFromText(match[1] ?? "");
   if (days === null) return undefined;
   return days >= NEVER_ONLINE_DAYS ? null : days;
 }
@@ -136,9 +136,9 @@ export function parseTotalPages($: cheerio.CheerioAPI): number {
   // The highest page number among the pagination links. Note: the numbers MUST be
   // parsed one at a time — joining them into one string produced figures like 234390.
   const fromLinks = $(".pagination a[href*='page=']")
-    .map((_, el) => getIntegerFromLadderText($(el).attr("href")?.match(/page=(\d+)/)?.[1] ?? ""))
+    .map((_, element) => getIntegerFromLadderText($(element).attr("href")?.match(/page=(\d+)/)?.[1] ?? ""))
     .get()
-    .filter((n): n is number => typeof n === "number" && n > 0);
+    .filter((value): value is number => typeof value === "number" && value > 0);
 
   return fromLinks.length > 0 ? Math.max(...fromLinks) : 1;
 }
@@ -147,9 +147,9 @@ export function parseTotalPages($: cheerio.CheerioAPI): number {
 
 function findLadderTable($: cheerio.CheerioAPI) {
   return $("table")
-    .filter((_, el) => {
-      const txt = $(el).find("thead").text();
-      return txt.includes("Gracz") && txt.includes("Poziom") && txt.includes("Ostatnio online");
+    .filter((_, element) => {
+      const headingText = $(element).find("thead").text();
+      return headingText.includes("Gracz") && headingText.includes("Poziom") && headingText.includes("Ostatnio online");
     })
     .first();
 }
@@ -171,23 +171,23 @@ export function parseTable($: cheerio.CheerioAPI, world: string, page: number): 
   // the rank from the offset against the first row that does have a number.
   const parsed: { index: number; rank: number | null; row: PlayerRow }[] = [];
 
-  table.find("tbody tr").each((index, tr) => {
-    const $tr = $(tr);
-    const tds = $tr.children("td");
-    if (tds.length < 5) {
-      errors.push(`row ${index}: ${tds.length} columns, expected 5`);
+  table.find("tbody tr").each((index, rowNode) => {
+    const rowElement = $(rowNode);
+    const cells = rowElement.children("td");
+    if (cells.length < 5) {
+      errors.push(`row ${index}: ${cells.length} columns, expected 5`);
       return;
     }
 
-    const cell = (className: string, fallbackIndex: number) => {
-      const byClass = $tr.children(`td.${className}`).first();
-      return byClass.length > 0 ? byClass : $(tds[fallbackIndex]);
+    const getCellElement = (className: string, fallbackIndex: number) => {
+      const byClass = rowElement.children(`td.${className}`).first();
+      return byClass.length > 0 ? byClass : $(cells[fallbackIndex]);
     };
 
-    const nameCell = cell("long-clan", 1);
-    const levelCell = cell("long-level", 2);
-    const honorCell = cell("long-ph", 3);
-    const lastOnlineCell = cell("long-last-online", 4);
+    const nameCell = getCellElement("long-clan", 1);
+    const levelCell = getCellElement("long-level", 2);
+    const honorCell = getCellElement("long-ph", 3);
+    const lastOnlineCell = getCellElement("long-last-online", 4);
 
     const name = nameCell.text().trim();
     if (!name) {
@@ -228,7 +228,7 @@ export function parseTable($: cheerio.CheerioAPI, world: string, page: number): 
       return;
     }
 
-    const rank = getIntegerFromLadderText($(tds[0]).text());
+    const rank = getIntegerFromLadderText($(cells[0]).text());
     parsed.push({
       index,
       rank: rank !== null && rank > 0 ? rank : null,
@@ -246,13 +246,13 @@ export function parseTable($: cheerio.CheerioAPI, world: string, page: number): 
 
   // The anchor: the first row with an explicit rank number. When a page has none
   // (theoretically possible), we fall back to deriving it from the page number.
-  const anchor = parsed.find((p) => p.rank !== null);
+  const anchor = parsed.find((parsedRow) => parsedRow.rank !== null);
   const anchorRank = anchor?.rank ?? (page - 1) * 100 + (parsed[0]?.index ?? 0) + 1;
   const anchorIndex = anchor?.index ?? parsed[0]?.index ?? 0;
 
-  for (const p of parsed) {
-    p.row[0] = p.rank ?? anchorRank + (p.index - anchorIndex);
-    rows.push(p.row);
+  for (const parsedRow of parsed) {
+    parsedRow.row[0] = parsedRow.rank ?? anchorRank + (parsedRow.index - anchorIndex);
+    rows.push(parsedRow.row);
   }
 
   return { rows, errors };

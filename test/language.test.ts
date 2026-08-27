@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Glob } from "bun";
-import { commentBlocks, regexLiterals, stringLiterals } from "@/test/source-text.ts";
+import { getCommentBlocks, getRegexLiterals, getStringLiterals } from "@/test/source-text.ts";
 
 // The guard for the language boundary in AGENTS.md: English everywhere except the text a
 // player reads and the keys that match material captured from Margonem.
@@ -68,16 +68,16 @@ describe("the language boundary", () => {
   test("no comment is written in Polish", () => {
     // Quotations are exempt: a comment explaining why a bar said "Ładowanie…" has to be able
     // to say what it said. So is a profession's name, which is the game's and not ours.
-    const prose = (comment: string) => {
+    const getProse = (comment: string) => {
       let text = comment.replace(/"[^"]*"/g, "").replace(/„[^”"]*[”"]/g, "");
       for (const name of GAME_NAMES) text = text.replaceAll(name, "");
       return text;
     };
 
     const offenders: string[] = [];
-    for (const [file, src] of sources) {
-      for (const comment of commentBlocks(src)) {
-        if (POLISH.test(prose(comment))) offenders.push(`${file}: ${comment.trim().slice(0, 80)}`);
+    for (const [file, source] of sources) {
+      for (const comment of getCommentBlocks(source)) {
+        if (POLISH.test(getProse(comment))) offenders.push(`${file}: ${comment.trim().slice(0, 80)}`);
       }
     }
     expect(offenders).toEqual([]);
@@ -87,9 +87,9 @@ describe("the language boundary", () => {
     const allowed = new Set(SPEAKS_POLISH.map((entry) => entry.file));
     const offenders: string[] = [];
 
-    for (const [file, src] of sources) {
+    for (const [file, source] of sources) {
       if (allowed.has(file)) continue;
-      for (const literal of stringLiterals(src)) {
+      for (const literal of getStringLiterals(source)) {
         if (POLISH.test(literal)) offenders.push(`${file}: ${literal.slice(0, 60)}`);
       }
     }
@@ -100,10 +100,10 @@ describe("the language boundary", () => {
     // The other direction. An entry that stops being true is a file whose Polish moved
     // somewhere else — and the list would go on guarding nothing while looking like it did.
     for (const { file, phrase } of SPEAKS_POLISH) {
-      const src = sources.get(file)!;
+      const source = sources.get(file)!;
       // Patterns count as well as strings: `parser.ts` reads the ranking's "N dni temu" with
       // a regex, and it is the only Polish left in that file.
-      const written = [...stringLiterals(src), ...regexLiterals(src)];
+      const written = [...getStringLiterals(source), ...getRegexLiterals(source)];
       const speaks = phrase
         ? written.some((literal) => literal.includes(phrase))
         : written.some((literal) => POLISH.test(literal));

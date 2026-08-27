@@ -27,7 +27,7 @@ describe("the defaults", () => {
       worlds: WORLDS,
       intervalMs: DEFAULT_INTERVAL_MS,
       dropThreshold: DEFAULT_DROP_THRESHOLD,
-      dryRun: false,
+      isDryRun: false,
     });
   });
 
@@ -97,7 +97,7 @@ describe("the drop threshold", () => {
 describe("flags", () => {
   test("--dry-run is a command, not a world", () => {
     const command = readCommand(["--dry-run"]);
-    expect(command.dryRun).toBe(true);
+    expect(command.isDryRun).toBe(true);
     expect(command.worlds).toEqual(WORLDS);
   });
 

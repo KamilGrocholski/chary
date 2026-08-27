@@ -8,7 +8,19 @@ import { stripComments } from "@/test/source-text.ts";
 // Read over exports only. A local helper is read together with its one caller and the name
 // carries less; an exported name is read by somebody who will never open the file.
 
-const SOURCE_GLOBS = ["src/**/*.ts", "tools/**/*.ts", "public/*.js", "public/lib/*.js"];
+const SOURCE_GLOBS = ["src/**/*.ts", "tools/**/*.ts", "public/*.js", "public/lib/*.js", "test/**/*.ts"];
+
+/**
+ * Names that belong to somebody else's interface, where ours is not the vote that counts.
+ *
+ * `fetch` is the key Bun's server reads the handler from; the four DOM methods and Chart.js's
+ * `update` are what `dom-smoke.ts` has to be called to be a stub of; `set` is the setter half
+ * of a property descriptor. Renaming any of them would not improve a name, it would break a
+ * contract — and each one is a method or a property, never a function we chose to name.
+ */
+const FOREIGN_INTERFACES = new Set([
+  "fetch", "addEventListener", "appendChild", "querySelectorAll", "replaceState", "update", "set",
+]);
 
 /** The action table from §9.4, plus the verbs that table leaves open. */
 const ACTIONS = [
@@ -38,6 +50,31 @@ const ACTIONS = [
   "load",
   "rebuild",
   "capitalize",
+  // The rest of the verbs this tree actually performs. Each one is precise where the table's
+  // own would be vaguer: `scrapeWorld` is not `getWorld`, and `drawChart` is not `renderChart`
+  // — the drawing is Chart.js's and we hand it the data. The list is closed, and it grows only
+  // by a round adding a verb it can defend here.
+  "apply",
+  "clear",
+  "draw",
+  "dryRun",
+  "ensure",
+  "fill",
+  "find",
+  "log",
+  "pad",
+  "resolve",
+  "run",
+  "schedule",
+  "scrape",
+  "select",
+  "show",
+  "sleep",
+  "start",
+  "strip",
+  "wait",
+  "walk",
+  "add",
 ];
 
 /**
@@ -49,6 +86,16 @@ const ACTIONS = [
  * declaration anywhere under the globs above.
  */
 const ACTIONS_ALSO_NOUNS = ["count"];
+
+/**
+ * Names this repository does not get to choose: they are fields of the files it publishes.
+ *
+ * `byProf` is a column of `trends.json`, written by `src/trends.ts` and read by the browser,
+ * and the shorthand `{ total, act, byProf }` is what puts it there. Spelling the local out
+ * would either rename the published field — `[ASK]`, and it reaches every file ever written
+ * (§9.2) — or add a mapping whose only purpose is to satisfy this test.
+ */
+const PUBLISHED_FIELDS = ["byProf"];
 
 /** A boolean-shaped name says so before it says anything else. */
 const BOOLEAN_PREFIXES = ["is", "has", "should", "min", "max", "prev", "next"];
@@ -82,15 +129,31 @@ for (const pattern of SOURCE_GLOBS) {
   }
 }
 
+/**
+ * The source with its comments, strings and patterns removed, so the extractors below read
+ * code and nothing else. Without this the guard read its own regex literals: `function\\s+(\\w+)`
+ * inside a pattern looks exactly like a function declaration to another pattern.
+ */
+function getCode(source: string): string {
+  return stripComments(source)
+    .replace(/(?<=[(=,:[!&|?{};]\s*)\/(?![*/])(?:[^/\\\n[]|\\.|\[(?:[^\]\\]|\\.)*\])+\/[dgimsuvy]*/g, " ")
+    .replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g, '""');
+}
+
+/** Whether a name opens with a prefix as a whole word: `getWorld` does, `getting` does not. */
+function hasPrefix(name: string, prefix: string): boolean {
+  return name === prefix || name.startsWith(prefix + name.charAt(prefix.length).toUpperCase());
+}
+
 /** Exported function names, by file. */
-function exportedFunctions(src: string): string[] {
-  return [...stripComments(src).matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)].map(
+function getExportedFunctions(source: string): string[] {
+  return [...getCode(source).matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)].map(
     ([, name]) => name ?? "",
   );
 }
 
-const exported = [...sources].flatMap(([file, src]) =>
-  exportedFunctions(src).map((name) => ({ file, name })),
+const exported = [...sources].flatMap(([file, source]) =>
+  getExportedFunctions(source).map((name) => ({ file, name })),
 );
 
 /**
@@ -98,27 +161,27 @@ const exported = [...sources].flatMap(([file, src]) =>
  * `const`. Wider than `exportedFunctions` on purpose, and only two of §9.4's three rules run
  * over it: see the block at the bottom for the measurement that decided which.
  */
-function functionNames(src: string): string[] {
-  const code = stripComments(src);
+function getFunctionNames(source: string): string[] {
+  const code = getCode(source);
   return [
     ...[...code.matchAll(/\b(?:async\s+)?function\s+(\w+)/g)],
-    ...[...code.matchAll(/\b(?:const|let)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>/g)],
+    ...[...code.matchAll(/\b(?:const|let)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*(?::[^=\n]+?)?\s*=>/g)],
   ].map(([, name]) => name ?? "");
 }
 
 /** Declared variable names, by file. `for (const page of …)` counts — it declares one too. */
-function declaredNames(src: string): string[] {
-  return [...stripComments(src).matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g)].map(
+function getDeclaredNames(source: string): string[] {
+  return [...getCode(source).matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g)].map(
     ([, name]) => name ?? "",
   );
 }
 
-const declared = [...sources].flatMap(([file, src]) =>
-  declaredNames(src).map((name) => ({ file, name })),
+const declared = [...sources].flatMap(([file, source]) =>
+  getDeclaredNames(source).map((name) => ({ file, name })),
 );
 
-const functions = [...sources].flatMap(([file, src]) =>
-  functionNames(src).map((name) => ({ file, name })),
+const functions = [...sources].flatMap(([file, source]) =>
+  getFunctionNames(source).map((name) => ({ file, name })),
 );
 
 describe("§9.4 — an exported function name starts with its action", () => {
@@ -129,11 +192,9 @@ describe("§9.4 — an exported function name starts with its action", () => {
   test("every one begins with an action or a boolean prefix", () => {
     const offenders: string[] = [];
     for (const { file, name } of exported) {
-      const opens = (prefix: string) =>
-        name === prefix || name.startsWith(prefix + name.charAt(prefix.length).toUpperCase());
       const named =
-        ACTIONS.some((action) => name === action || opens(action)) ||
-        BOOLEAN_PREFIXES.some((prefix) => opens(prefix));
+        ACTIONS.some((action) => name === action || hasPrefix(name, action)) ||
+        BOOLEAN_PREFIXES.some((prefix) => hasPrefix(name, prefix));
       if (!named) offenders.push(`${file}: ${name}`);
     }
     expect(offenders.sort()).toEqual([]);
@@ -176,9 +237,12 @@ describe("§9.4 — a variable is not named for an action", () => {
   });
 
   test("no declaration is named exactly an action from the table", () => {
+    // A `const` holding a function is judged by the rule above instead: `const walk = …` is
+    // named for what it does, which is the whole point there and the mistake here.
+    const functionNames = new Set(functions.map(({ file, name }) => `${file}:${name}`));
     const offenders: string[] = [];
     for (const { file, name } of declared) {
-      if (ACTIONS_ALSO_NOUNS.includes(name)) continue;
+      if (ACTIONS_ALSO_NOUNS.includes(name) || functionNames.has(`${file}:${name}`)) continue;
       if (ACTIONS.includes(name)) offenders.push(`${file}: ${name} — an action, not a value`);
     }
     expect(offenders.sort()).toEqual([]);
@@ -207,6 +271,23 @@ describe("§9.4 — every function, not only the exported ones", () => {
     expect(functions.length).toBeGreaterThan(exported.length);
   });
 
+  test("every function name begins with the action it performs", () => {
+    // Widened after a round that renamed the accessors the earlier measurement excused:
+    // `baseTrend` and `currentSnapshot` in app.js read as values because they were named
+    // like values, and they are functions. What that measurement got right is that the
+    // table alone is too narrow — so the verbs this tree performs are listed beside it,
+    // each one defended there, rather than the rule being dropped.
+    const offenders: string[] = [];
+    for (const { file, name } of functions) {
+      if (FOREIGN_INTERFACES.has(name)) continue;
+      const named =
+        ACTIONS.some((action) => name === action || hasPrefix(name, action)) ||
+        BOOLEAN_PREFIXES.some((prefix) => hasPrefix(name, prefix));
+      if (!named) offenders.push(`${file}: ${name}`);
+    }
+    expect(offenders.sort()).toEqual([]);
+  });
+
   test("no function name uses a synonym for a verb the table already has", () => {
     const offenders: string[] = [];
     for (const { file, name } of functions) {
@@ -219,9 +300,13 @@ describe("§9.4 — every function, not only the exported ones", () => {
     expect(offenders.sort()).toEqual([]);
   });
 
-  test("no function name carries a contraction of a word spelled out elsewhere", () => {
+  test("no name carries a contraction of a word spelled out elsewhere", () => {
+    // Functions and declarations alike: `const lbl` is the same fault as `buildProfCheckboxes`
+    // and neither is easier to read for being shorter. Parameters are not read here — a
+    // regex cannot tell a parameter list from a call — so they are held by review.
     const offenders: string[] = [];
-    for (const { file, name } of functions) {
+    for (const { file, name } of [...functions, ...declared]) {
+      if (PUBLISHED_FIELDS.includes(name)) continue;
       const words = name.split(/(?=[A-Z])/).map((word) => word.toLowerCase());
       if (words.some((word) => CONTRACTIONS.includes(word))) offenders.push(`${file}: ${name}`);
     }

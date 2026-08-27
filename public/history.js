@@ -11,7 +11,14 @@
 //
 // The labels below are Polish because a player reads them — see "Language" in AGENTS.md.
 
-import { composeActivitySeries, composeProfessionSeries, getActivityBucketBound, getDaysBetween } from "./shared.js";
+import {
+  ACTIVITY_BUCKET_COUNT,
+  PROFESSION_COUNT,
+  composeActivitySeries,
+  composeProfessionSeries,
+  getActivityBucketBound,
+  getDaysBetween,
+} from "./shared.js";
 import { isDefaultFilters, summarizeFiltered } from "./filters.js";
 import { getJsonFromUrl } from "./fetch-json.js";
 import { assertDefined } from "./lib/assert.js";
@@ -65,7 +72,7 @@ export const DEFAULT_THRESHOLD = "7d";
  * @returns {typeof ACTIVITY_THRESHOLDS}
  */
 export function getUsableThresholds(maxDays = Infinity) {
-  return ACTIVITY_THRESHOLDS.filter((t) => t.bound < maxDays);
+  return ACTIVITY_THRESHOLDS.filter((threshold) => threshold.bound < maxDays);
 }
 
 /**
@@ -77,8 +84,8 @@ export function getThresholdByKey(key, maxDays = Infinity) {
   const usable = getUsableThresholds(maxDays);
   if (usable.length === 0) return null;
   return (
-    usable.find((t) => t.key === key) ??
-    usable.find((t) => t.key === DEFAULT_THRESHOLD) ??
+    usable.find((threshold) => threshold.key === key) ??
+    usable.find((threshold) => threshold.key === DEFAULT_THRESHOLD) ??
     // `usable` is non-empty here — the line above returned for the empty case.
     assertDefined(usable[usable.length - 1], "a non-empty threshold list has a last entry")
   );
@@ -95,9 +102,9 @@ export function getThresholdByKey(key, maxDays = Infinity) {
 export function getActiveCounts(trend, key, maxDays = Infinity) {
   const threshold = getThresholdByKey(key, maxDays);
   if (!threshold) return trend.total.slice();
-  return trend.total.map((_, i) =>
+  return trend.total.map((_, index) =>
     threshold.buckets.reduce(
-      (sum, bucket) => sum + assertDefined(trend.act[bucket]?.[i], "every activity bucket has a count per snapshot"),
+      (sum, bucket) => sum + assertDefined(trend.act[bucket]?.[index], "every activity bucket has a count per snapshot"),
       0,
     ),
   );
@@ -111,8 +118,8 @@ export function getActiveCounts(trend, key, maxDays = Infinity) {
  * @returns {number[]}
  */
 export function getShareSeries(counts, totals) {
-  return counts.map((count, i) => {
-    const total = totals[i] ?? 0;
+  return counts.map((count, index) => {
+    const total = totals[index] ?? 0;
     return total > 0 ? (count / total) * 100 : 0;
   });
 }
@@ -124,7 +131,7 @@ export function getShareSeries(counts, totals) {
  * @returns {SnapshotEntry[]}
  */
 export function getSnapshotEntries(trend) {
-  return trend.id.map((id, i) => ({ id, startedAt: trend.startedAt[i], suspect: trend.suspect[i] === 1 }));
+  return trend.id.map((id, index) => ({ id, startedAt: trend.startedAt[index], suspect: trend.suspect[index] === 1 }));
 }
 
 /**
@@ -142,12 +149,12 @@ export function getChangeRows(trend) {
   const entries = getSnapshotEntries(trend);
   const rows = [];
 
-  for (let i = 1; i < entries.length; i++) {
-    const days = getDaysBetween(entries[i - 1], entries[i]);
-    const total = assertDefined(trend.total[i], "every snapshot has a population");
-    const delta = total - assertDefined(trend.total[i - 1], "every snapshot has a population");
+  for (let index = 1; index < entries.length; index++) {
+    const days = getDaysBetween(entries[index - 1], entries[index]);
+    const total = assertDefined(trend.total[index], "every snapshot has a population");
+    const delta = total - assertDefined(trend.total[index - 1], "every snapshot has a population");
     rows.push({
-      entry: entries[i],
+      entry: entries[index],
       total,
       delta,
       days,
@@ -207,7 +214,7 @@ export function readViewFromParams(params) {
     world: params.get("world") || null,
     date: params.get("date") || null,
     threshold:
-      threshold !== null && ACTIVITY_THRESHOLDS.some((t) => t.key === threshold) ? threshold : DEFAULT_THRESHOLD,
+      threshold !== null && ACTIVITY_THRESHOLDS.some((known) => known.key === threshold) ? threshold : DEFAULT_THRESHOLD,
     share: params.get("udzial") === "1",
   };
 }
@@ -265,8 +272,8 @@ export function getWindowedEntries(entries, size = HISTORY_WINDOW) {
  */
 export function getBudgetedEntries(entries, bytesPerSnapshot, budget = HISTORY_BUDGET_BYTES) {
   if (!bytesPerSnapshot || bytesPerSnapshot <= 0) return getWindowedEntries(entries);
-  const fits = Math.max(2, Math.floor(budget / bytesPerSnapshot));
-  return getWindowedEntries(entries, fits);
+  const affordable = Math.max(2, Math.floor(budget / bytesPerSnapshot));
+  return getWindowedEntries(entries, affordable);
 }
 
 /**
@@ -303,9 +310,9 @@ export function composeTypedSnapshot(json) {
   }
 
   const days = new Int32Array(rows);
-  for (let i = 0; i < rows; i++) {
-    const d = source.days[i];
-    days[i] = d === null || d === undefined ? -1 : d;
+  for (let index = 0; index < rows; index++) {
+    const date = source.days[index];
+    days[index] = date === null || date === undefined ? -1 : date;
   }
 
   return {
@@ -352,7 +359,7 @@ export function getCachedSnapshots(world) {
  * @returns {number}
  */
 export function getLoadedCount(store, entries) {
-  return entries.reduce((n, e) => n + (store.has(e.id) ? 1 : 0), 0);
+  return entries.reduce((loaded, entry) => loaded + (store.has(entry.id) ? 1 : 0), 0);
 }
 
 // Fetches in flight, one per world.
@@ -390,9 +397,9 @@ export function loadHistory(world, entries, options = {}) {
   const running = inFlight.get(world);
   if (running) return running;
 
-  const run = loadMissingSnapshots(world, entries, options).finally(() => inFlight.delete(world));
-  inFlight.set(world, run);
-  return run;
+  const loading = loadMissingSnapshots(world, entries, options).finally(() => inFlight.delete(world));
+  inFlight.set(world, loading);
+  return loading;
 }
 
 /**
@@ -403,15 +410,15 @@ export function loadHistory(world, entries, options = {}) {
 async function loadMissingSnapshots(world, entries, options) {
   const { concurrency = 4, onProgress = () => {}, isStale = () => false } = options;
   const store = getCachedSnapshots(world);
-  const missing = entries.filter((e) => !store.has(e.id));
+  const missing = entries.filter((entry) => !store.has(entry.id));
   /** @type {string[]} */
   const failed = [];
-  let next = 0;
+  let nextIndex = 0;
 
-  const worker = async () => {
-    while (next < missing.length) {
+  const runWorker = async () => {
+    while (nextIndex < missing.length) {
       if (isStale()) return;
-      const entry = missing[next++];
+      const entry = missing[nextIndex++];
       if (entry === undefined) return;
       try {
         const json = await getJsonFromUrl(entry.filters);
@@ -427,7 +434,7 @@ async function loadMissingSnapshots(world, entries, options) {
     }
   };
 
-  await Promise.all(Array.from({ length: Math.min(concurrency, missing.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(concurrency, missing.length) }, runWorker));
   return { store, failed };
 }
 
@@ -477,10 +484,10 @@ export function buildFilteredTrend(base, store, filters, allowed = null) {
   const population = [];
 
   let expected = 0;
-  for (let i = 0; i < base.id.length; i++) {
+  for (let index = 0; index < base.id.length; index++) {
     // Every column of the aggregate is the same length — that is what columnar means
     // (§9.2) — so a short one is a broken file rather than a snapshot to skip.
-    const id = assertDefined(base.id[i], "every column of trends.json is the same length");
+    const id = assertDefined(base.id[index], "every column of trends.json is the same length");
     if (allowed && !allowed.has(id)) continue;
     expected += 1;
 
@@ -489,18 +496,18 @@ export function buildFilteredTrend(base, store, filters, allowed = null) {
     // unfiltered number from the aggregate. The hole stays a hole — §9.6.
     if (!snapshot) continue;
 
-    const s = summarizeFiltered(snapshot, filters);
+    const summary = summarizeFiltered(snapshot, filters);
     trend.id.push(id);
-    trend.startedAt.push(assertDefined(base.startedAt[i], "every column of trends.json is the same length"));
-    trend.suspect.push(assertDefined(base.suspect[i], "every column of trends.json is the same length"));
-    trend.total.push(s.total);
-    for (let b = 0; b < 5; b++) {
-      assertDefined(trend.act[b], "five activity buckets").push(assertDefined(s.act[b], "five activity buckets"));
+    trend.startedAt.push(assertDefined(base.startedAt[index], "every column of trends.json is the same length"));
+    trend.suspect.push(assertDefined(base.suspect[index], "every column of trends.json is the same length"));
+    trend.total.push(summary.total);
+    for (let bucket = 0; bucket < ACTIVITY_BUCKET_COUNT; bucket++) {
+      assertDefined(trend.act[bucket], "five activity buckets").push(assertDefined(summary.act[bucket], "five activity buckets"));
     }
-    for (let p = 0; p < 6; p++) {
-      assertDefined(trend.byProf[p], "six professions").push(assertDefined(s.byProf[p], "six professions"));
+    for (let profession = 0; profession < PROFESSION_COUNT; profession++) {
+      assertDefined(trend.byProf[profession], "six professions").push(assertDefined(summary.byProf[profession], "six professions"));
     }
-    population.push(assertDefined(base.total[i], "every column of trends.json is the same length"));
+    population.push(assertDefined(base.total[index], "every column of trends.json is the same length"));
   }
 
   return { trend, population, loaded: trend.id.length, expected };

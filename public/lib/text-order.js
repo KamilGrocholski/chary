@@ -15,11 +15,11 @@
 /**
  * Negative, zero or positive, for `Array.prototype.sort`.
  *
- * @param {string} a
- * @param {string} b
+ * @param {string} left
+ * @param {string} right
  * @returns {number}
  */
-export function getTextOrder(a, b) {
-  if (a === b) return 0;
-  return a < b ? -1 : 1;
+export function getTextOrder(left, right) {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
 }

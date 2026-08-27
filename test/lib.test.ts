@@ -29,8 +29,8 @@ describe("assert", () => {
     try {
       assert(false, "x");
       expect.unreachable();
-    } catch (e) {
-      expect((e as Error).name).toBe("MargoStat/Assertion");
+    } catch (error) {
+      expect((error as Error).name).toBe("MargoStat/Assertion");
     }
   });
 
