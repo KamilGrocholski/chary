@@ -219,7 +219,7 @@ test/
   language.test.ts   # the language boundary: English everywhere except what a player reads
   lib.test.ts        # the value readers: everything JavaScript would otherwise invent
   scraper-cli.test.ts  # every argument the scraper refuses
-  dom-smoke.ts       # a DOM stub, two scenarios (run from the tests in a subprocess)
+  dom-smoke.ts       # the view against a real DOM (happy-dom), two scenarios, in a subprocess
   source-text.ts     # splitting a source into comments, code and string literals
   tools/             # guards: the rules in AGENTS.md held over the tree itself
 public/              # what lands on GitHub Pages

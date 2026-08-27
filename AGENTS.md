@@ -543,8 +543,9 @@ every snapshot on disk. §9.1's last rule, and a test holds it.
   `loadHistory` holds a `world → Promise` map; calling it from the `input` handler pulled the
   same set of files once per keystroke. A test counts fetches per URL.
 - `[ALWAYS]` **Read a `<select>`'s value before replacing its `innerHTML`.** The browser picks
-  the first option even when the previous value is still on the list. The DOM stub used to be
-  gentler than a browser and that is what hid it.
+  the first option even when the previous value is still on the list. It stayed hidden while the
+  view was tested against a hand-written DOM stub gentler than a browser — which is why
+  `test/dom-smoke.ts` now runs against `happy-dom` and stubs only what is not a document.
 
 ### 9.7 Design system
 

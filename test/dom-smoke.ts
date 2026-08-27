@@ -1,78 +1,38 @@
-// A DOM stub for the view layer. Run in a separate process by dashboard.test.ts —
-// a `globalThis.document` set here would make importing app.ts in another test file start
-// the view on somebody else's markup.
+// The view layer put through a real DOM. Run in a separate process by dashboard.test.ts —
+// registering happy-dom's globals here would make importing app.ts in another test file
+// start the view on somebody else's markup.
 //
-// The static tests only check that every `el("...")` has its node in the HTML. This one
-// puts real data from public/ through the real render, so it catches what those cannot
+// The static tests only check that every `getElement("...")` has its node in the HTML. This
+// one puts real data from public/ through the real render, so it catches what those cannot
 // see: an exception in the render, an empty series, a chart with no points.
 //
 //   bun test/dom-smoke.ts default    — the default filter: history from trends.json
 //   bun test/dom-smoke.ts filtered   — a filter set: history from raw .f.json
 //
-// The stub has to imitate a browser in the two places the code relies on it: a `<select>`
-// picks the first option by itself once innerHTML is set, and `querySelectorAll` descends
-// through the tree (the checkboxes sit inside `<label>`s).
+// ⚠️ This used to be a hand-written stub of the DOM, and §9.6 records what that cost: a
+// `<select>` that kept its value when a browser would have dropped it, and no event
+// delegation, so a chip's close button had to be tested by calling a listener with a
+// hand-made `{ target: { dataset: { clear } } }`. What is stubbed now is only what is not a
+// document: the network, and Chart.js — which wants a canvas and paints pixels nothing here
+// would read.
+
+import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
 const scenario = process.argv[2] === "filtered" ? "filtered" : "default";
 
-function composeNode(id = "", tag = "") {
-  const node: any = {
-    id,
-    tag,
-    value: "",
-    textContent: "",
-    hidden: false,
-    disabled: false,
-    checked: true,
-    style: {},
-    dataset: {} as Record<string, string>,
-    attributes: {} as Record<string, string>,
-    children: [] as any[],
-    handlers: [] as ((...args: unknown[]) => void)[],
-    setAttribute(name: string, value: string) {
-      node.attributes[name] = value;
-    },
-    addEventListener(_event: string, handler: (...args: unknown[]) => void) {
-      node.handlers.push(handler);
-    },
-    appendChild(child: any) {
-      node.children.push(child);
-      return child;
-    },
-    querySelectorAll(selector: string) {
-      const walk = (node: any): any[] => (node.children ?? []).flatMap((child: any) => [child, ...walk(child)]);
-      const inputs = walk(node).filter((child: any) => child.tag === "input");
-      return selector.includes(":checked") ? inputs.filter((child: any) => child.checked) : inputs;
-    },
-    getBoundingClientRect: () => ({ left: 0, top: 0 }),
-  };
+// The "filtered" scenario gets its filters in the URL, so the numbers can be compared
+// against `.f.json` and so the history starts without waiting for a mouse move — exactly
+// like a shared link.
+const search =
+  scenario === "filtered" ? "?world=aether&minLevel=200&maxLevel=250&prof=1,4" : "?world=fobos";
 
-  let html = "";
-  Object.defineProperty(node, "innerHTML", {
-    get: () => html,
-    set(value: string) {
-      html = value;
-      // Replacing the options clears the selection — the browser then picks the first
-      // option, EVEN when the previously selected one is still on the list. The stub has to
-      // be just as ruthless: a gentler version ("clear only when the choice vanished from
-      // the list") hid the bug that made the view lose the chosen activity threshold.
-      const first = value.match(/<option value="([^"]*)"/);
-      if (first) node.value = first[1]!;
-    },
-  });
-  return node;
-}
+await GlobalRegistrator.register({ url: `http://localhost/index.html${search}` });
 
+// The markup a browser would have parsed, minus its two `<script>` tags: Chart.js is
+// replaced below and `app.js` is imported from source, so letting happy-dom try to fetch
+// either would only produce a load error for a file this run does not use.
 const markup = await Bun.file("public/index.html").text();
-const nodes: Record<string, any> = {};
-for (const [, id] of markup.matchAll(/id="([^"]+)"/g)) nodes[id!] = composeNode(id!);
-
-// The stub has to know the `hidden` attribute from the markup. Without it an element
-// hidden in the HTML starts out visible, and `hidden === true` assertions pass only because
-// that is the node's default — i.e. they hold nothing.
-for (const tag of markup.matchAll(/<[a-z][^>]*\bid="([^"]+)"[^>]*>/g)) {
-  if (/\shidden[\s>/]/.test(tag[0])) nodes[tag[1]!]!.hidden = true;
-}
+document.write(markup.replace(/<script\b[\s\S]*?<\/script>/g, ""));
 
 /**
  * A response the way a browser hands one over: a body, read as text, parsed by the caller.
@@ -97,13 +57,9 @@ function composeResponse(status: number, body: string) {
 const fetchCounts = new Map<string, number>();
 
 // URLs that are to answer with an error — the "part of the history did not arrive" path
-// was never exercised, because the stub always returned `ok: true`.
+// was never exercised while the stub always returned `ok: true`.
 const failUrls = new Set<string>();
 
-// A world with exactly one snapshot, appended to the manifest and the trends by the stub
-// rather than taken from real data — in live data such a world exists only until the second
-// scrape (`luvia` had 1 snapshot, today it has 2), so a test tied to a particular world name
-// breaks on every `bun run scrape`.
 // The price the status line has to print while a history is in flight. Overstated on
 // purpose — brutal really costs 20 KB a snapshot, and a figure that small rounds to
 // something the format cannot tell apart from a rounding error. It also keeps the two
@@ -111,6 +67,10 @@ const failUrls = new Set<string>();
 // the file the stub actually answered with.
 const BRUTAL_BYTES = 300_000;
 
+// A world with exactly one snapshot, appended to the manifest and the trends by the stub
+// rather than taken from real data — in live data such a world exists only until the second
+// scrape (`luvia` had 1 snapshot, today it has 2), so a test tied to a particular world name
+// breaks on every `bun run scrape`.
 const SMOKE_WORLD = "smoke-single";
 const SMOKE_ENTRY = {
   id: "smoke-only",
@@ -130,6 +90,9 @@ const SMOKE_FILTERS = {
   days: [0, 5, null],
 };
 
+// Chart.js wants a canvas and paints pixels nothing here would read, so what stands in for
+// it records the config it was handed. That config IS the subject: which series, how many
+// points, what the axis ends are.
 const charts: Record<string, any> = {};
 class FakeChart {
   data: any;
@@ -146,49 +109,8 @@ class FakeChart {
   }
 }
 
-// The "filtered" scenario gets its filters in the URL, so the numbers can be compared
-// against `.f.json` and so the history starts without waiting for a mouse move — exactly
-// like a shared link.
-const search =
-  scenario === "filtered" ? "?world=aether&minLevel=200&maxLevel=250&prof=1,4" : "?world=fobos";
-
-// The theme, straight out of the stylesheet the browser would have applied. Reading it here
-// rather than answering a fixed colour is the point: `getThemeTokens` asserts on a token that
-// does not resolve, so a token renamed in `index.html` and not in `app.ts` fails the smoke
-// run instead of painting a chart with an empty string.
-const rootTokens = new Map(
-  [...(/:root\s*\{([\s\S]*?)\n\s*\}/.exec(markup)?.[1] ?? "").matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(
-    ([, name, value]) => [name!, value!.trim()],
-  ),
-);
-
 Object.assign(globalThis, {
-  getComputedStyle: (_element: unknown) => ({
-    getPropertyValue: (name: string) => rootTokens.get(name) ?? "",
-  }),
-  document: {
-    readyState: "complete",
-    body: composeNode("body"),
-    documentElement: composeNode("html"),
-    getElementById: (id: string) => nodes[id] ?? null,
-    createElement: (tag: string) => composeNode("", tag),
-    createTextNode: (getText: string) => ({ getText }),
-    addEventListener() {},
-  },
-  window: { Chart: FakeChart, innerWidth: 1400, innerHeight: 900 },
   Chart: FakeChart,
-  // `hash` has to be here, because `writeUrlState` appends the anchor to the URL. Without
-  // that field the stub would give "undefined" on both sides of the comparison — a green
-  // test for code that appends the string "undefined" to the URL in a browser.
-  location: { search, pathname: "/index.html", href: "", hash: "" },
-  history: {
-    replaceState(_state: unknown, _title: string, url: string) {
-      (globalThis as { location: { search: string } }).location.search = new URL(
-        url,
-        "http://localhost",
-      ).search;
-    },
-  },
   fetch: async (url: string) => {
     fetchCounts.set(url, (fetchCounts.get(url) ?? 0) + 1);
     // The snapshots get an artificial delay. From disk they come back in microseconds, and
@@ -223,15 +145,18 @@ Object.assign(globalThis, {
   },
 });
 
+const node = (id: string) => document.getElementById(id)!;
+const field = (id: string) => node(id) as HTMLInputElement | HTMLSelectElement;
+const send = (id: string, type: string) => node(id).dispatchEvent(new Event(type, { bubbles: true }));
+const settle = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
 const trends = JSON.parse(await Bun.file("public/trends.json").text());
 const worldName = scenario === "filtered" ? "aether" : "fobos";
 const expectedPoints = trends.worlds[worldName].total.length;
 
 async function waitFor(check: () => boolean, timeoutMs = 20_000) {
   const started = Date.now();
-  while (!check() && Date.now() - started < timeoutMs) {
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
+  while (!check() && Date.now() - started < timeoutMs) await settle(20);
 }
 
 // The import starts the view's setup, because `document` already exists.
@@ -242,9 +167,10 @@ await import(`${process.cwd()}/web/app.ts`);
 // A filtered history pulls ten `.f.json` files, so we wait for the full set of points
 // rather than for a fixed time — otherwise the test would be measuring disk speed.
 await waitFor(() => (charts.popChart?.data.datasets[0]?.data.length ?? 0) >= expectedPoints);
-await new Promise((resolve) => setTimeout(resolve, 300));
+await settle(300);
 
-const getText = (id: string) => nodes[id]!.innerHTML.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+// Tags become spaces rather than nothing: `<td>3</td><td>4</td>` reads as "3 4", not "34".
+const getText = (id: string) => node(id).innerHTML.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 // The ends of the time axis. They must not depend on how much of the history was fetched —
 // otherwise typing a level moves the left edge of the chart under the reader.
 const getAxis = (id: string) => ({
@@ -259,22 +185,23 @@ const getChartShape = (id: string) => ({
   firstX: charts[id]?.data.datasets[0]?.data[0]?.x ?? null,
   lastY: charts[id]?.data.datasets[0]?.data.at(-1)?.y ?? null,
 });
+const getTableRows = () => [...node("changeTable").querySelectorAll("tr")];
 
 const result: Record<string, unknown> = {
-  error: nodes.error!.textContent,
+  error: node("error").textContent,
   matchLine: getText("matchLine"),
   stats: getText("stats"),
   summary: getText("summary"),
-  historyStatus: nodes.historyStatus!.textContent,
-  professionCheckboxes: nodes.profCheckboxes!.querySelectorAll("input").length,
-  source: nodes.sourceInfo!.textContent,
-  snapshotMeta: nodes.snapshotMeta!.textContent,
-  suspectHidden: nodes.suspect!.hidden,
-  suspectNoteHidden: nodes.suspectNote!.hidden,
-  singlePointHidden: nodes.singlePoint!.hidden,
-  partialNoteHidden: nodes.partialNote!.hidden,
-  thresholdNoteHidden: nodes.thresholdNote!.hidden,
-  actChartHidden: nodes.actChartBox!.hidden,
+  historyStatus: node("historyStatus").textContent,
+  professionCheckboxes: node("profCheckboxes").querySelectorAll("input").length,
+  source: node("sourceInfo").textContent,
+  snapshotMeta: node("snapshotMeta").textContent,
+  suspectHidden: node("suspect").hidden,
+  suspectNoteHidden: node("suspectNote").hidden,
+  singlePointHidden: node("singlePoint").hidden,
+  partialNoteHidden: node("partialNote").hidden,
+  thresholdNoteHidden: node("thresholdNote").hidden,
+  actChartHidden: node("actChartBox").hidden,
   levels: charts.professionChart?.data.labels.length ?? 0,
   // The sum across every histogram series = the number of players matching the URL's filters.
   matched:
@@ -287,25 +214,23 @@ const result: Record<string, unknown> = {
     actChart: getChartShape("actChart"),
     profChart: getChartShape("profChart"),
   },
-  tableRows: (nodes.changeTable!.innerHTML.match(/<tr>/g) ?? []).length,
+  tableRows: getTableRows().length,
   // The table runs newest first, so the OLDEST snapshot is its last row — the one that
   // used to be absent altogether. Cells as text, so the test can compare the population
   // against trends.json rather than against the view's own output.
-  oldestTableRow: [...(nodes.changeTable!.innerHTML.match(/<tr>[\s\S]*?<\/tr>/g) ?? [])]
-    .at(-1)!
-    .split(/<\/?td[^>]*>/)
-    .map((cell: string) => cell.replace(/<[^>]*>/g, "").trim())
-    .filter((cell: string) => cell !== ""),
+  oldestTableRow: [...(getTableRows().at(-1)?.querySelectorAll("td") ?? [])]
+    .map((cell) => cell.textContent?.trim() ?? "")
+    .filter((cell) => cell !== ""),
   table: getText("changeTable"),
-  tableHidden: nodes.changeTable!.hidden,
+  tableHidden: node("changeTable").hidden,
 };
 
 if (scenario === "default") {
   // Switching to share and the shortest threshold — a second render pass, after chart.update().
-  nodes.modeSelect!.value = "udzial";
-  nodes.thresholdSelect!.value = "24h";
-  nodes.modeSelect!.handlers[0]!();
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  field("modeSelect").value = "udzial";
+  field("thresholdSelect").value = "24h";
+  send("modeSelect", "change");
+  await settle(400);
 
   result.afterToggle = {
     title: charts.actChart.options.plugins.title.text,
@@ -318,69 +243,73 @@ if (scenario === "default") {
 
   // A world with one snapshot — a valid state, not an error. Appended by the stub
   // (SMOKE_WORLD), not taken from live data — see the comment at its definition.
-  nodes.worldSelect!.value = SMOKE_WORLD;
-  nodes.modeSelect!.value = "liczba";
-  await nodes.worldSelect!.handlers[0]!();
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  field("worldSelect").value = SMOKE_WORLD;
+  field("modeSelect").value = "liczba";
+  send("worldSelect", "change");
+  await waitFor(() => node("changeTable").hidden);
+  await settle(400);
 
   result.singleSnapshotWorld = {
     points: charts.popChart.data.datasets[0].data.length,
-    noticeHidden: nodes.singlePoint!.hidden,
-    table: nodes.changeTable!.innerHTML,
-    tableHidden: nodes.changeTable!.hidden,
+    noticeHidden: node("singlePoint").hidden,
+    table: node("changeTable").innerHTML,
+    tableHidden: node("changeTable").hidden,
   };
 } else {
+  // The chip's own text, not its close button's — `textContent` on the whole chip reads
+  // "Poziom 200-250×", which is not a label anybody sees as one.
   const getChipLabels = () =>
-    [...nodes.filterChips!.innerHTML.matchAll(/<span class="chip"[^>]*>([^<]*)</g)].map((match) => match[1]);
+    [...node("filterChips").querySelectorAll(".chip")].map((chip) => chip.firstChild?.textContent ?? "");
 
   // The drawer starts closed and nobody toggles it once the data arrives — otherwise the
   // page would jump by the panel's height mid-load.
   result.bar = {
     chips: getChipLabels(),
-    toggle: nodes.filtersToggle!.textContent,
-    fieldsHidden: nodes.filterFields!.hidden,
+    toggle: node("filtersToggle").textContent,
+    fieldsHidden: node("filterFields").hidden,
   };
 
-  nodes.filtersToggle!.handlers[0]!({});
+  node("filtersToggle").click();
   result.afterOpen = {
-    fieldsHidden: nodes.filterFields!.hidden,
-    expanded: nodes.filtersToggle!.attributes["aria-expanded"],
+    fieldsHidden: node("filterFields").hidden,
+    expanded: node("filtersToggle").getAttribute("aria-expanded"),
     chips: getChipLabels(),
   };
 
-  nodes.filtersToggle!.handlers[0]!({});
+  node("filtersToggle").click();
   result.afterClose = {
-    fieldsHidden: nodes.filterFields!.hidden,
-    expanded: nodes.filtersToggle!.attributes["aria-expanded"],
+    fieldsHidden: node("filterFields").hidden,
+    expanded: node("filtersToggle").getAttribute("aria-expanded"),
   };
 
-  // The close button on a chip clears the WHOLE group of fields, not one. The stub has no
-  // real event delegation, so we call the handler with the `target` the DOM would give.
-  nodes.filterChips!.handlers[0]!({ target: { dataset: { clear: "level" } } });
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  // The close button on a chip clears the WHOLE group of fields, not one — and the click
+  // lands on the button, which is what makes this a test of the delegation in `app.ts`
+  // rather than of a listener called by hand.
+  (node("filterChips").querySelector('[data-clear="level"]') as HTMLElement).click();
+  await settle(400);
   result.afterChipClear = {
-    minLevel: nodes.minLevel!.value,
-    maxLevel: nodes.maxLevel!.value,
+    minLevel: field("minLevel").value,
+    maxLevel: field("maxLevel").value,
     chips: getChipLabels(),
-    toggle: nodes.filtersToggle!.textContent,
+    toggle: node("filtersToggle").textContent,
   };
 
   const setOnline = async (value: string) => {
-    nodes.onlineValue!.value = value;
-    nodes.onlineValue!.handlers[0]!();
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    field("onlineValue").value = value;
+    send("onlineValue", "input");
+    await settle(500);
   };
   const getThreshold = () => ({
-    value: nodes.thresholdSelect!.value,
-    options: (nodes.thresholdSelect!.innerHTML.match(/<option/g) ?? []).length,
+    value: field("thresholdSelect").value,
+    options: node("thresholdSelect").querySelectorAll("option").length,
   });
 
   // The chosen threshold has to survive a rebuild of the option list. Replacing `innerHTML`
   // clears a select's value, so code reading it AFTER the replacement drops the user back to
   // the first option — to "< 24h", a series swinging by 14.7%.
-  nodes.thresholdSelect!.value = "30d";
-  nodes.thresholdSelect!.handlers[0]!();
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  field("thresholdSelect").value = "30d";
+  send("thresholdSelect", "change");
+  await settle(400);
   const picked = getThreshold();
 
   // Narrowing: "≤ 30 dni" stops being reachable, but we must fall to the widest threshold
@@ -397,10 +326,10 @@ if (scenario === "default") {
 
   result.thresholdSurvival = { picked, narrowed, widened };
   result.afterActivityFilter = {
-    thresholdOptions: (nodes.thresholdSelect!.innerHTML.match(/<option/g) ?? []).length,
-    noteHidden: nodes.thresholdNote!.hidden,
+    thresholdOptions: node("thresholdSelect").querySelectorAll("option").length,
+    noteHidden: node("thresholdNote").hidden,
     note: getText("thresholdNote"),
-    actHidden: nodes.actChartBox!.hidden,
+    actHidden: node("actChartBox").hidden,
   };
 
   // Switching worlds and an immediate burst of filter events — the worst realistic case:
@@ -414,49 +343,51 @@ if (scenario === "default") {
   ).files as { filters: string }[];
   failUrls.add(brutalFiles.at(-2)!.filters);
 
-  nodes.worldSelect!.value = "brutal";
-  const switching = nodes.worldSelect!.handlers[0]!();
+  field("worldSelect").value = "brutal";
+  send("worldSelect", "change");
 
-  // A sample taken immediately after calling the handler, i.e. before a single byte of the
-  // new world arrives: the previous one's charts are to be cleared already.
+  // A sample taken immediately after the event, i.e. before a single byte of the new world
+  // arrives — a listener runs synchronously up to its first `await`, so this is the same
+  // moment the browser is in. The previous world's charts are to be cleared already.
   result.afterWorldSwitch = {
     popSeries: charts.popChart?.data.datasets.length ?? -1,
     profSeries: charts.profChart?.data.datasets.length ?? -1,
-    tableRows: (nodes.changeTable!.innerHTML.match(/<tr>/g) ?? []).length,
+    tableRows: getTableRows().length,
   };
 
   // The events are spaced OUTSIDE the debounce (150 ms), so each reaches `ensureHistory`
   // separately — and each lands on a fetch that is still running.
   for (const value of ["2", "25", "250"]) {
-    nodes.minLevel!.value = value;
-    nodes.minLevel!.handlers[0]!();
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    field("minLevel").value = value;
+    send("minLevel", "input");
+    await settle(200);
     // Sampled mid-flight, which is the only moment the price exists: the snapshots carry a
     // 100 ms delay each and run four at a time, so after 200 ms the pass has started and is
     // nowhere near done. This is what replaced the transfer budget — nobody is stopped, so
     // the megabytes have to be named while they are being spent.
-    result.loadingStatus ??= nodes.historyStatus!.textContent;
+    result.loadingStatus ??= node("historyStatus").textContent;
   }
-  await switching;
-  await waitFor(() => (charts.popChart?.data.datasets[0]?.data.length ?? 0) > 1);
-  await new Promise((resolve) => setTimeout(resolve, 600));
+  // Until the pass is over, not until a fixed time: a real event hands back no promise to
+  // await, so what says "done" is the status line dropping its progress text.
+  await waitFor(() => !(node("historyStatus").textContent ?? "").includes("wczytywanie"));
+  await settle(600);
 
   result.partialHistory = {
-    status: nodes.historyStatus!.textContent,
-    noteHidden: nodes.partialNote!.hidden,
+    status: node("historyStatus").textContent,
+    noteHidden: node("partialNote").hidden,
     note: getText("partialNote"),
     points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
     axis: getAxis("popChart"),
-    error: nodes.error!.textContent,
+    error: node("error").textContent,
   };
 
   // Back to the default filter: the history comes from the complete aggregate again, so the
   // failure counter has no business still describing it.
-  nodes.resetBtn!.handlers[0]!();
-  await new Promise((resolve) => setTimeout(resolve, 600));
+  node("resetBtn").click();
+  await settle(600);
   result.afterReset = {
-    status: nodes.historyStatus!.textContent,
-    noteHidden: nodes.partialNote!.hidden,
+    status: node("historyStatus").textContent,
+    noteHidden: node("partialNote").hidden,
     points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
     axis: getAxis("popChart"),
   };
@@ -466,8 +397,8 @@ if (scenario === "default") {
   const snapshotFetches = [...fetchCounts].filter(([url]) => url.endsWith(".f.json") && !failUrls.has(url));
   result.fetches = {
     files: snapshotFetches.length,
-    maxPerFile: Math.max(...snapshotFetches.map(([, node]) => node)),
-    duplicated: snapshotFetches.filter(([, node]) => node > 1).map(([url]) => url),
+    maxPerFile: Math.max(...snapshotFetches.map(([, count]) => count)),
+    duplicated: snapshotFetches.filter(([, count]) => count > 1).map(([url]) => url),
   };
 }
 

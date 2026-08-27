@@ -1288,9 +1288,6 @@ function startView() {
   getElement("resetBtn").addEventListener("click", resetAndRender);
   getElement("emptyResetBtn").addEventListener("click", resetAndRender);
 
-  // The bar's listeners are registered LAST. `test/dom-smoke.ts` calls a node's
-  // first-registered listener (`handlers[0]`), so pushing anything ahead of the existing
-  // bindings would change what the test actually runs.
   getElement("filtersToggle").addEventListener("click", (event) => {
     event.stopPropagation?.();
     setFieldsOpen(getElement("filterFields").hidden);
