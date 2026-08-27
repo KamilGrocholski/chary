@@ -15,6 +15,7 @@ import { composeActivitySeries, composeProfessionSeries, getActivityBucketBound,
 import { isDefaultFilters, summarizeFiltered } from "./filters.js";
 import { getJsonFromUrl } from "./fetch-json.js";
 import { assertDefined } from "./lib/assert.js";
+import { BYTES_IN_MEGABYTE } from "./lib/byte-size.js";
 
 /**
  * @typedef {import("./shared.js").Filters} Filters
@@ -225,7 +226,7 @@ export function readViewFromParams(params) {
  *
  * Binary megabytes, because that is the unit the sizes next to it are quoted in.
  */
-export const HISTORY_BUDGET_BYTES = 2 * 1024 * 1024;
+export const HISTORY_BUDGET_BYTES = 2 * BYTES_IN_MEGABYTE;
 
 /**
  * The fallback ceiling, used only when a world's snapshot size is unknown.

@@ -17,10 +17,11 @@ import { TRENDS_FILE, type Trends } from "@/src/trends.ts";
 import { HISTORY_BUDGET_BYTES } from "@/public/history.js";
 import { getValueFromJsonText } from "@/public/lib/json.js";
 import { assert } from "@/public/lib/assert.js";
+import { BYTES_IN_GIGABYTE, BYTES_IN_KILOBYTE, BYTES_IN_MEGABYTE } from "@/public/lib/byte-size.js";
 import { getTextOrder } from "@/public/lib/text-order.js";
 
 /** GitHub Pages refuses to publish an artefact past this. Not ours to raise. */
-const PAGES_LIMIT_BYTES = 1024 * 1024 * 1024;
+const PAGES_LIMIT_BYTES = BYTES_IN_GIGABYTE;
 
 async function getDirectorySizeBytes(dir: string): Promise<number> {
   let total = 0;
@@ -32,9 +33,9 @@ async function getDirectorySizeBytes(dir: string): Promise<number> {
 }
 
 function formatBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`;
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes >= BYTES_IN_GIGABYTE) return `${(bytes / BYTES_IN_GIGABYTE).toFixed(2)} GB`;
+  if (bytes >= BYTES_IN_MEGABYTE) return `${(bytes / BYTES_IN_MEGABYTE).toFixed(1)} MB`;
+  if (bytes >= BYTES_IN_KILOBYTE) return `${(bytes / BYTES_IN_KILOBYTE).toFixed(1)} KB`;
   return `${bytes} B`;
 }
 

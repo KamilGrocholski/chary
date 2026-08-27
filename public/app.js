@@ -42,6 +42,7 @@ import {
 } from "./history.js";
 import { MargoStatError } from "./lib/margostat-error.js";
 import { assert, assertDefined } from "./lib/assert.js";
+import { BYTES_IN_KILOBYTE, BYTES_IN_MEGABYTE } from "./lib/byte-size.js";
 import { getFiniteNumberFromText, getIntegerFromText } from "./lib/number.js";
 import { getMillisecondsFromIsoText } from "./lib/timestamp.js";
 import { ResourceFetchError, ResourceParseError, getJsonFromUrl } from "./fetch-json.js";
@@ -367,8 +368,10 @@ function setupView() {
   const signed = (/** @type {number} */ n, format = formatNumber) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${format(Math.abs(n))}`;
   // A transfer, as the person paying for it reads it. Under a megabyte in whole kilobytes:
   // "0,4 MB" says less than "360 KB" to somebody deciding whether to press the button.
-  const MB = 1024 * 1024;
-  const formatBytes = (/** @type {number} */ n) => (n >= MB ? `${formatDecimal(n / MB)} MB` : `${formatNumber(Math.round(n / 1024))} KB`);
+  const formatBytes = (/** @type {number} */ n) =>
+    n >= BYTES_IN_MEGABYTE
+      ? `${formatDecimal(n / BYTES_IN_MEGABYTE)} MB`
+      : `${formatNumber(Math.round(n / BYTES_IN_KILOBYTE))} KB`;
 
   /**
    * An exception turned into a message for a person. The error bar used to carry the raw

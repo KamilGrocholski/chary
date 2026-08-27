@@ -360,6 +360,7 @@ public/            Exactly what lands on GitHub Pages. No build step — §1.
     margostat-error.js
                    Base for everything the dashboard throws — §9.5.
     number.js      Every number read or written. Reading returns null, writing asserts.
+    byte-size.js   The binary size ladder. Three places format bytes; one names them.
     json.js        JSON both ways: the value or the SyntaxError, never a bare null.
     timestamp.js   Date.parse without the NaN.
     text-order.js  Two pieces of text in order, by code unit, deterministic.
@@ -703,6 +704,10 @@ one spelling in JavaScript, or can answer with a value nobody wrote.**
 | `public/lib/json.js` | `JSON.parse` and its `try`/`catch`, `JSON.stringify` | `getValueFromJsonText` → the value **or** the `SyntaxError`; `composeJsonText` refuses a value with no JSON |
 | `public/lib/timestamp.js` | `Date.parse`, `new Date(text)` | `getMillisecondsFromIsoText` → a number or `null`, never `NaN` |
 | `public/lib/text-order.js` | `localeCompare` | `getTextOrder`, by code unit, deterministic — a sort that decides which snapshot is newest must not depend on a locale |
+
+`byte-size.js` is in the same directory on a different ticket: not a value reader but the
+one place `1024` and its powers are written, because three formatters — Polish and capped at
+MB, MB alone, and up to GB — share a ladder and nothing else.
 
 Look in `public/lib/` first; if it is not there and meets the criterion, add it there rather
 than at the call site, even for one caller. **Reading returns `null` and throws nothing** —

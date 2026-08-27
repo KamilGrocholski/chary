@@ -12,6 +12,7 @@ import {
 } from "@/src/snapshot.ts";
 import { rebuildTrends } from "@/src/trends.ts";
 import { getValueFromJsonText } from "@/public/lib/json.js";
+import { BYTES_IN_MEGABYTE } from "@/public/lib/byte-size.js";
 import { getIntegerFromValue } from "@/public/lib/number.js";
 import { writeAtomic } from "@/src/atomic.ts";
 
@@ -61,7 +62,7 @@ const args = process.argv.slice(2);
 const keepLegacy = args.includes("--keep-legacy");
 
 function formatMegabytes(bytes: number) {
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / BYTES_IN_MEGABYTE).toFixed(1)} MB`;
 }
 
 let before = 0;
