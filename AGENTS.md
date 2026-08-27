@@ -384,7 +384,8 @@ test/              A test sits beside the thing it tests.
   parser.test.ts     The parser against a capture of a real ranking page.
   snapshot.test.ts   The snapshot format, the migration, the population guard.
   dashboard.test.ts  The snapshot view: filters, the −1 sentinel, snapshot time, agreement
-                     with index.html, smoke.
+                     with index.html — its ids, its design tokens and the classes the view
+                     writes — and smoke.
   trends.test.ts     History: the server aggregate, trends.json, history.js, and that the
                      client and the server agree number for number.
   lib.test.ts        The floor: every value JavaScript would otherwise have invented.
@@ -756,7 +757,22 @@ snapshot on disk — §9.1's last rule, and a test holds it.
 
 ### 9.7 Design system
 
-- **Tokens, not literals.** A raw hex in a rule is a bug.
+- `[ALWAYS] [dash]` **Tokens, not literals — and the rule does not stop at the stylesheet.**
+  A raw hex in a CSS rule is a bug, and a raw hex in `app.js` is the same bug one file to the
+  left. It was measured: 13 tokens in `:root` against 24 colour literals in `app.js`, every
+  one of them an exact copy of a token's value, so changing `--muted` repainted the page and
+  left every chart, tooltip and legend on the old grey with nothing to say so.
+
+  Two ways down from `:root`, and neither is a second copy: markup this repo writes keeps
+  `var(--token)` in its `style="…"`, and Chart.js — which takes a concrete colour and nothing
+  else — is handed `getThemeTokens()`, read once from the document. A token that does not
+  resolve is an **assertion**, not a fallback: the stylesheet ships in the same commit, so an
+  empty string there is our bug, and §9.5 forbids painting with a value nobody wrote.
+
+  One value is deliberately written twice — `<meta name="theme-color">` cannot hold a `var()`
+  — and a test holds it equal to `--bg`. The series palette in `shared.js` is exempt on
+  purpose: those six are a vocabulary of their own, and a module that may not touch the
+  document (§9.1) could not read them from it anyway.
 - **Two border tokens, and the split is load-bearing.** The borders of controls and cards
   need 3:1 (WCAG 2.2 SC 1.4.11); dividers inside a table do not. One shared value measured
   1.48:1 and a form field was indistinguishable from the card behind it.

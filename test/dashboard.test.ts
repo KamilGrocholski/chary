@@ -321,6 +321,53 @@ describe("app.js asks index.html for the right kind of node", () => {
     expect(offenders.sort()).toEqual([]);
   });
 
+  // §9.7 says tokens, not literals, and used to be read as a rule about CSS. `app.js` sat
+  // outside it with 24 colour literals — every one an exact copy of a `:root` token — so
+  // changing the theme repainted the page and left the charts behind. These four hold the
+  // one-address rule across the file boundary; the palette in `shared.js` is exempt and the
+  // exemption is narrow: those six are series colours, a vocabulary of their own, and that
+  // module may not touch the document to read anything.
+  const rootBlock = /:root\s*\{([\s\S]*?)\n\s*\}/.exec(html)?.[1] ?? "";
+  const tokens = new Map(
+    [...rootBlock.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(([, name, value]) => [name!, value!.trim()]),
+  );
+
+  test("the stylesheet still defines tokens to agree with", () => {
+    expect(tokens.size).toBeGreaterThan(8);
+  });
+
+  test("no module spells a colour that the stylesheet already names", () => {
+    const offenders: string[] = [];
+    for (const [name, source] of [["app.js", js], ["filters.js", filtersJs], ["history.js", historyJs]] as const) {
+      for (const [literal] of stripComments(source).matchAll(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\([^)]*\)/g)) {
+        offenders.push(`${name}: ${literal}`);
+      }
+    }
+    expect(offenders.sort()).toEqual([]);
+  });
+
+  test("every token a module reads is a token the stylesheet defines", () => {
+    const asked = [...js.matchAll(/var\((--[\w-]+)\)|requireToken\("(--[\w-]+)"\)/g)].map((m) => m[1] ?? m[2]!);
+    expect(asked.length).toBeGreaterThan(10);
+    for (const name of new Set(asked)) expect([...tokens.keys()]).toContain(name);
+  });
+
+  test("the browser chrome is painted the same colour as the page", () => {
+    // A `<meta>` cannot hold `var(--bg)`, so this one value is written twice on purpose and
+    // the duplicate is held here rather than left to drift.
+    const themeColor = /<meta name="theme-color" content="([^"]+)"/.exec(html)?.[1];
+    expect(themeColor).toBe(tokens.get("--bg"));
+  });
+
+  test("every class the view writes is a class the stylesheet styles", () => {
+    // `class="num"` became `class="formatNumber"` in a rename, and the change table lost its
+    // right alignment and tabular numerals in silence: the markup is written in JS and the
+    // rule that styles it lives in the HTML, so nothing connected the two.
+    const written = [...js.matchAll(/class="([^"${}]+)"/g)].flatMap((m) => m[1]!.split(/\s+/));
+    expect(written.length).toBeGreaterThan(3);
+    for (const name of new Set(written)) expect(html).toMatch(new RegExp(`\\.${name}\\b`));
+  });
+
   test("getElement() is not used for a value — that is what the split is for", () => {
     expect(stripComments(js)).not.toMatch(/\bgetElement\([^)]*\)\.(value|checked|disabled)\b/);
   });

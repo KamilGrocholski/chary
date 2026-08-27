@@ -12,7 +12,7 @@
   <script defer src="vendor/chart.umd.min.js"></script>
   <style>
     :root {
-      /* margometer's theme: warm, dark */
+      /* MargoMeter's theme: warm, dark */
       --bg: #101013;
       --panel: #16161a;
       --surface-2: #1e1e22;
@@ -28,6 +28,10 @@
       --warn: #c98500;
       --danger: #e66767;
       --ok: #199e70;
+      /* Chart gridlines. No CSS rule reads these two — Chart.js does, through app.js — but
+         they are the theme, and the theme has one address. */
+      --grid: rgba(255, 255, 255, 0.06);
+      --grid-soft: rgba(255, 255, 255, 0.04);
       /* Without this, native dropdowns, number-field arrows and scrollbars are drawn in
          the system's light skin on top of a dark interface. */
       color-scheme: dark;

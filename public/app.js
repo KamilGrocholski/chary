@@ -79,6 +79,41 @@ class MissingElementError extends MargoStatError {
   }
 }
 
+/**
+ * The theme, read from `:root` in `index.html`.
+ *
+ * It used to be spelled twice: 13 tokens in the stylesheet and 24 copies of eight of their
+ * values in here, as `"#a0a09a"` and `"rgba(255, 255, 255, 0.06)"`. Changing `--muted`
+ * repainted the page and left every chart, tooltip and legend on the old grey, and nothing
+ * said so — the same fault §9.7 already forbids inside CSS, one file to the left.
+ *
+ * A missing token is an assertion, not a fallback: the stylesheet and this module ship in
+ * the same commit, so a name that no longer resolves is our bug and not something a visitor
+ * can be shown a substitute for. A colour nobody wrote is exactly §9.5's "value nobody
+ * wrote" — an empty string here paints a chart in the browser's default black on black.
+ *
+ * Inline styles in the markup this module writes do NOT come through here: `var(--muted)`
+ * in a `style="..."` resolves in the browser, so the token stays a token all the way down.
+ * This object exists for Chart.js, which takes concrete colours and nothing else.
+ */
+function getThemeTokens() {
+  const style = getComputedStyle(document.documentElement);
+  const requireToken = (/** @type {string} */ name) => {
+    const value = style.getPropertyValue(name).trim();
+    assert(value !== "", `index.html defines the token ${name}`);
+    return value;
+  };
+  return {
+    text: requireToken("--text"),
+    muted: requireToken("--muted"),
+    accent: requireToken("--accent"),
+    warn: requireToken("--warn"),
+    ok: requireToken("--ok"),
+    grid: requireToken("--grid"),
+    gridSoft: requireToken("--grid-soft"),
+  };
+}
+
 function setupView() {
   /**
    * A node `index.html` is expected to hold.
@@ -91,6 +126,8 @@ function setupView() {
     if (!node) throw new MissingElementError(id);
     return node;
   };
+
+  const theme = getThemeTokens();
 
   /**
    * A form control this view reads or writes.
@@ -156,8 +193,8 @@ function setupView() {
   // implicit `any` on every chart the view touches (§9.3).
   const Chart = /** @type {any} */ (/** @type {any} */ (window).Chart);
   if (Chart) {
-    Chart.defaults.color = "#a0a09a";
-    Chart.defaults.borderColor = "rgba(255, 255, 255, 0.06)";
+    Chart.defaults.color = theme.muted;
+    Chart.defaults.borderColor = theme.grid;
     Chart.defaults.font.family = 'ui-sans-serif, system-ui, "Segoe UI", sans-serif';
   }
 
@@ -365,13 +402,13 @@ function setupView() {
       maintainAspectRatio: false,
       animation: false,
       plugins: {
-        title: { display: true, text: "Level według profesji", color: "#f2f2ef", font: { size: 14, weight: "600" } },
+        title: { display: true, text: "Level według profesji", color: theme.text, font: { size: 14, weight: "600" } },
         legend: { display: false },
         tooltip: { enabled: false, external: renderLevelTooltip },
       },
       scales: {
-        y: { beginAtZero: true, stacked: true, ticks: { precision: 0 }, grid: { color: "rgba(255, 255, 255, 0.06)" } },
-        x: { stacked: true, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 50 }, grid: { color: "rgba(255, 255, 255, 0.04)" } },
+        y: { beginAtZero: true, stacked: true, ticks: { precision: 0 }, grid: { color: theme.grid } },
+        x: { stacked: true, ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 50 }, grid: { color: theme.gridSoft } },
       },
     };
   }
@@ -385,7 +422,7 @@ function setupView() {
       node = document.createElement("div");
       node.id = "profTooltip";
       node.style.cssText =
-        "position:fixed;pointer-events:none;background:#1e1e22;border:1px solid #35353b;border-radius:10px;padding:10px 14px;font-size:13px;color:#f2f2ef;min-width:180px;z-index:999;transition:opacity .1s";
+        "position:fixed;pointer-events:none;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--text);min-width:180px;z-index:999;transition:opacity .1s";
       document.body.appendChild(node);
     }
     if (tooltip.opacity === 0) {
@@ -411,16 +448,16 @@ function setupView() {
         return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
           <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${e.color};flex-shrink:0"></span>
           <span style="flex:1">${e.label}</span>
-          <span style="color:#a0a09a;margin-left:8px">${formatNumber(e.value)}</span>
-          <span style="color:#3987e5;min-width:48px;text-align:right">${percentText}%</span>
+          <span style="color:var(--muted);margin-left:8px">${formatNumber(e.value)}</span>
+          <span style="color:var(--accent);min-width:48px;text-align:right">${percentText}%</span>
         </div>`;
       })
       .join("");
 
     node.innerHTML = `
-      <div style="font-weight:700;margin-bottom:6px;color:#3987e5">Level ${level}</div>
+      <div style="font-weight:700;margin-bottom:6px;color:var(--accent)">Level ${level}</div>
       ${rows}
-      <div style="border-top:1px solid #35353b;margin-top:6px;padding-top:6px;color:#a0a09a">Razem: <b style="color:#f2f2ef">${formatNumber(total)}</b></div>
+      <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:var(--muted)">Razem: <b style="color:var(--text)">${formatNumber(total)}</b></div>
     `;
 
     const pos = chart.canvas.getBoundingClientRect();
@@ -485,7 +522,7 @@ function setupView() {
       animation: false,
       interaction: { mode: "nearest", axis: "x", intersect: false },
       plugins: {
-        title: { display: true, text: title, color: "#f2f2ef", font: { size: 14, weight: "600" } },
+        title: { display: true, text: title, color: theme.text, font: { size: 14, weight: "600" } },
         legend: { display: false },
         tooltip: {
           callbacks: {
@@ -504,7 +541,7 @@ function setupView() {
         y: {
           beginAtZero: percent,
           ticks: { precision: percent ? 1 : 0, callback: (/** @type {number} */ v) => (percent ? `${formatDecimal(v)}%` : formatNumber(v)) },
-          grid: { color: "rgba(255, 255, 255, 0.06)" },
+          grid: { color: theme.grid },
         },
         x: {
           type: "linear",
@@ -513,7 +550,7 @@ function setupView() {
             axis.ticks = tickValues.map((value) => ({ value }));
           },
           ticks: { callback: (/** @type {number} */ v) => formatShortDate(v), maxRotation: 45, autoSkip: false },
-          grid: { color: "rgba(255, 255, 255, 0.04)" },
+          grid: { color: theme.gridSoft },
         },
       },
     };
@@ -527,7 +564,7 @@ function setupView() {
   function pointStyle(trend, color) {
     return {
       pointBackgroundColor: trend.suspect.map((/** @type {number} */ s) => (s ? "transparent" : color)),
-      pointBorderColor: trend.suspect.map((/** @type {number} */ s) => (s ? "#c98500" : color)),
+      pointBorderColor: trend.suspect.map((/** @type {number} */ s) => (s ? theme.warn : color)),
       pointBorderWidth: trend.suspect.map((/** @type {number} */ s) => (s ? 2 : 1)),
       pointRadius: trend.suspect.map((/** @type {number} */ s) => (s ? 6 : 3)),
       pointHoverRadius: 6,
@@ -579,10 +616,10 @@ function setupView() {
         {
           label: filtered ? "Pasujących" : "Populacja",
           data: series(trend, popShare ? getShareSeries(trend.total, population) : trend.total),
-          borderColor: "#3987e5",
-          backgroundColor: "#3987e5",
+          borderColor: theme.accent,
+          backgroundColor: theme.accent,
           tension: 0.15,
-          ...pointStyle(trend, "#3987e5"),
+          ...pointStyle(trend, theme.accent),
         },
       ],
       timeChartOptions(
@@ -604,10 +641,10 @@ function setupView() {
           {
             label: `Aktywni ${threshold.label}`,
             data: series(trend, share ? getShareSeries(counts, population) : counts),
-            borderColor: "#199e70",
-            backgroundColor: "#199e70",
+            borderColor: theme.ok,
+            backgroundColor: theme.ok,
             tension: 0.15,
-            ...pointStyle(trend, "#199e70"),
+            ...pointStyle(trend, theme.ok),
           },
         ],
         timeChartOptions(
@@ -815,7 +852,7 @@ function setupView() {
       getElement("summary").textContent = "—";
       return;
     }
-    const color = s.delta < 0 ? "#e66767" : s.delta > 0 ? "#199e70" : "var(--muted)";
+    const color = s.delta < 0 ? "var(--danger)" : s.delta > 0 ? "var(--ok)" : "var(--muted)";
     const span = s.days === null ? "—" : `${Math.round(s.days)} dni`;
     // "Od pierwszej migawki" is a lie the moment the budget leaves the oldest ones unfetched:
     // the axis still reaches April while the number counts from June. Then it says from when.
@@ -853,9 +890,9 @@ function setupView() {
 
     const body = rows
       .map(({ entry, total, delta, days, perDay }) => {
-        const color = delta < 0 ? "#e66767" : delta > 0 ? "#199e70" : "var(--muted)";
+        const color = delta < 0 ? "var(--danger)" : delta > 0 ? "var(--ok)" : "var(--muted)";
         return `<tr>
-          <td>${formatSnapshotDate(entry ?? null)}${entry?.suspect ? ' <span title="migawka może być obcięta" style="color:#c98500">⚠</span>' : ""}</td>
+          <td>${formatSnapshotDate(entry ?? null)}${entry?.suspect ? ' <span title="migawka może być obcięta" style="color:var(--warn)">⚠</span>' : ""}</td>
           <td class="number">${days === null ? "—" : formatDecimal(days)}</td>
           <td class="number">${formatNumber(total)}</td>
           <td class="number" style="color:${color}">${signed(delta)}</td>

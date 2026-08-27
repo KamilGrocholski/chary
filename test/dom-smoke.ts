@@ -151,10 +151,24 @@ class FakeChart {
 const search =
   scenario === "filtered" ? "?world=aether&minLevel=200&maxLevel=250&prof=1,4" : "?world=fobos";
 
+// The theme, straight out of the stylesheet the browser would have applied. Reading it here
+// rather than answering a fixed colour is the point: `getThemeTokens` asserts on a token that
+// does not resolve, so a token renamed in `index.html` and not in `app.js` fails the smoke
+// run instead of painting a chart with an empty string.
+const rootTokens = new Map(
+  [...(/:root\s*\{([\s\S]*?)\n\s*\}/.exec(markup)?.[1] ?? "").matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(
+    ([, name, value]) => [name!, value!.trim()],
+  ),
+);
+
 Object.assign(globalThis, {
+  getComputedStyle: (_element: unknown) => ({
+    getPropertyValue: (name: string) => rootTokens.get(name) ?? "",
+  }),
   document: {
     readyState: "complete",
     body: makeNode("body"),
+    documentElement: makeNode("html"),
     getElementById: (id: string) => nodes[id] ?? null,
     createElement: (tag: string) => makeNode("", tag),
     createTextNode: (text: string) => ({ text }),

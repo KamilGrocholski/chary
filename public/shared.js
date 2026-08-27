@@ -82,7 +82,7 @@ export const PROFESSION_NAMES = {
   6: "Łowca",
 };
 
-// margometer's series palette (validated for contrast/CVD on a dark background).
+// MargoMeter's series palette (validated for contrast/CVD on a dark background).
 /** @type {Record<number, string>} */
 export const PROFESSION_COLORS = {
   1: "#3987e5", // Wojownik — blue
