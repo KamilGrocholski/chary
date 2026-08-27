@@ -393,6 +393,18 @@ test/              A test sits beside the thing it tests.
   language.test.ts   The language boundary of §9.8, over comments and string literals.
   dom-smoke.ts       A DOM stub — two scenarios, run from the tests in a subprocess.
   source-text.ts     Splitting a source into comments, code and string literals.
+  tools/             Guards: the rules of this file, held over the tree itself.
+    source-layout.test.ts
+                     §9.3, §9.4 and §9.5 read over every source: brands and codes, no `!`,
+                     no cast off JSON.parse, the value-reader register, imports, file names.
+    structure-block.test.ts
+                     The block above against the tree it claims to describe.
+    naming.test.ts   §9.4 over every exported function: the action it opens with, the
+                     synonyms it may not use, the contractions it may not carry.
+    cited-paths.test.ts
+                     Every path this file and README.md name is a path that exists.
+    commit-messages.test.ts
+                     §7.2 over this history: the type, the scope, and a scrape on its own.
   fixtures/          A capture of a ranking page, and one snapshot in the old schema.
 
 docs/              Dated specs and audits. docs/README.md indexes them.
