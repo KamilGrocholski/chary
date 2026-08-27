@@ -21,40 +21,73 @@ const RULES_LANDED_AT = "test/tools/commit-messages.test.ts";
 
 type Commit = { hash: string; subject: string; files: string[] };
 
-async function runGit(...args: string[]): Promise<string> {
-  const result = Bun.spawnSync(["git", ...args]);
-  expect(result.exitCode).toBe(0);
-  return new TextDecoder().decode(result.stdout).trim();
-}
+/**
+ * The history, read in ONE `git` call.
+ *
+ * It used to be one `git show` per commit behind a helper that asserted the exit code — and
+ * the helper ran at module scope, so a single failed call reported itself as a failing test
+ * with no offender to show for it. That is not hypothetical: this guard went red during a
+ * run taken while commits were being written, because `git` was busy, and the message named
+ * a rule nothing had broken. A guard that can cry about the wrong thing is worse than one
+ * that is merely slow.
+ *
+ * The reading can still fail, and now it says so as data: the test below is the only place
+ * that turns it into a failure, and it names `git` rather than §7.2.
+ */
+type HistoryReading = { ok: true; commits: Commit[] } | { ok: false; reason: string };
 
-/** Commits that touched AGENTS.md, newest first — the rewrite and everything after it. */
-const commits: Commit[] = await (async () => {
-  const first = (await runGit("log", "--format=%H", "--reverse", "--", RULES_LANDED_AT)).split("\n")[0] ?? "";
-  if (first === "") return [];
+const RECORD = "\x1e";
+const UNIT = "\x1f";
+
+function readHistory(): HistoryReading {
+  const read = (...args: string[]) => {
+    const result = Bun.spawnSync(["git", ...args]);
+    return result.exitCode === 0
+      ? { ok: true as const, text: new TextDecoder().decode(result.stdout) }
+      : { ok: false as const, text: new TextDecoder().decode(result.stderr).trim() };
+  };
+
+  const anchor = read("log", "--format=%H", "--reverse", "--", RULES_LANDED_AT);
+  if (!anchor.ok) return { ok: false, reason: `git log over ${RULES_LANDED_AT} failed: ${anchor.text}` };
+  const first = anchor.text.trim().split("\n")[0] ?? "";
+  if (first === "") return { ok: true, commits: [] };
 
   // Inclusive of `first`, and read by walking back from HEAD rather than with `first..HEAD`.
   // The exclusive range leaves out the very commit that lands this file — so the first run
   // of this guard would have judged nothing while looking exactly like a run that judged
-  // everything, which is the failure the test below exists to make impossible.
-  const parsed: Commit[] = [];
-  for (const line of (await runGit("log", "--format=%H%x00%s", "HEAD")).split("\n")) {
-    const [hash = "", subject = ""] = line.split("\0");
+  // everything, which is the failure the first test below exists to make impossible.
+  const history = read("log", `--format=${RECORD}%H${UNIT}%s`, "--name-only", "HEAD");
+  if (!history.ok) return { ok: false, reason: `git log over HEAD failed: ${history.text}` };
+
+  const commits: Commit[] = [];
+  for (const record of history.text.split(RECORD)) {
+    if (record.trim() === "") continue;
+    const [header = "", ...rest] = record.split("\n");
+    const [hash = "", subject = ""] = header.split(UNIT);
     if (hash === "") continue;
-    const files = (await runGit("show", "--name-only", "--format=", hash)).split("\n").filter((file) => file !== "");
-    parsed.push({ hash, subject, files });
+    commits.push({ hash, subject, files: rest.filter((file) => file.trim() !== "") });
     if (hash === first) break;
   }
-  return parsed;
-})();
+  return { ok: true, commits };
+}
+
+const reading = readHistory();
+const commits = reading.ok ? reading.commits : [];
 
 describe("§7.2 — commit messages", () => {
-  test("there is history to read, or this guard has not landed yet", async () => {
+  test("git answered at all", () => {
+    // Separate from the rule, and first: a failure here is about the reading, not about a
+    // commit anybody wrote.
+    expect(reading.ok ? "git read the history" : reading.reason).toBe("git read the history");
+  });
+
+  test("there is history to read, or this guard has not landed yet", () => {
     // A range that resolved to nothing would let every assertion below pass over an empty
     // list, which is the quietest way for a guard to stop guarding. There is exactly one
     // honest reason for an empty range: the commit adding this file is the one being
     // written, so the rule has no history to judge yet.
     if (commits.length > 0) return;
-    const tracked = await runGit("ls-files", RULES_LANDED_AT);
+    const tracked = new TextDecoder().decode(Bun.spawnSync(["git", "ls-files", RULES_LANDED_AT]).stdout).trim();
     expect(`${RULES_LANDED_AT} is tracked: ${tracked !== ""}`).toBe(`${RULES_LANDED_AT} is tracked: false`);
   });
 
