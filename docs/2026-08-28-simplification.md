@@ -80,12 +80,105 @@ shorter; a rule either survived intact or was removed with its reason recorded a
 say the same thing, so a removed section leaves its number unused instead. §8 keeps its
 heading and a line saying where it went.
 
-## What this round does not fix
+## The build step
 
-`public/app.js` is 1412 lines, of which 1290 are one `startView()` closure — untouched here,
-and the largest remaining thing in the tree. `test/dom-smoke.ts` is 472 lines of hand-rolled
-DOM stub, which §9.6 already records as having hidden a real bug by being gentler than a
-browser. There is still no build step, so the dashboard is typed through JSDoc and
-`public/lib/` has to sit in the published directory for both sides to import it. Separate
-rounds, each with its own reason.
+`bun build` ships inside Bun, so this added **no dependency**. `public/worlds/` is 173 MB,
+which rules out any `dist/`-copy design — and it needed none: only the module graph under
+the dashboard's entry point is built, and it lands back in `public/` as one gitignored file.
 
+```
+public/lib/*.js        →  src/lib/*.ts        the bottom layer, now shared by path
+public/shared.js       →  src/shared.ts       the vocabulary of the data
+public/*.js            →  web/*.ts            the dashboard
+public/app.js                                 GENERATED, gitignored
+```
+
+What it removed, beyond the syntax:
+
+- **115 JSDoc type tags** in the dashboard, and every `/** @type {X} */ (…)` cast with them.
+  `checkJs` and `allowJs` are gone from `tsconfig.json`; there is nothing left for them to
+  check.
+- **§9.1's edge case.** `public/lib/` sat under the published directory for exactly one
+  reason — with no build step it was the only place both `src/*.ts` and a browser could
+  import from. That paragraph is gone; `src/lib/` is simply the bottom layer.
+- **§9.3's exception.** `public/*.js` had to import siblings as `./shared.js`, because a
+  `<script type="module">` resolves relative URLs and knows nothing of `tsconfig.json`. Every
+  import in the tree is now `@/…`, at every depth, with no exception — and the guard that
+  used to hold the exception was deleted rather than kept guarding nothing.
+
+`deploy.yml` gained `bun install` + `bun run build` before the Pages upload. The gate does
+**not** build: nothing under test reads `public/app.js`, so a stale bundle can neither pass
+nor fail it, and `test/dom-smoke.ts` imports `web/app.ts` rather than the bundle.
+
+## `happy-dom` instead of the hand-written stub
+
+`test/dom-smoke.ts` went from **472 to 405 lines** — not to zero, and the estimate that said
+otherwise was wrong about what the file held. Roughly 130 lines of it were a DOM: a node
+factory, an `innerHTML` setter imitating what a `<select>` does to its own value, a
+`:root`-token regex standing in for the cascade, a hand-assembled `globalThis`. Those are
+gone. What stays is everything that is **not** a document and still has to be stubbed: the
+network (~110 lines of fetch counting, an injected failure, a one-snapshot world), Chart.js
+(which wants a canvas and paints pixels nothing here reads), and the extraction of the
+result the assertions compare against.
+
+The fidelity is the return, not the line count:
+
+- The `<select>` trap §9.6 records is now caught by the browser's own behaviour rather than
+  by a stub written to imitate it. Verified by breaking the read order in
+  `fillThresholdSelect` and watching "the chosen threshold survives a rebuild of the option
+  list" go red.
+- A chip's close button is now **clicked**. The old stub had no event delegation, so that
+  test called a listener by hand with a fabricated `{ target: { dataset: { clear } } }` —
+  it held the handler, not the wiring.
+- `app.ts` carried a comment saying the bar's listeners had to be registered **last**,
+  because the stub called `handlers[0]`. Real events do not care; the comment is gone.
+- The theme comes through a real cascade, so `getThemeTokens`'s assertion is held against
+  what a browser would compute rather than against a regular expression over the stylesheet.
+
+## The view is a layer, not one closure
+
+`public/app.js` was 1412 lines, 1290 of them inside a single `startView()` closure holding
+~50 nested functions and eight pieces of mutable state. It is now seven files:
+
+| File | Lines | Holds |
+|---|---|---|
+| `web/app.ts` | 448 | the wiring: `manifest`, `trends`, what is in flight, when to redraw, what to fetch |
+| `web/charts.ts` | 401 | the Chart.js instances and the time axis — the four variables that outlive a render |
+| `web/controls.ts` | 264 | the form: reading it, writing it, the chips, the drawer, the threshold picker |
+| `web/panels.ts` | 221 | the text panels, one node each |
+| `web/dom.ts` | 88 | every lookup in the document, and the `:root` tokens |
+| `web/format.ts` | 52 | numbers and failures as a Polish-speaking reader sees them |
+| `web/margostat-error.ts` | 35 | the base every browser-side error extends |
+
+Three couplings were cut rather than carried across:
+
+- `renderHistoryCharts` read the threshold off a `<select>`. The picker owns that choice, so
+  the board is handed the key.
+- `renderHistoryStatus` read the in-flight `progress` out of the closure. It is a parameter.
+- `clearHistoryCharts` also emptied the change table. The board clears charts; `app.ts` has
+  a `clearHistory()` that clears both, because all three of its callers wanted both and one
+  that had cleared only the charts would leave the previous world's table standing.
+
+§9.1's DOM rule moved with the code: "`app.js` is the only module that touches the DOM"
+became "`web/` is the view layer", with `format.ts` and `fetch-json.ts` named as the two
+inside it that must reach for neither — held by a new test, proved to fail by making
+`format.ts` read `document.title`.
+
+The tests that scan the view for ids, tokens and classes now read all seven files rather
+than `app.ts` alone. Read over the wiring only, each of those rules would have been held
+over nothing that draws.
+
+## Where the estimates were wrong
+
+Two of the four figures in the plan were guesses made before the material was read, and both
+were optimistic. `AGENTS.md` reached 651 lines, not ~350: §9.2, §9.5, §9.6 and §7.6 are 232
+lines of traps and error rules that each cost something once, and hitting the number meant
+cutting those. `test/dom-smoke.ts` reached 405 lines, not 0: most of it was never a DOM. The
+target moved rather than the content, both times.
+
+## What this round did not touch
+
+`public/worlds/`, `test/fixtures/`, `SNAPSHOT_SCHEMA`, the `.f.json`/`.n.json` pair,
+`trends.json` and every published URL — unchanged, and `git status` over the data was
+checked empty at each step. Chart.js is still vendored: bundling it from npm would change
+the runtime-dependency promise in `README.md`, and that is a separate `[ASK]`.

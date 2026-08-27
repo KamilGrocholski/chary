@@ -34,7 +34,9 @@ dashboard into `public/app.js`, the one generated file there and the only one gi
 
 **Orientation.** `src/` is the scraper and the data format, terminal only; `src/lib/` is the
 bottom layer both sides read and `src/shared.ts` the vocabulary of the data. `web/` is the
-dashboard, built into `public/`. `public/` is what Pages serves: the markup, `vendor/`, `worlds/` — and `app.js`, which is
+dashboard, built into `public/`: `app.ts` the wiring, `controls.ts` the form, `charts.ts` and
+`panels.ts` the drawing, `dom.ts` the document, `filters.ts`/`history.ts` the counting.
+`public/` is what Pages serves: the markup, `vendor/`, `worlds/` — and `app.js`, which is
 output. `tools/` ships nowhere. `test/` sits beside what it tests. `docs/` holds dated specs
 and audits, indexed by `docs/README.md`. Why a file is the way it is lives in its own docblock;
 what is in `public/` right now is `bun run data:status`, never prose (§5).
@@ -288,10 +290,17 @@ guard that kept it true cost more than the block was worth — `docs/2026-08-28-
   and `src/shared.ts`, and nothing in `src/` reads the dashboard. `web/app.ts` starts the view on
   import and `web/fetch-json.ts` is written against the browser's `fetch`, so an import the other
   way would start a view inside a scrape.
-- `[ALWAYS]` **`web/app.ts` is the only module that touches the DOM.** `src/shared.ts`,
-  `web/filters.ts` and `web/history.ts` touch no document and run nothing on import — that is what
-  makes them testable outside a browser, and a test holds it. `fetch` in `web/history.ts` is not
+- `[ALWAYS]` **`web/` is the view layer and the only place the DOM is touched.** Inside it the
+  document belongs to `dom.ts` (every lookup, and `:root`) and to `charts.ts` (Chart.js wants a
+  canvas); `format.ts` and `fetch-json.ts` reach for neither, and a test holds that. Outside it
+  `src/shared.ts`, `web/filters.ts` and `web/history.ts` touch no document and run nothing on
+  import — that is what makes them testable outside a browser. `fetch` in `web/history.ts` is not
   an exception: it is not the document interface, and the tests substitute a stub.
+- `[ALWAYS]` **`web/app.ts` is the wiring and holds the page's state** — `manifest`, `trends`,
+  what is in flight — and decides when to redraw and what to fetch. The pieces it hands work to
+  take what they need as arguments and decide nothing: `controls.ts` answers *what is in the form
+  right now*, `panels.ts` prints one node each, `charts.ts` owns the Chart.js instances and the
+  time axis, because those outlive a single render.
 - `[ALWAYS]` **A tool may read anything.** It ships nowhere — and a report about what the
   dashboard costs is only true if it reads the same material the dashboard reads.
 - `[ALWAYS]` **`public/app.js` is output, never a source.** It is gitignored and rebuilt; a rule

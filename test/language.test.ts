@@ -30,6 +30,10 @@ const GAME_NAMES = ["Wojownik", "Mag", "Paladyn", "Tropiciel", "Tancerz ostrzy",
 const SPEAKS_POLISH: Array<{ file: string; phrase?: string }> = [
   // The dashboard — the text a player reads.
   { file: "web/app.ts" },
+  { file: "web/charts.ts" },
+  { file: "web/controls.ts" },
+  { file: "web/format.ts" },
+  { file: "web/panels.ts" },
   { file: "web/filters.ts" },
   { file: "src/shared.ts" },
   { file: "web/history.ts", phrase: "≤ 7 dni" },

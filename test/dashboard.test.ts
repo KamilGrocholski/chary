@@ -254,9 +254,19 @@ const sharedJs = readSource("src/shared.ts");
 const filtersJs = readSource("web/filters.ts");
 const historyJs = readSource("web/history.ts");
 
+/**
+ * The whole view layer as one text.
+ *
+ * The rules below are about what `web/` as a whole asks of the markup — which ids, which
+ * tokens, which classes — and the layer is seven files rather than one. Read over `app.ts`
+ * alone, each rule would be held over the wiring and over nothing that draws.
+ */
+const VIEW_FILES = ["app", "charts", "controls", "dom", "fetch-json", "format", "panels"];
+const viewSource = VIEW_FILES.map((name) => readSource(`web/${name}.ts`)).join("\n");
+
 describe("app.js agrees with index.html", () => {
   test("every element fetched through getElement() exists in the markup", () => {
-    const ids = [...appSource.matchAll(/\bgetElement\("([^"]+)"\)/g)].map((match) => match[1]);
+    const ids = [...viewSource.matchAll(/\bgetElement\("([^"]+)"\)/g)].map((match) => match[1]);
     expect(ids.length).toBeGreaterThan(10);
     for (const id of new Set(ids)) {
       expect(html).toContain(`id="${id}"`);
@@ -280,8 +290,8 @@ describe("app.js agrees with index.html", () => {
   test("the view does not reach for the nicknames", () => {
     // `.n.json` has no consumer today, and until a player search exists, fetching it
     // would be two thirds of the transfer for nothing.
-    expect(appSource).toContain("entry.filters");
-    expect(appSource).not.toContain("entry.names");
+    expect(viewSource).toContain("entry.filters");
+    expect(viewSource).not.toContain("entry.names");
   });
 
   test("fetches the aggregate and the snapshots, and nothing from outside the directory", () => {
@@ -289,18 +299,19 @@ describe("app.js agrees with index.html", () => {
     // second aggregate. Every fetch goes through `getJsonFromUrl`, so this reads the calls
     // to it rather than the calls to `fetch` — the reason the wrapper exists is that the
     // four call sites were doing the same three steps four ways (§9.5).
-    const literals = [...appSource.matchAll(/getJsonFromUrl\(\s*["'`]([^"'`]+)/g)].map((match) => match[1]);
+    const literals = [...viewSource.matchAll(/getJsonFromUrl\(\s*["'`]([^"'`]+)/g)].map((match) => match[1]);
     expect(literals.sort()).toEqual(["manifest.json", "trends.json"]);
 
     // The remaining URLs come from the manifest, not from the code.
     expect(historyJs).toContain("getJsonFromUrl(entry.filters)");
-    expect(appSource).toContain("getJsonFromUrl(entry.filters)");
+    expect(viewSource).toContain("getJsonFromUrl(entry.filters)");
 
     // And `fetch` itself is spelled in exactly one place, which is what makes the line
     // above a complete list rather than a sample of one.
     const fetchJs = readSource("web/fetch-json.ts");
     expect(stripComments(fetchJs)).toContain("await fetch(url)");
-    for (const module of [appSource, historyJs, filtersJs, sharedJs]) {
+    const elsewhere = VIEW_FILES.filter((name) => name !== "fetch-json").map((name) => readSource(`web/${name}.ts`));
+    for (const module of [...elsewhere, historyJs, filtersJs, sharedJs]) {
       expect(stripComments(module)).not.toMatch(/[^.\w]fetch\(/);
     }
   });
@@ -311,7 +322,7 @@ describe("app.js asks index.html for the right kind of node", () => {
   // docblock that the pairing is proved here rather than asserted at every call. That
   // sentence is only true while this test exists — asking a `<div>` for `.value` is silent
   // in a browser and would have been silent under checkJs too, since the cast is ours.
-  const ids = [...appSource.matchAll(/\bgetField\(\s*"([^"]+)"\s*\)/g)].map((match) => match[1]!);
+  const ids = [...viewSource.matchAll(/\bgetField\(\s*"([^"]+)"\s*\)/g)].map((match) => match[1]!);
 
   test("the view really reads form controls through it", () => {
     expect(new Set(ids).size).toBeGreaterThan(5);
@@ -344,7 +355,7 @@ describe("app.js asks index.html for the right kind of node", () => {
 
   test("no module spells a colour that the stylesheet already names", () => {
     const offenders: string[] = [];
-    for (const [name, source] of [["app.ts", appSource], ["filters.ts", filtersJs], ["history.ts", historyJs]] as const) {
+    for (const [name, source] of [["web/", viewSource], ["filters.ts", filtersJs], ["history.ts", historyJs]] as const) {
       for (const [literal] of stripComments(source).matchAll(/#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\([^)]*\)/g)) {
         offenders.push(`${name}: ${literal}`);
       }
@@ -353,7 +364,7 @@ describe("app.js asks index.html for the right kind of node", () => {
   });
 
   test("every token a module reads is a token the stylesheet defines", () => {
-    const asked = [...appSource.matchAll(/var\((--[\w-]+)\)|requireToken\("(--[\w-]+)"\)/g)].map((match) => match[1] ?? match[2]!);
+    const asked = [...viewSource.matchAll(/var\((--[\w-]+)\)|requireToken\("(--[\w-]+)"\)/g)].map((match) => match[1] ?? match[2]!);
     expect(asked.length).toBeGreaterThan(10);
     for (const name of new Set(asked)) expect([...tokens.keys()]).toContain(name);
   });
@@ -369,13 +380,13 @@ describe("app.js asks index.html for the right kind of node", () => {
     // `class="num"` became `class="formatNumber"` in a rename, and the change table lost its
     // right alignment and tabular numerals in silence: the markup is written in JS and the
     // rule that styles it lives in the HTML, so nothing connected the two.
-    const written = [...appSource.matchAll(/class="([^"${}]+)"/g)].flatMap((match) => match[1]!.split(/\s+/));
+    const written = [...viewSource.matchAll(/class="([^"${}]+)"/g)].flatMap((match) => match[1]!.split(/\s+/));
     expect(written.length).toBeGreaterThan(3);
     for (const name of new Set(written)) expect(html).toMatch(new RegExp(`\\.${name}\\b`));
   });
 
   test("getElement() is not used for a value — that is what the split is for", () => {
-    expect(stripComments(appSource)).not.toMatch(/\bgetElement\([^)]*\)\.(value|checked|disabled)\b/);
+    expect(stripComments(viewSource)).not.toMatch(/\bgetElement\([^)]*\)\.(value|checked|disabled)\b/);
   });
 });
 
@@ -394,6 +405,18 @@ describe("the pure modules must not run anything", () => {
     expect(appSource).toContain('from "@/src/shared.ts"');
     expect(appSource).toContain('from "@/web/filters.ts"');
     expect(appSource).toContain('from "@/web/history.ts"');
+  });
+
+  test("only the modules that draw reach for the document", () => {
+    // Splitting the view into a layer made this worth holding: `format.ts` is arithmetic
+    // and Polish sentences, and the moment it reaches for a node it stops being testable
+    // without one. `dom.ts` and `charts.ts` are where the document belongs — the first is
+    // the lookup itself, the second hands Chart.js a canvas and reads `:root`.
+    expect(getCode(readSource("web/format.ts"))).not.toMatch(/\bdocument\b|\bwindow\b/);
+    expect(getCode(readSource("web/fetch-json.ts"))).not.toMatch(/\bdocument\b|\bwindow\b/);
+    // And the layer really does use it, so the rule above is a fact about this tree rather
+    // than about a search that matched nothing.
+    expect(getCode(readSource("web/dom.ts"))).toMatch(/\bdocument\b/);
   });
 });
 
@@ -878,8 +901,8 @@ describe("the suspect-snapshot warning", () => {
   test("the view reads the flag from the snapshot and has somewhere to show it", () => {
     // Without this the scraper would write `suspect` for nobody — exactly the pattern the
     // audit deleted the aggregate module for.
-    expect(appSource).toMatch(/showSuspect\(\w+\.suspect/);
-    expect(appSource).toContain("Ta migawka może być niekompletna");
+    expect(viewSource).toMatch(/showSuspect\(\w+\.suspect/);
+    expect(viewSource).toContain("Ta migawka może być niekompletna");
     expect(html).toContain('id="suspect"');
   });
 

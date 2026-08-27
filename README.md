@@ -33,7 +33,7 @@ margonem.pl/ladder  ──scrape──►  public/worlds/<world>/<ts>.f.json   (
 - **The snapshot split** (`src/snapshot.ts`) — writing to two files sharing one row order.
 - **The manifest** (`public/manifest.json`) — an index of snapshots per world, linking to both files.
 - **The trends** (`src/trends.ts` → `public/trends.json`) — each world's folded history, one number per snapshot.
-- **The world view** (`public/index.html` + `web/app.ts`) — a bar pinned to the top (the world, the match counter, chips for the active filters, section anchors), the filter fields below it (level, honor, profession, last activity), and below that two sections: **the cross-section** of the chosen snapshot (the level distribution by profession) and **the history** of every snapshot (population, activity, professions, a change table). The filter governs both.
+- **The world view** (`public/index.html` + `web/`) — a bar pinned to the top (the world, the match counter, chips for the active filters, section anchors), the filter fields below it (level, honor, profession, last activity), and below that two sections: **the cross-section** of the chosen snapshot (the level distribution by profession) and **the history** of every snapshot (population, activity, professions, a change table). The filter governs both.
 - **The logic** (`web/filters.ts`, `web/history.ts`, `src/shared.ts`) — filtering, counting and building the series, with no DOM, tested without a browser.
 
 The whole of `public/` is static — there is no application server, which makes it a perfect fit for Pages. `web/` is bundled into `public/app.js` by `bun run build`; that one file is generated and gitignored, everything else in `public/` is committed.
@@ -204,7 +204,12 @@ src/
   shared.ts          # the vocabulary of the data, read by the scraper AND the dashboard
   lib/               # the bottom layer: assert, and the only way to read a value
 web/                 # the dashboard, bundled into public/app.js — never shipped as-is
-  app.ts             # the only module that touches the DOM
+  app.ts             # the wiring: page state, when to redraw, what to fetch
+  dom.ts             # every lookup in the document, and the :root tokens
+  controls.ts        # the filter bar: reading and writing the form, chips, drawer
+  charts.ts          # the Chart.js instances and the time axis they share
+  panels.ts          # the text panels: match line, distribution, summary, table
+  format.ts          # numbers and failures as a Polish-speaking reader sees them
   filters.ts         # filtering, counting, the filter state in the URL (no DOM)
   history.ts         # a world's history: thresholds, series, fetching snapshots (no DOM)
   fetch-json.ts      # the one place `fetch` is spelled; refuses with a code
