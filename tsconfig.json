@@ -8,6 +8,11 @@
     "jsx": "react-jsx",
     "allowJs": true,
 
+    // Every import is written from the repository root — a path reads the same wherever it
+    // appears, and moving a file does not rewrite its neighbours' imports. AGENTS.md §9.3.
+    "baseUrl": ".",
+    "paths": { "@/*": ["./*"] },
+
     // Bundler mode
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
