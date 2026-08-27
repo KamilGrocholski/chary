@@ -9,6 +9,7 @@ import {
   parseTotalPages,
   getProfessionId,
 } from "@/src/parser.ts";
+import { PROFESSION_COUNT, getProfessionEntries } from "@/public/shared.js";
 
 const fixture = await Bun.file(
   new URL("./fixtures/ladder-aether-p1.html", import.meta.url).pathname,
@@ -206,5 +207,35 @@ describe("parseTable resilience", () => {
     const brokenRow = `<tr><td class="dark-cell id">1</td><td class="long-clan"></td><td class="long-level"></td><td class="long-ph"></td><td class="long-last-online"></td></tr>`;
     expect(() => parseTable(cheerio.load(`${header}<tbody>${brokenRow}</tbody></table>`), "aether", 1))
       .toThrow(LadderMarkupError);
+  });
+});
+
+// The professions are named once, in `public/shared.js`, and the parser folds those names to
+// read a heading (§9.1). What the parser cannot derive is the ranking's own letter code —
+// `378t` — so that table stays written out, and this holds it to the same six ids.
+describe("the profession vocabulary", () => {
+  test("the names the dashboard prints are the names the ranking printed", () => {
+    // Against the captured page, not against the derivation: `getProfessionId` folds case
+    // and spacing away, so asking it about a name taken from `PROFESSION_NAMES` would ask
+    // the table about itself and pass however that table was edited (§7.5).
+    const titles = new Set([...$("[title]")].map((node) => $(node).attr("title") ?? ""));
+    const found = new Map<number, string>();
+
+    for (const title of titles) {
+      const id = getProfessionId(title, "378");
+      if (id !== null) found.set(id, title);
+    }
+
+    // Every profession, spelled exactly as the ranking spells it — the dashboard renders
+    // these strings to a player verbatim.
+    expect([...found.entries()].sort(([a], [b]) => a - b)).toEqual(getProfessionEntries());
+  });
+
+  test("the letter code covers the same six professions and nothing else", () => {
+    const byLetter = new Set(
+      ["w", "m", "p", "t", "b", "h"].map((letter) => getProfessionId("nie profesja", `378${letter}`)),
+    );
+    expect([...byLetter].sort()).toEqual(getProfessionEntries().map(([id]) => id).sort());
+    expect(byLetter.size).toBe(PROFESSION_COUNT);
   });
 });

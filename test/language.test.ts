@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Glob } from "bun";
-import { commentBlocks, stringLiterals } from "@/test/source-text.ts";
+import { commentBlocks, regexLiterals, stringLiterals } from "@/test/source-text.ts";
 
 // The guard for the language boundary in AGENTS.md: English everywhere except the text a
 // player reads and the keys that match material captured from Margonem.
@@ -101,9 +101,12 @@ describe("the language boundary", () => {
     // somewhere else — and the list would go on guarding nothing while looking like it did.
     for (const { file, phrase } of SPEAKS_POLISH) {
       const src = sources.get(file)!;
+      // Patterns count as well as strings: `parser.ts` reads the ranking's "N dni temu" with
+      // a regex, and it is the only Polish left in that file.
+      const written = [...stringLiterals(src), ...regexLiterals(src)];
       const speaks = phrase
-        ? stringLiterals(src).some((literal) => literal.includes(phrase))
-        : stringLiterals(src).some((literal) => POLISH.test(literal));
+        ? written.some((literal) => literal.includes(phrase))
+        : written.some((literal) => POLISH.test(literal));
       expect(`${file} speaks Polish: ${speaks}`).toBe(`${file} speaks Polish: true`);
     }
   });

@@ -817,7 +817,7 @@ snapshot on disk — §9.1's last rule, and a test holds it.
 |---|---|
 | The text a player reads | `public/index.html` body copy, `aria-label`s, placeholders, `<title>`, `<meta description>`, `lang="pl"`, `trends.html`, `404.html` |
 | UI strings built in JS | chart titles, chips, table headings, status and error copy in `app.js`; `PROFESSION_NAMES` in `shared.js`; `activityLabel`/`filterChips` in `filters.js`; `ACTIVITY_THRESHOLDS[].label` in `history.js`; `toLocaleString("pl-PL")` |
-| Keys that match scraped material | `PROFESSION_BY_NAME`, `PROFESSION_BY_LETTER` and the `ł → l` folding in `parser.ts`; the captured page in `test/fixtures/` |
+| Keys that match scraped material | `PROFESSION_NAMES` in `shared.js`, which `parser.ts` folds through `ł → l` to read a heading, and `PROFESSION_BY_LETTER` in `parser.ts` — the ranking's own letter code; the captured page in `test/fixtures/`; the "N dni temu" pattern in `parser.ts` |
 | `suspect.reason` | written by `snapshot.ts` into every flagged `.f.json` and rendered verbatim by the dashboard — server-side code composing a sentence for a player |
 | The assertions pinning all of the above | the Polish expected values in `test/dashboard.test.ts` |
 

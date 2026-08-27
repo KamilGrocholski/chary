@@ -228,10 +228,13 @@ export function getActivityBucketBound(bucket) {
  * @returns {[number, string][]}
  */
 export function getProfessionEntries() {
-  return Object.entries(PROFESSION_NAMES).map(([id, name]) => [
-    assertDefined(getIntegerFromText(id), `a profession key is a whole number, got "${id}"`),
-    name,
-  ]);
+  return Object.entries(PROFESSION_NAMES).map(
+    ([id, name]) =>
+      /** @type {[number, string]} */ ([
+        assertDefined(getIntegerFromText(id), `a profession key is a whole number, got "${id}"`),
+        name,
+      ]),
+  );
 }
 
 /**

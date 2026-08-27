@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import { getIntegerFromText } from "@/public/lib/number.js";
 import { MargoStatToolError } from "@/src/margostat-tool-error.ts";
+import { getProfessionEntries } from "@/public/shared.js";
 
 // ── The row schema (v2) ───────────────────────────────────────────────────────
 //
@@ -25,16 +26,6 @@ export const ROW_SCHEMA = 2;
 // The ranking shows ~20655 days ("1969") for accounts that have never been online.
 const NEVER_ONLINE_DAYS = 10_000;
 
-// Polish, because these are the game's own names — see "Language" in AGENTS.md.
-export const PROFESSIONS: Record<number, string> = {
-  1: "Wojownik",
-  2: "Mag",
-  3: "Paladyn",
-  4: "Tropiciel",
-  5: "Tancerz ostrzy",
-  6: "Łowca",
-};
-
 // The letter appended to the level in the "Poziom" column (e.g. "378t").
 const PROFESSION_BY_LETTER: Record<string, number> = {
   w: 1,
@@ -45,14 +36,13 @@ const PROFESSION_BY_LETTER: Record<string, number> = {
   h: 6,
 };
 
-const PROFESSION_BY_NAME: Record<string, number> = {
-  wojownik: 1,
-  mag: 2,
-  paladyn: 3,
-  tropiciel: 4,
-  "tancerz ostrzy": 5,
-  lowca: 6,
-};
+// The column heading the ranking prints, folded the way `normalize` folds it, back to the
+// id. Derived rather than written out: the names themselves are `PROFESSION_NAMES` in
+// `public/shared.js` (§9.1), and this file used to hold two more copies of them — one to
+// read a heading with and one nothing read at all.
+const PROFESSION_BY_NAME: Record<string, number> = Object.fromEntries(
+  getProfessionEntries().map(([id, name]) => [normalize(name), id]),
+);
 
 /**
  * The ranking page did not have the shape we can read.

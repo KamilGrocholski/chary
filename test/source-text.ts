@@ -43,6 +43,25 @@ export function commentBlocks(src: string): string[] {
   return [...blocks, ...lines];
 }
 
+/**
+ * The regular-expression literals, comments removed first.
+ *
+ * Needed because a source can hold text in a pattern and nowhere else: `parser.ts` matches
+ * the ranking's "N dni temu" with a regex, and once the profession names moved out of it,
+ * that pattern was the only Polish left in the file — invisible to `stringLiterals`, so the
+ * language boundary would have been dropped rather than held.
+ *
+ * A `/` opens a literal only where a value may start, which is what the prefix class below
+ * approximates. It is deliberately narrow: a division misread as a pattern would let a file
+ * claim a language it does not speak.
+ */
+export function regexLiterals(src: string): string[] {
+  const code = stripComments(src);
+  return [...code.matchAll(/(?<=[(=,:[!&|?{};]\s*)\/(?![*/])(?:[^/\\\n[]|\\.|\[(?:[^\]\\]|\\.)*\])+\/[dgimsuvy]*/g)].map(
+    ([literal]) => literal,
+  );
+}
+
 /** The string and template literals, comments removed first. */
 export function stringLiterals(src: string): string[] {
   const code = stripComments(src);
