@@ -11,7 +11,7 @@
 //
 // The labels below are Polish because a player reads them — see "Language" in AGENTS.md.
 
-import { getDaysBetween } from "./shared.js";
+import { getActivityBucketBound, getDaysBetween } from "./shared.js";
 import { isDefaultFilters, summarizeFiltered } from "./filters.js";
 import { getJsonFromUrl } from "./fetch-json.js";
 import { assertDefined } from "./lib/assert.js";
@@ -35,10 +35,16 @@ import { assertDefined } from "./lib/assert.js";
  * thresholds that stop saying anything under an activity filter (`getUsableThresholds`).
  */
 export const ACTIVITY_THRESHOLDS = [
-  { key: "24h", label: "< 24h", buckets: [0], bound: 0 },
-  { key: "7d", label: "≤ 7 dni", buckets: [0, 1], bound: 7 },
-  { key: "30d", label: "≤ 30 dni", buckets: [0, 1, 2], bound: 30 },
-];
+  { key: "24h", label: "< 24h", buckets: [0] },
+  { key: "7d", label: "≤ 7 dni", buckets: [0, 1] },
+  { key: "30d", label: "≤ 30 dni", buckets: [0, 1, 2] },
+].map((threshold) => ({
+  ...threshold,
+  // Read off the disjoint scale rather than written again: a threshold ends where its
+  // widest bucket ends, so 7 and 30 have one address (`ACTIVITY_BUCKET_BOUNDS`) and the two
+  // scales cannot drift apart into a chart understated by a whole bucket.
+  bound: getActivityBucketBound(assertDefined(threshold.buckets.at(-1), "a threshold covers a bucket")),
+}));
 
 // ≤ 7 days by default: "< 24h" swings by 14.7% while the population is steady at 0.6%,
 // because it depends on the hour and weekday of the scrape. See

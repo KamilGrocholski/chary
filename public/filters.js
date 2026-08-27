@@ -8,7 +8,13 @@
 //
 // The strings below are Polish because a player reads them — see "Language" in AGENTS.md.
 
-import { PROFESSION_NAMES, getActivityBucket, isNeverOnline } from "./shared.js";
+import {
+  ACTIVITY_BUCKET_BOUNDS,
+  NEVER_ONLINE_BUCKET,
+  PROFESSION_NAMES,
+  getActivityBucket,
+  isNeverOnline,
+} from "./shared.js";
 import { getFiniteNumberFromText, getIntegerFromText } from "./lib/number.js";
 import { assertDefined } from "./lib/assert.js";
 
@@ -19,17 +25,13 @@ import { assertDefined } from "./lib/assert.js";
  * @typedef {{ key: string, label: string }} FilterChip
  */
 
-// The bounds of the activity buckets (in days). Bucket 4 is accounts never used.
-// The buckets are disjoint, not cumulative — the labels have to convey that, because
-// "≤ 7 dni" over the 1-7 bucket suggested it was everyone from the last week, when it is
-// only those not in the "< 24h" bucket.
-/** @type {[number, number][]} */
-export const ACTIVITY_BOUNDS = [
-  [0, 0],
-  [1, 7],
-  [8, 30],
-  [31, Infinity],
-];
+// The bounds of the activity buckets, in days — bucket 4 is accounts never used. Disjoint,
+// not cumulative, which is what the labels below have to convey: "≤ 7 dni" over the 1-7
+// bucket suggested everyone from the last week, when it is only those not in "< 24h".
+//
+// The scale itself lives in `shared.js`, because `src/trends.ts` reads it too (§9.1).
+// Re-exported under the name this module's callers already use.
+export { ACTIVITY_BUCKET_BOUNDS as ACTIVITY_BOUNDS };
 
 /**
  * A bucket's label trimmed to the active threshold — under a "14 days" filter the 8-30
@@ -40,9 +42,9 @@ export const ACTIVITY_BOUNDS = [
  * @returns {string}
  */
 export function getActivityLabel(bucket, maxDays = Infinity) {
-  if (bucket === 4) return "nigdy";
+  if (bucket === NEVER_ONLINE_BUCKET) return "nigdy";
 
-  const [from, to] = assertDefined(ACTIVITY_BOUNDS[bucket], "an activity bucket outside 0-4 has no bounds");
+  const [from, to] = assertDefined(ACTIVITY_BUCKET_BOUNDS[bucket], "an activity bucket outside 0-4 has no bounds");
   const hi = Math.min(to, maxDays);
   if (from === 0) return "< 24h";
   if (hi === Infinity) return `> ${from - 1} dni`;
@@ -59,7 +61,7 @@ export function getActivityLabel(bucket, maxDays = Infinity) {
  */
 export function getVisibleActivityBuckets(maxDays = Infinity) {
   if (maxDays === Infinity) return [0, 1, 2, 3, 4];
-  return ACTIVITY_BOUNDS.flatMap(([from], bucket) => (from <= maxDays ? [bucket] : []));
+  return ACTIVITY_BUCKET_BOUNDS.flatMap(([from], bucket) => (from <= maxDays ? [bucket] : []));
 }
 
 // ── Filters ─────────────────────────────────────────────────────────────────

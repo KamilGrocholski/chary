@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import path from "node:path";
 import { normalizeLegacyRows, splitNormalized, type FilterFile } from "@/src/snapshot.ts";
-import { getActivityBucket as activityBucketServer, buildWorldTrend, summarizeSnapshot } from "@/src/trends.ts";
-import { getActivityBucket as activityBucketBrowser } from "@/public/shared.js";
+import { buildWorldTrend, summarizeSnapshot } from "@/src/trends.ts";
+import { ACTIVITY_BUCKET_BOUNDS, ACTIVITY_BUCKET_COUNT, getActivityBucket } from "@/public/shared.js";
 import { getEmptyFilters, summarizeFiltered } from "@/public/filters.js";
 import {
   ACTIVITY_THRESHOLDS,
@@ -64,8 +64,8 @@ describe("the snapshot aggregate", () => {
   });
 
   test("the activity buckets are disjoint and sum to the population", () => {
-    for (let bucket = 0; bucket < 5; bucket++) {
-      expect(summary.act[bucket]).toBe(legacyCount((r) => activityBucketServer(legacyDays(r[5])) === bucket));
+    for (let bucket = 0; bucket < ACTIVITY_BUCKET_COUNT; bucket++) {
+      expect(summary.act[bucket]).toBe(legacyCount((r) => getActivityBucket(legacyDays(r[5])) === bucket));
     }
     expect(summary.act.reduce((a, b) => a + b, 0)).toBe(summary.total);
   });
@@ -77,14 +77,43 @@ describe("the snapshot aggregate", () => {
     expect(summary.act[4]).toBeGreaterThan(0);
   });
 
-  test("the scraper and the browser bucket identically", () => {
-    // Two copies of the same function (src/trends.ts and public/shared.js) — drift would
-    // give a history that disagrees with the snapshot view. The list is every value the
-    // scraper can produce; the −1 sentinel is not on it, because it appears only during the
-    // conversion to typed arrays, i.e. on the browser side alone.
-    for (const days of [null, undefined, 0, 1, 7, 8, 30, 31, 365, 20_655]) {
-      expect(activityBucketServer(days)).toBe(activityBucketBrowser(days));
+  test("every value the scraper can produce lands in the bucket the scale names", () => {
+    // This used to compare two implementations against each other — one in `src/trends.ts`
+    // and one in `public/shared.js`. There is one now (§9.1), so the assertion is against
+    // the answers themselves: every boundary of `ACTIVITY_BUCKET_BOUNDS` from both sides,
+    // plus what the ranking prints for an account nobody has used.
+    const expected: [number | null | undefined, number][] = [
+      [null, 4],
+      [undefined, 4],
+      [0, 0],
+      [1, 1],
+      [7, 1],
+      [8, 2],
+      [30, 2],
+      [31, 3],
+      [365, 3],
+      [20_655, 3],
+    ];
+    for (const [days, bucket] of expected) expect(getActivityBucket(days)).toBe(bucket);
+  });
+
+  test("a cumulative threshold ends where its widest bucket ends", () => {
+    // Two scales over one subject — §10. `ACTIVITY_THRESHOLDS` is cumulative and the buckets
+    // are disjoint, and confusing them understates a chart by the whole "< 24h" bucket. The
+    // thresholds now read their edges off the disjoint table instead of restating 7 and 30;
+    // this is what holds the derivation to what the labels say.
+    for (const threshold of ACTIVITY_THRESHOLDS) {
+      const widest = threshold.buckets[threshold.buckets.length - 1]!;
+      expect(threshold.bound).toBe(ACTIVITY_BUCKET_BOUNDS[widest]![1]);
+      expect(threshold.buckets).toEqual([...threshold.buckets].sort((a, b) => a - b));
+      expect(threshold.buckets[0]).toBe(0);
     }
+  });
+
+  test("the sentinel the browser writes is bucketed like the null it replaced", () => {
+    // −1 exists only after the conversion to typed arrays, so the scraper never produces it
+    // — but one function now answers both sides and this is the value that separates them.
+    expect(getActivityBucket(-1)).toBe(getActivityBucket(null));
   });
 });
 

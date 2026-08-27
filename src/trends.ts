@@ -6,6 +6,7 @@ import { writeAtomic } from "@/src/atomic.ts";
 import { assertDefined } from "@/public/lib/assert.js";
 import { getValueFromJsonText } from "@/public/lib/json.js";
 import { getTextOrder } from "@/public/lib/text-order.js";
+import { getActivityBucket } from "@/public/shared.js";
 
 // The folded history of one world: a single number per snapshot instead of hundreds of
 // thousands of rows. The whole history (202 snapshots, 21 worlds) fits in ~24 KB, i.e.
@@ -19,22 +20,6 @@ import { getTextOrder } from "@/public/lib/text-order.js";
 
 export const TRENDS_SCHEMA = 2;
 export const TRENDS_FILE = path.join(PUBLIC_DIR, "trends.json");
-
-/**
- * The activity bucket: 0 = <24h, 1 = 1-7 days, 2 = 8-30 days, 3 = >30 days, 4 = never.
- *
- * The buckets are **disjoint**, not cumulative — "active ≤7 days" is the sum of buckets
- * 0 and 1. It must agree value for value with `getActivityBucket` in `public/shared.js`;
- * a test holds that, because the two drifting apart would give a chart that disagrees
- * with the snapshot dashboard.
- */
-export function getActivityBucket(days: number | null | undefined): number {
-  if (days === null || days === undefined) return 4;
-  if (days === 0) return 0;
-  if (days <= 7) return 1;
-  if (days <= 30) return 2;
-  return 3;
-}
 
 export type SnapshotSummary = {
   total: number;

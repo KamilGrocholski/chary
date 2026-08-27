@@ -9,7 +9,7 @@
 
 import { getDateFromIsoText, getMillisecondsFromIsoText } from "./lib/timestamp.js";
 import { getIntegerFromText } from "./lib/number.js";
-import { assertDefined } from "./lib/assert.js";
+import { assert, assertDefined } from "./lib/assert.js";
 
 /**
  * The vocabulary the whole front end shares, stated once so the modules cannot disagree
@@ -72,7 +72,13 @@ import { assertDefined } from "./lib/assert.js";
  * @property {number} bytes What one snapshot of this world costs a client, gzipped.
  */
 
-/** @type {Record<number, string>} */
+/**
+ * The professions, in the ranking's own Polish. Read by the parser as well as by the view:
+ * `src/parser.ts` folds these names to match a column heading, so this table and the
+ * ranking's vocabulary are the same thing stated once (§9.1).
+ *
+ * @type {Record<number, string>}
+ */
 export const PROFESSION_NAMES = {
   1: "Wojownik",
   2: "Mag",
@@ -112,21 +118,44 @@ export function isNeverOnline(days) {
 }
 
 /**
- * The activity bucket: 0 = <24h, 1 = 1-7 days, 2 = 8-30 days, 3 = >30 days, 4 = never.
- * The buckets are **disjoint**, not cumulative — the cumulative thresholds live in
- * `ACTIVITY_THRESHOLDS` in `history.js`, and those are two different scales.
+ * The activity scale, **disjoint**: how many days ago a player was last online, in the four
+ * bands the data is counted in. The fifth bucket — an account never used — is not a number
+ * of days and so has no bounds here; it is `ACTIVITY_BUCKET_COUNT - 1`.
  *
- * The same function as `getActivityBucket` in `src/trends.ts`, with one difference: that one
- * does not know the −1 sentinel, because there are no typed arrays on the server side and
- * nowhere for it to come from. On the values the scraper can produce, both must give the
- * same answer — drift would give a history that disagrees with the snapshot view. A test
- * holds this.
+ * The one place 7 and 30 are written. They used to be written four times: twice as a
+ * comparison (here and in `src/trends.ts`), once as these bounds in `filters.js`, and once
+ * as `bound` in `ACTIVITY_THRESHOLDS`. ⚠️ The cumulative thresholds in `history.js` are a
+ * **different scale** over the same subject — §10 — and they derive their edges from this
+ * table rather than restating them.
+ *
+ * @type {readonly (readonly [number, number])[]}
+ */
+export const ACTIVITY_BUCKET_BOUNDS = /** @type {const} */ ([
+  [0, 0],
+  [1, 7],
+  [8, 30],
+  [31, Infinity],
+]);
+
+/** Four bands of days, plus "never used". */
+export const ACTIVITY_BUCKET_COUNT = ACTIVITY_BUCKET_BOUNDS.length + 1;
+
+/** The bucket an account never used falls into — the one with no upper bound in days. */
+export const NEVER_ONLINE_BUCKET = ACTIVITY_BUCKET_COUNT - 1;
+
+/**
+ * The activity bucket: 0 = <24h, 1 = 1-7 days, 2 = 8-30 days, 3 = >30 days, 4 = never.
+ *
+ * Read by both sides — the browser filters with it and `src/trends.ts` folds the history
+ * with it (§9.1). The server cannot produce the −1 sentinel, having no typed arrays, so on
+ * its values this answers exactly what a version without that check would; the difference
+ * costs one comparison and saves a second implementation.
  *
  * @param {number | null | undefined} days
- * @returns {number} 0-4
+ * @returns {number} 0 to ACTIVITY_BUCKET_COUNT - 1
  */
 export function getActivityBucket(days) {
-  if (isNeverOnline(days)) return 4;
+  if (isNeverOnline(days)) return NEVER_ONLINE_BUCKET;
 
   // `isNeverOnline` has already refused `null`, `undefined` and the −1 sentinel, but it
   // says so in prose rather than in a type the checker can follow — a predicate cannot
@@ -134,10 +163,25 @@ export function getActivityBucket(days) {
   // put the sentinel's meaning in two places, which is the one thing that module exists to
   // prevent (§9.1).
   const value = /** @type {number} */ (days);
-  if (value === 0) return 0;
-  if (value <= 7) return 1;
-  if (value <= 30) return 2;
-  return 3;
+  const bucket = ACTIVITY_BUCKET_BOUNDS.findIndex(([, to]) => value <= to);
+
+  // The last band reaches Infinity, so a finite number always lands somewhere. A miss would
+  // mean the table stopped covering the number line, not that this reading is unusual.
+  assert(bucket !== -1, "the activity bands cover every non-negative number of days");
+  return bucket;
+}
+
+/**
+ * The last day a bucket still covers. What the cumulative thresholds in `history.js` are
+ * built from: "≤ 7 dni" is buckets 0 and 1, and its edge is whatever the table says bucket
+ * 1 ends at — never a 7 written a second time.
+ *
+ * @param {number} bucket
+ * @returns {number}
+ */
+export function getActivityBucketBound(bucket) {
+  const bounds = assertDefined(ACTIVITY_BUCKET_BOUNDS[bucket], "a bucket of days has bounds");
+  return bounds[1];
 }
 
 /**
