@@ -1,4 +1,4 @@
-# margostat
+# MargoStat
 
 Player statistics for [Margonem](https://www.margonem.pl) — a scraper for the world rankings plus an interactive dashboard hosted on **GitHub Pages**.
 

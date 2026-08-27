@@ -13,8 +13,9 @@ GitHub Pages. It periodically fetches the player rankings of every tracked world
 snapshots to static JSON files, and lets you browse and filter them with no backend at all.
 
 - **Live:** https://kamilgrocholski.github.io/chary/
-- **Repo:** `git@github.com:KamilGrocholski/chary.git` — note that the repository is called
-  `chary` even though the package and the project are `margostat`. That is not a mistake.
+- **Repo:** `git@github.com:KamilGrocholski/chary.git` — the project is called **MargoStat**,
+  the repository `chary`, and the npm package id `margostat` (lowercase, because npm forbids
+  capitals). None of the three disagreements is a mistake.
 - **Data source:** `https://www.margonem.pl/ladder/<world>/players?page=N`
 - **State:** 244 snapshots from 21 worlds, **12 rounds** since 2026-04-17, ~593k players per
   round, `public/` 173 MB. Two worlds are off that grid: `brutal` has a 13th snapshot from a
