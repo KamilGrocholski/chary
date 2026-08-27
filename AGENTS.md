@@ -290,6 +290,24 @@ columns mean, what it prints for an account nobody has used: dated claims, per �
 - `[ALWAYS] [scrape]` **One strange row must not take down a world.** A row that cannot be
   read is rejected with a reason; only above 1% of a page do we assume the markup changed
   and abort.
+- `[ALWAYS] [scrape]` **The pages of a walk are stitched, never concatenated.** `?page=N`
+  is an offset into a live list, not an address in a fixed one, and a round spends 6-13
+  minutes per world. A character inserted above the current page pushes the tail of it onto
+  the next one; a character leaving pulls characters past unseen. `removePageOverlap`
+  (`src/page-overlap.ts`) drops a `charId` already fetched and keeps the first copy, because
+  row *i* is rank *i+1*. Measured on 2026-08-27: 150 rows across the published snapshots
+  were fetched twice, 122 of them luvia's — the world that takes ~5500 new characters a
+  round against ~350 for aether.
+- `[ALWAYS] [scrape]` **A snapshot's `count` is a floor, not a population.** The repeats can
+  be removed; the characters the list shifted past leave nothing on the page to find them
+  by. One luvia snapshot double-counted 52 rows and missed at least 20 characters at the
+  same time. `[NEVER]` present it as an exact population, and `[NEVER]` estimate the
+  difference — §9.5.
+- `[ALWAYS] [scrape]` **The "#" column is an offset, not a rank.** It reads
+  `(page − 1) · 100 + i + 1` and is contiguous by construction — probed 2026-08-27, luvia
+  page 2 prints 101..200 and page 3 prints 201..300 — so it says the same thing whether or
+  not the page repeats characters. A sequence check over it passes on every snapshot,
+  including the broken ones. Identity is `charId` and nothing else.
 - `[ALWAYS] [scrape]` **The population guard writes rather than rejects.** A snapshot whose
   population dropped more than the threshold against the previous one is written and
   flagged `suspect`. Losing a whole round hurts more than a snapshot with a warning, and
@@ -349,6 +367,9 @@ src/               The scraper and the data format. Runs in a terminal, never in
                    public/trends.json.
   atomic.ts        Write to a temp file, then rename. All of it or none of it.
   retry.ts         Backoff and Retry-After. Pure, because world-scraper.ts runs on import.
+  page-overlap.ts  Stitching a walk's pages into one snapshot: the ranking re-sorts while
+                   we page through it, so a character can arrive twice. Pure, for the same
+                   reason as retry.ts.
   rebuild-data.ts  Data maintenance CLI: migration, then the manifest, then the trends.
   worlds.ts        The worlds we track. Edited by hand — §4.
   server.ts        A local static server for previewing public/.
@@ -397,6 +418,9 @@ test/              A test sits beside the thing it tests.
   lib.test.ts        The floor: every value JavaScript would otherwise have invented.
   scraper-cli.test.ts
                      Every argument the scraper refuses, and why each refusal exists.
+  page-overlap.test.ts
+                     Stitching a walk's pages: what a repeat costs, which copy survives,
+                     and that a seam nothing moved under is counted as nothing.
   language.test.ts   The language boundary of §9.8, over comments and string literals.
   dom-smoke.ts       A DOM stub — two scenarios, run from the tests in a subprocess.
   source-text.ts     Splitting a source into comments, code and string literals.
@@ -510,6 +534,11 @@ filtering has no use for them; the split cut `public/` from 620 MB to 118 MB.
   used** — the ranking shows about 20655 days for those, a date in 1969. They fall out of
   every activity threshold.
 - **`honor` can be negative.** The lowest observed is −35. No `Math.max(0, …)`.
+- **`count` is what the walk collected, not what the world holds** — a floor. The walk
+  pages through a ranking that re-sorts under it, so before 08.2026 a character could land
+  in a snapshot twice, and in any snapshot a character can be missed entirely. `overlapRows`
+  says how many repeats were dropped on the way in; it is absent, not `0`, on everything
+  written before anything counted. §7.6 and `docs/2026-08-27-page-boundary-overlap.md`.
 - **A snapshot's `id` is NOT a date.** Files from before August 2026 carry local time in
   the name, newer ones UTC. Displaying a date and measuring an interval use `startedAt`
   from the manifest or the file, and nothing else. The same goes for the `timestamp` field
@@ -918,6 +947,7 @@ budgets, and they are different things:
 | [`docs/2026-08-05-audit-ui-ux.md`](docs/2026-08-05-audit-ui-ux.md) | Audit #4, the first about the interface: border contrast, chips squeezed to 0 px, focus lost on Escape. The measuring method and three hypotheses disproved. |
 | [`docs/2026-08-26-spec-history-budget.md`](docs/2026-08-26-spec-history-budget.md) | Pricing the history ceiling in bytes instead of snapshots, and why the time axis belongs to the aggregate. |
 | [`docs/2026-08-27-spec-rewrite.md`](docs/2026-08-27-spec-rewrite.md) | This rewrite: what changed, the four latent faults that fell out of it, what the published `public/lib/` costs, and the two guards that were wrong before they were right. |
+| [`docs/2026-08-27-page-boundary-overlap.md`](docs/2026-08-27-page-boundary-overlap.md) | Luvia's population was right and the walk was not: paging through a live ranking fetched 150 rows twice and missed at least 20 characters, in silence. Why the `#` column cannot catch it and `charId` can. |
 | [`README.md`](README.md) | The manual, for a human. |
 
 New notes go to `docs/`, named `YYYY-MM-DD-<topic>.md`, and are added to the table in

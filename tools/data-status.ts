@@ -13,13 +13,13 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { PUBLIC_DIR, WORLDS_DIR } from "@/src/manifest.ts";
-import { TRENDS_FILE, type Trends } from "@/src/trends.ts";
+import { TRENDS_FILE, readFilterFile, type Trends } from "@/src/trends.ts";
 import { HISTORY_BUDGET_BYTES } from "@/public/history.js";
 import { getValueFromJsonText } from "@/public/lib/json.js";
 import { assert } from "@/public/lib/assert.js";
 import { BYTES_IN_GIGABYTE, BYTES_IN_KILOBYTE, BYTES_IN_MEGABYTE } from "@/public/lib/byte-size.js";
 import { getTextOrder } from "@/public/lib/text-order.js";
-import { FILTER_SUFFIX } from "@/src/snapshot.ts";
+import { FILTER_SUFFIX, getTimestampFromFileName } from "@/src/snapshot.ts";
 
 /** GitHub Pages refuses to publish an artefact past this. Not ours to raise. */
 const PAGES_LIMIT_BYTES = BYTES_IN_GIGABYTE;
@@ -97,3 +97,44 @@ output.write(
   `\n  ${trimmedWorlds.length} of ${rows.length} worlds meet the ceiling` +
     `${trimmedWorlds.length > 0 ? `: ${trimmedWorlds.map((row) => row.world).join(", ")}` : ""}\n\n`,
 );
+
+// What the ranking moving under a walk cost that walk. Reading every `.f.json` in full
+// costs ~0.6 s against the whole tree, which is cheaper than a prefix and a pattern that
+// would go quietly wrong the day a field moves.
+const overlaps: { world: string; id: string; overlapRows: number }[] = [];
+let counted = 0;
+
+for (const world of worldNames) {
+  const directory = path.join(WORLDS_DIR, world);
+  for (const file of (await readdir(directory)).filter((name) => name.endsWith(FILTER_SUFFIX)).sort()) {
+    const reading = getValueFromJsonText(await Bun.file(path.join(directory, file)).text());
+    if (!reading.ok) continue;
+    const filters = readFilterFile(reading.value);
+    // Absent is not zero — a snapshot written before anything counted repeats says nothing
+    // about how many it had, and printing it as 0 would be a measurement nobody took (§5).
+    if (filters === null || typeof filters.overlapRows !== "number") continue;
+    counted++;
+    if (filters.overlapRows > 0) {
+      overlaps.push({ world, id: getTimestampFromFileName(file), overlapRows: filters.overlapRows });
+    }
+  }
+}
+
+output.write(`Rows a walk fetched twice and dropped before writing — AGENTS.md §9.2\n\n`);
+output.write(`  counted in  ${counted} of ${snapshots} snapshots`);
+output.write(counted < snapshots ? `; the rest were written before anything counted\n` : `\n`);
+
+if (counted === 0) {
+  output.write(`\n`);
+} else if (overlaps.length === 0) {
+  output.write(`  carrying    none — every counted walk read a ranking that held still\n\n`);
+} else {
+  const total = overlaps.reduce((sum, entry) => sum + entry.overlapRows, 0);
+  output.write(`  carrying    ${overlaps.length} snapshots, ${total} rows in total\n\n`);
+  for (const entry of overlaps.sort((left, right) => right.overlapRows - left.overlapRows)) {
+    output.write(`  ${entry.world.padEnd(9)} ${entry.id.padEnd(21)} ${String(entry.overlapRows).padStart(5)} rows\n`);
+  }
+  // The other direction of the same movement leaves nothing on the page to count, so this
+  // is a floor under how far the ranking moved — never a count of what the walk missed.
+  output.write(`\n  A walk that repeated rows also stepped over some. Those leave no trace.\n\n`);
+}

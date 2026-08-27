@@ -32,6 +32,16 @@ export type SnapshotMeta = {
   finishedAt?: string;
   pages?: number;
   skippedRows?: number;
+  /**
+   * How many rows the walk fetched twice and `removePageOverlap` dropped — the ranking
+   * shifting under a walk that takes minutes (`src/page-overlap.ts`). Absent on every
+   * snapshot written before 08.2026, when nothing counted it.
+   *
+   * It is a reliability mark on the snapshot, not a correction to it: the repeats are gone
+   * from the rows, but the same movement in the other direction stepped players over, and
+   * that leaves no trace on the page. Above zero, `count` is a floor.
+   */
+  overlapRows?: number;
   /** Set when a world's population dropped suspiciously far — see `checkPopulationDrop`. */
   suspect?: PopulationDrop;
 };

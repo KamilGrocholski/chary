@@ -17,6 +17,7 @@ import { WORLDS_DIR, rebuildManifest } from "@/src/manifest.ts";
 import { rebuildTrends } from "@/src/trends.ts";
 import { writeAtomic } from "@/src/atomic.ts";
 import { MAX_PAGE_RETRIES, getBackoffMs, parseRetryAfter } from "@/src/retry.ts";
+import { removePageOverlap } from "@/src/page-overlap.ts";
 
 // ── Error types ───────────────────────────────────────────────────────────────
 //
@@ -44,6 +45,13 @@ class SnapshotWriteError extends MargoStatToolError {
     super("SnapshotWrite", message, options);
   }
 }
+
+/** What one world's round produced, beyond the snapshot it wrote. */
+type WorldRoundResult = {
+  suspect: PopulationDrop | null;
+  overlapRows: number;
+  shiftedBoundaries: number;
+};
 
 // ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -196,10 +204,13 @@ async function scrapeWorld(
   world: string,
   interval: number,
   dropThreshold: number,
-): Promise<PopulationDrop | null> {
+): Promise<WorldRoundResult> {
   const startedAt = new Date();
-  const allRows: PlayerRow[] = [];
+  // The pages are kept apart rather than concatenated: `removePageOverlap` counts the seams
+  // at which the ranking had shifted under the walk, and a flat array has no seams left.
+  const walkedPages: PlayerRow[][] = [];
   const badRows: string[] = [];
+  let walkedRows = 0;
   let page = 1;
   let maxPages = 1;
 
@@ -210,27 +221,33 @@ async function scrapeWorld(
     const result = await scrapePageWithRetry(world, page);
     if (page === 1) maxPages = result.totalPages;
 
-    allRows.push(...result.rows);
+    walkedPages.push(result.rows);
+    walkedRows += result.rows.length;
     badRows.push(...result.badRows.map((error) => `p.${page}: ${error}`));
 
     await log("DEBUG", `page ${page}/${maxPages}: ${result.rows.length} rows`, { world });
-    process.stdout.write(`\r  ${world}: page ${page}/${maxPages} (${allRows.length} players)`);
+    process.stdout.write(`\r  ${world}: page ${page}/${maxPages} (${walkedRows} players)`);
     page++;
 
     if (page <= maxPages) await sleep(interval);
   }
 
+  const { rows, overlapRows, shiftedBoundaries } = removePageOverlap(walkedPages);
+
   const directory = path.join(WORLDS_DIR, world);
   const timestamp = formatStamp(startedAt);
-  const suspect = checkPopulationDrop(allRows.length, await getLatestSnapshotCount(directory), dropThreshold);
+  // The stitched count, not the walked one: a repeat was never a player, and comparing a
+  // doubled-up count against a previous round's would hide a drop behind the walk's error.
+  const suspect = checkPopulationDrop(rows.length, await getLatestSnapshotCount(directory), dropThreshold);
 
-  const { filters, names } = splitSnapshot(allRows, {
+  const { filters, names } = splitSnapshot(rows, {
     world,
     timestamp,
     startedAt: startedAt.toISOString(),
     finishedAt: new Date().toISOString(),
     pages: maxPages,
     skippedRows: badRows.length,
+    overlapRows,
     ...(suspect ? { suspect } : {}),
   });
 
@@ -249,21 +266,35 @@ async function scrapeWorld(
     await log("WARN", `skipped ${badRows.length} rows`, { world, examples: badRows.slice(0, 5) });
   }
 
+  if (overlapRows > 0) {
+    await log("WARN", `dropped ${overlapRows} rows the walk fetched twice`, {
+      world,
+      overlapRows,
+      shiftedBoundaries,
+      walkedRows,
+    });
+  }
+
+  // Zero says nothing and stays off the line, the way `skippedRows` already does.
+  const overlapText = overlapRows > 0 ? ` — ${overlapRows} repeated rows dropped at ${shiftedBoundaries} page seams` : "";
+
   if (suspect) {
     await log("WARN", `suspect snapshot: ${suspect.reason}`, { world, ...suspect });
-    process.stdout.write(`\r⚠ ${world}: ${allRows.length} players — ${suspect.reason}\n`);
+    process.stdout.write(`\r⚠ ${world}: ${rows.length} players — ${suspect.reason}\n`);
   } else {
-    process.stdout.write(`\r✓ ${world}: ${allRows.length} players, ${maxPages} pages — written\n`);
+    process.stdout.write(`\r✓ ${world}: ${rows.length} players, ${maxPages} pages — written${overlapText}\n`);
   }
   await log("INFO", `done`, {
     world,
-    rows: allRows.length,
+    rows: rows.length,
     pages: maxPages,
     skippedRows: badRows.length,
+    overlapRows,
+    shiftedBoundaries,
     file: composeFilterPath(directory, timestamp),
   });
 
-  return suspect;
+  return { suspect, overlapRows, shiftedBoundaries };
 }
 
 // ── Dry-run ───────────────────────────────────────────────────────────────────
@@ -355,11 +386,13 @@ if (isDryRun) {
 
 const failures: { world: string; code: string; error: string }[] = [];
 const suspects: { world: string; reason: string }[] = [];
+const overlaps: { world: string; overlapRows: number; shiftedBoundaries: number }[] = [];
 
 for (const world of worlds) {
   try {
-    const suspect = await scrapeWorld(world, intervalMs, dropThreshold);
+    const { suspect, overlapRows, shiftedBoundaries } = await scrapeWorld(world, intervalMs, dropThreshold);
     if (suspect) suspects.push({ world, reason: suspect.reason });
+    if (overlapRows > 0) overlaps.push({ world, overlapRows, shiftedBoundaries });
   } catch (error) {
     // The boundary with the ranking and with the filesystem: whatever comes back, this
     // world is over and the next one still has to run (§9.5).
@@ -378,6 +411,19 @@ await rebuildManifest();
 const { skipped } = await rebuildTrends();
 if (skipped > 0) {
   await log("WARN", `trends: skipped ${skipped} snapshots with no startedAt`, { skipped });
+}
+
+if (overlaps.length > 0) {
+  // Not a warning to act on: the repeats are already gone from what was written. What it
+  // reports is how far the ranking moved under the walk — and the other direction of that
+  // same movement, the players the walk stepped over, is not visible from the pages at all
+  // (`src/page-overlap.ts`). A world that grows here is a world whose `count` is a floor.
+  process.stdout.write(`\n${overlaps.length} worlds were read off a moving ranking:\n`);
+  for (const overlap of overlaps) {
+    process.stdout.write(
+      `  ${overlap.world}: ${overlap.overlapRows} repeated rows dropped at ${overlap.shiftedBoundaries} page seams\n`,
+    );
+  }
 }
 
 if (suspects.length > 0) {
