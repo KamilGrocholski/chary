@@ -19,6 +19,7 @@ import { getValueFromJsonText } from "@/public/lib/json.js";
 import { assert } from "@/public/lib/assert.js";
 import { BYTES_IN_GIGABYTE, BYTES_IN_KILOBYTE, BYTES_IN_MEGABYTE } from "@/public/lib/byte-size.js";
 import { getTextOrder } from "@/public/lib/text-order.js";
+import { FILTER_SUFFIX } from "@/src/snapshot.ts";
 
 /** GitHub Pages refuses to publish an artefact past this. Not ours to raise. */
 const PAGES_LIMIT_BYTES = BYTES_IN_GIGABYTE;
@@ -46,7 +47,7 @@ const trends = trendsReading.value as Trends;
 const worldNames = Object.keys(trends.worlds).sort(getTextOrder);
 let snapshots = 0;
 for (const world of worldNames) {
-  snapshots += (await readdir(path.join(WORLDS_DIR, world))).filter((f) => f.endsWith(".f.json")).length;
+  snapshots += (await readdir(path.join(WORLDS_DIR, world))).filter((f) => f.endsWith(FILTER_SUFFIX)).length;
 }
 
 // The number of rounds is the longest history, not an average: a world that joined late

@@ -73,6 +73,13 @@ import { assert, assertDefined } from "./lib/assert.js";
  */
 
 /**
+ * The locale every number a player reads is formatted in — "23 719" and "−5,3%", never
+ * "23,719" and "-5.3%". One spelling, because a page that mixes two conventions in one
+ * table looks like two different numbers.
+ */
+export const POLISH_LOCALE = "pl-PL";
+
+/**
  * The professions, in the ranking's own Polish. Read by the parser as well as by the view:
  * `src/parser.ts` folds these names to match a column heading, so this table and the
  * ranking's vocabulary are the same thing stated once (§9.1).

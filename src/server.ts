@@ -1,7 +1,8 @@
 import path from "node:path";
+import { PUBLIC_DIR } from "@/src/manifest.ts";
 
 // A local preview of what lands on GitHub Pages.
-const ROOT = path.resolve("public");
+const ROOT = path.resolve(PUBLIC_DIR);
 
 function resolveInsideRoot(pathname: string): string | null {
   // Without normalising, `/../src/world-scraper.ts` escaped public/.

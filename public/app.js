@@ -10,7 +10,7 @@
 //
 // The strings a reader sees are Polish — see "Language" in AGENTS.md.
 
-import { PROFESSION_COLORS, getProfessionEntries, capitalize, formatSnapshotDate, formatShortDate, formatUtcTime } from "./shared.js";
+import { POLISH_LOCALE, PROFESSION_COLORS, getProfessionEntries, capitalize, formatSnapshotDate, formatShortDate, formatUtcTime } from "./shared.js";
 import {
   getActivityLabel,
   countByActivity,
@@ -360,11 +360,11 @@ function setupView() {
 
   // ── Formatting numbers ────────────────────────────────────────────────────
 
-  const formatNumber = (/** @type {number} */ n) => n.toLocaleString("pl-PL");
+  const formatNumber = (/** @type {number} */ n) => n.toLocaleString(POLISH_LOCALE);
   // Fractions in Polish too — "−5,3%" next to "23 719" rather than "−5.3%", two
   // conventions at once.
   const formatDecimal = (/** @type {number} */ n, digits = 1) =>
-    n.toLocaleString("pl-PL", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    n.toLocaleString(POLISH_LOCALE, { minimumFractionDigits: digits, maximumFractionDigits: digits });
   const signed = (/** @type {number} */ n, format = formatNumber) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${format(Math.abs(n))}`;
   // A transfer, as the person paying for it reads it. Under a megabyte in whole kilobytes:
   // "0,4 MB" says less than "360 KB" to somebody deciding whether to press the button.

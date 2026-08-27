@@ -1,6 +1,6 @@
 import { mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
-import { isLegacySnapshot, getTimestampFromFileName } from "@/src/snapshot.ts";
+import { FILTER_SUFFIX, NAMES_SUFFIX, isLegacySnapshot, getTimestampFromFileName } from "@/src/snapshot.ts";
 import { writeAtomic } from "@/src/atomic.ts";
 import { getValueFromJsonText } from "@/public/lib/json.js";
 import { getTextOrder } from "@/public/lib/text-order.js";
@@ -51,7 +51,7 @@ export async function rebuildManifest(): Promise<Manifest> {
     const snapshots: SnapshotEntry[] = [];
 
     for (const id of ids) {
-      const filters = `${id}.f.json`;
+      const filters = `${id}${FILTER_SUFFIX}`;
       const legacy = `${id}.json`;
       if (!present.has(filters) && !present.has(legacy)) continue;
 
@@ -80,7 +80,7 @@ export async function rebuildManifest(): Promise<Manifest> {
         id,
         ...(startedAt ? { startedAt } : {}),
         filters: rel(source),
-        ...(present.has(`${id}.n.json`) ? { names: rel(`${id}.n.json`) } : {}),
+        ...(present.has(`${id}${NAMES_SUFFIX}`) ? { names: rel(`${id}${NAMES_SUFFIX}`) } : {}),
         ...(present.has(legacy) ? { file: rel(legacy) } : {}),
       });
     }

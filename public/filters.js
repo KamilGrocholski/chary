@@ -11,6 +11,7 @@
 import {
   ACTIVITY_BUCKET_BOUNDS,
   NEVER_ONLINE_BUCKET,
+  POLISH_LOCALE,
   PROFESSION_COUNT,
   PROFESSION_NAMES,
   composeActivityCounts,
@@ -114,7 +115,7 @@ export function isDefaultFilters(f) {
  * @returns {FilterChip[]}
  */
 export function describeFilters(f) {
-  const n = (/** @type {number} */ value) => value.toLocaleString("pl-PL");
+  const n = (/** @type {number} */ value) => value.toLocaleString(POLISH_LOCALE);
   /** @type {FilterChip[]} */
   const chips = [];
 

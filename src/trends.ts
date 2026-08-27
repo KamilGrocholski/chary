@@ -1,7 +1,7 @@
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { PUBLIC_DIR, WORLDS_DIR } from "@/src/manifest.ts";
-import { getTimestampFromFileName, type FilterFile } from "@/src/snapshot.ts";
+import { FILTER_SUFFIX, getTimestampFromFileName, type FilterFile } from "@/src/snapshot.ts";
 import { writeAtomic } from "@/src/atomic.ts";
 import { assertDefined } from "@/public/lib/assert.js";
 import { getValueFromJsonText } from "@/public/lib/json.js";
@@ -178,7 +178,7 @@ export async function rebuildTrends(): Promise<{ trends: Trends; skipped: number
 
   for (const world of worldDirs) {
     const dir = path.join(WORLDS_DIR, world);
-    const files = (await readdir(dir)).filter((f) => f.endsWith(".f.json")).sort();
+    const files = (await readdir(dir)).filter((f) => f.endsWith(FILTER_SUFFIX)).sort();
 
     const snapshots: { id: string; filters: FilterFile }[] = [];
     for (const file of files) {
@@ -209,7 +209,7 @@ export async function rebuildTrends(): Promise<{ trends: Trends; skipped: number
 
     // What the next snapshot of this world will cost the client. Only the newest file is
     // compressed — 21 of them instead of 244, and within one world the sizes barely move.
-    trend.bytes = gzipSize(await Bun.file(path.join(dir, `${trend.id.at(-1)}.f.json`)).arrayBuffer());
+    trend.bytes = gzipSize(await Bun.file(path.join(dir, `${trend.id.at(-1)}${FILTER_SUFFIX}`)).arrayBuffer());
     worlds[world] = trend;
   }
 

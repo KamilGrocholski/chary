@@ -242,7 +242,7 @@ export function splitNormalized(rows: NormalizedRow[], meta: SnapshotMeta): { fi
 export async function getLatestSnapshotCount(dir: string): Promise<number | null> {
   let files: string[];
   try {
-    files = (await readdir(dir)).filter((f) => f.endsWith(".f.json")).sort();
+    files = (await readdir(dir)).filter((f) => f.endsWith(FILTER_SUFFIX)).sort();
   } catch {
     // The only expected failure here, and the only one worth answering `null` to: a world
     // scraped for the first time has no directory yet. The catch used to wrap the whole
@@ -269,12 +269,22 @@ export async function getLatestSnapshotCount(dir: string): Promise<number | null
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 
+/**
+ * The two halves of a snapshot, by the ending of their names. Written here and read
+ * everywhere else — the manifest builds URLs with them, the trends and the status tool find
+ * snapshots by them, and this file composes paths from them. They are part of the published
+ * contract: a shared link resolves to `<id>.f.json` on Pages, so changing either is `[ASK]`
+ * and reaches every file ever written.
+ */
+export const FILTER_SUFFIX = ".f.json";
+export const NAMES_SUFFIX = ".n.json";
+
 export function composeFilterPath(dir: string, timestamp: string) {
-  return path.join(dir, `${timestamp}.f.json`);
+  return path.join(dir, `${timestamp}${FILTER_SUFFIX}`);
 }
 
 export function composeNamesPath(dir: string, timestamp: string) {
-  return path.join(dir, `${timestamp}.n.json`);
+  return path.join(dir, `${timestamp}${NAMES_SUFFIX}`);
 }
 
 /** Whether the filename is a snapshot in the old, single-file format. */
