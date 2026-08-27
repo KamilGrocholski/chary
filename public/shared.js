@@ -69,7 +69,12 @@ import { assert, assertDefined } from "./lib/assert.js";
  * @property {number[][]} act
  * @property {number[][]} byProf
  * @property {number[]} suspect
- * @property {number} bytes What one snapshot of this world costs a client, gzipped.
+ * @property {number} bytes What one of this world's snapshots costs over the wire: the gzip
+ *   size of the newest `.f.json`. The history view spends its transfer budget in this
+ *   currency. One number per world, not per snapshot — per-snapshot sizes in the manifest
+ *   measured 5835 → 7164 B gzip, i.e. +1.3 KB on every visit for everyone, and within a
+ *   world the sizes barely move. A raw size times a constant ratio will not do instead: the
+ *   ratio is 4.18 for one world and 4.85 for another, so a constant misjudges one by 15%.
  */
 
 /**

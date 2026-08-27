@@ -410,6 +410,9 @@ test/              A test sits beside the thing it tests.
                      surface; the synonyms and contractions it may not carry, over every
                      function; and over every declaration, that it is not named exactly
                      an action. Why the first one stops at the exports is measured there.
+    type-agreement.test.ts
+                     The manifest entry the scraper writes against the one the dashboard
+                     reads: the fields they share, held by the typechecker.
     cited-paths.test.ts
                      Every path this file and README.md name is a path that exists.
     commit-messages.test.ts

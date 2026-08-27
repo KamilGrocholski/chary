@@ -27,13 +27,13 @@ import {
 export const TRENDS_SCHEMA = 2;
 export const TRENDS_FILE = path.join(PUBLIC_DIR, "trends.json");
 
-export type SnapshotSummary = {
-  total: number;
-  /** Activity bucket counts, indexed as in `getActivityBucket`. */
-  act: number[];
-  /** Counts for professions 1-6. */
-  byProf: number[];
-};
+/**
+ * The few numbers a chart draws — one row of `trends.json`. Stated once, in
+ * `public/shared.js`, because the browser computes the same shape when a filter is set and
+ * the two paths must be indistinguishable to the drawing (§9.6). Re-exported here so the
+ * scraper's callers read it from the module that builds it.
+ */
+export type SnapshotSummary = import("@/public/shared.js").SnapshotSummary;
 
 export function summarizeSnapshot(filters: FilterFile): SnapshotSummary {
   const act = composeActivityCounts();
@@ -60,27 +60,12 @@ export function summarizeSnapshot(filters: FilterFile): SnapshotSummary {
   return { total, act, byProf };
 }
 
-/** One world's history, columnar. Row i of every column is the same snapshot. */
-export type WorldTrend = {
-  id: string[];
-  startedAt: string[];
-  total: number[];
-  act: number[][];
-  byProf: number[][];
-  suspect: number[];
-  /**
-   * What one of this world's snapshots costs over the wire: the gzip size of the newest
-   * `.f.json`, in bytes. The history view spends its transfer budget in this currency, so
-   * the ceiling falls on gordion (180 KB a snapshot) rather than on brutal (19 KB).
-   *
-   * One number per world, not per snapshot: per-snapshot sizes in the manifest measured
-   * 5835 → 7164 B gzip, i.e. +1.3 KB on every visit for everyone — and within a world the
-   * sizes barely move (gordion 177-185 KB), so count × this is accurate enough to choose a
-   * count. The raw size will not do instead: the gzip ratio is 4.18 for brutal and 4.85 for
-   * gordion, so a constant would misjudge one of them by 15%.
-   */
-  bytes: number;
-};
+/**
+ * One world's folded history, columnar. Stated once in `public/shared.js` for the same
+ * reason as `SnapshotSummary`: this is the shape of a file this repository publishes and the
+ * browser reads, so it has one definition and not one per side.
+ */
+export type WorldTrend = import("@/public/shared.js").WorldTrend;
 
 export type Trends = {
   schema: number;
