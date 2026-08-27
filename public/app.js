@@ -96,6 +96,13 @@ class MissingElementError extends MargoStatError {
  * in a `style="..."` resolves in the browser, so the token stays a token all the way down.
  * This object exists for Chart.js, which takes concrete colours and nothing else.
  */
+/**
+ * How long a burst of typing is allowed to run before the view redraws and, if a filter is
+ * set, before the history starts fetching. Long enough that "250" is one render rather than
+ * three; short enough that letting go of the key feels like the answer arriving.
+ */
+const RENDER_DEBOUNCE_MS = 150;
+
 function getThemeTokens() {
   const style = getComputedStyle(document.documentElement);
   const requireToken = (/** @type {string} */ name) => {
@@ -463,14 +470,20 @@ function setupView() {
     const pos = chart.canvas.getBoundingClientRect();
     node.style.opacity = "1";
 
-    let x = pos.left + tooltip.caretX + 12;
+    // The gap the tooltip keeps from the cursor, and the one it keeps from every edge it
+    // can be pushed against. Named because the second is spelled four times below and read
+    // as four unrelated eights.
+    const CURSOR_GAP = 12;
+    const EDGE_GAP = 8;
+
+    let x = pos.left + tooltip.caretX + CURSOR_GAP;
     let y = pos.top + tooltip.caretY - 10;
-    if (x + node.offsetWidth > window.innerWidth - 8) x = pos.left + tooltip.caretX - node.offsetWidth - 12;
-    if (y + node.offsetHeight > window.innerHeight - 8) y = window.innerHeight - node.offsetHeight - 8;
+    if (x + node.offsetWidth > window.innerWidth - EDGE_GAP) x = pos.left + tooltip.caretX - node.offsetWidth - CURSOR_GAP;
+    if (y + node.offsetHeight > window.innerHeight - EDGE_GAP) y = window.innerHeight - node.offsetHeight - EDGE_GAP;
     // The filter bar is sticky and has a higher z-index than the tooltip, so the upper
     // clamp has to end below it rather than 8 px from the window's edge.
     const barBottom = getElement("filterBar").getBoundingClientRect().bottom || 0;
-    if (y < barBottom + 8) y = barBottom + 8;
+    if (y < barBottom + EDGE_GAP) y = barBottom + EDGE_GAP;
 
     node.style.left = `${x}px`;
     node.style.top = `${y}px`;
@@ -1160,7 +1173,7 @@ function setupView() {
     renderTimer = setTimeout(() => {
       render();
       void ensureHistory();
-    }, 150);
+    }, RENDER_DEBOUNCE_MS);
   }
 
   /**

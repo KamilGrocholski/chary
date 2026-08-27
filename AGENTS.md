@@ -528,6 +528,18 @@ per snapshot, because per-snapshot sizes in the manifest measured 5835 → 7164 
   only describes may never exist.
 - **Unknown is loud, never zero.** A failed read returns `null` or an explicit unknown; it
   never substitutes `0` and never copies a neighbour.
+- `[ALWAYS] [any]` **A literal earns a name by being spelled twice, or by deciding
+  something.** Those two, and not "no magic numbers" — §7.1 has already deleted a constant
+  that existed for its own sake. Spelled twice: the eight in the tooltip's edge clamp were
+  four unrelated eights until they became `EDGE_GAP`. Decides something: a debounce, a
+  threshold, a budget, the user agent §5 turns into a promise — somebody will go looking for
+  it by name. What does not earn one is a number that configures the object it is written
+  inside, once: `maxRotation: 45` says what it is, and `const MAX_ROTATION = 45` above it says
+  it twice.
+
+  ⚠️ A literal shared across a **file boundary** is a different problem and a name does not
+  solve it — §9.7's colours, `:root` against `app.js`. There the answer is one address and a
+  guard, because two files cannot be read together.
 - `[ALWAYS] [any]` **Imports are written from the repository root.**
 
   ```ts

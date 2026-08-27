@@ -92,6 +92,12 @@ function logError(err: unknown, context?: object) {
 const BASE = "https://www.margonem.pl";
 const FETCH_TIMEOUT_MS = 30_000;
 
+/**
+ * Who is knocking. AGENTS.md §5 makes this a promise rather than a detail — the scraper does
+ * not dress up as a browser — so it is named and spelled once.
+ */
+const USER_AGENT = "Mozilla/5.0 (margostat scraper)";
+
 /** Above this share of rejected rows on a page we assume the markup changed. */
 const MAX_BAD_ROW_RATIO = 0.01;
 
@@ -121,7 +127,7 @@ async function getPage(world: string, page: number): Promise<string> {
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: { "user-agent": "Mozilla/5.0 (margostat scraper)", accept: "text/html,application/xhtml+xml" },
+      headers: { "user-agent": USER_AGENT, accept: "text/html,application/xhtml+xml" },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   } catch (e) {

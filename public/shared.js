@@ -217,6 +217,8 @@ export function formatUtcTime(startedAt) {
   return d === null ? null : d.toISOString().slice(11, 16);
 }
 
+const MILLISECONDS_IN_DAY = 86_400_000;
+
 /**
  * The interval between snapshots in days — computed from `startedAt` and nothing else.
  *
@@ -230,5 +232,5 @@ export function getDaysBetween(a, b) {
   // Either end unreadable means there is no interval — not an interval of zero, which
   // would divide a change by no time at all and report it as an infinite rate.
   if (from === null || to === null) return null;
-  return (to - from) / 86_400_000;
+  return (to - from) / MILLISECONDS_IN_DAY;
 }
