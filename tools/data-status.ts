@@ -14,7 +14,6 @@ import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { PUBLIC_DIR, WORLDS_DIR } from "@/src/manifest.ts";
 import { TRENDS_FILE, readFilterFile, type Trends } from "@/src/trends.ts";
-import { HISTORY_BUDGET_BYTES } from "@/public/history.js";
 import { getValueFromJsonText } from "@/public/lib/json.js";
 import { assert } from "@/public/lib/assert.js";
 import { BYTES_IN_GIGABYTE, BYTES_IN_KILOBYTE, BYTES_IN_MEGABYTE } from "@/public/lib/byte-size.js";
@@ -68,46 +67,24 @@ output.write(
 );
 output.write(`  trends     ${formatBytes(trendsGzipBytes)} gzipped — what every visitor downloads\n`);
 
-output.write(`\nWhat one snapshot costs a visitor, and how far a filtered history reaches\n`);
-output.write(`(the transfer budget is ${formatBytes(HISTORY_BUDGET_BYTES)} — AGENTS.md §9.9)\n\n`);
-output.write(`  world      snapshot     held   of   reach\n`);
-
-const rows = worldNames
-  .map((world) => {
-    const trend = trends.worlds[world];
-    assert(trend !== undefined, "a world listed in trends.json has a trend");
-    // 0 means "not measured" — the client reads it the same way and falls back rather than
-    // treating the world as free.
-    const held = trend.bytes > 0 ? Math.floor(HISTORY_BUDGET_BYTES / trend.bytes) : trend.id.length;
-    return { world, bytes: trend.bytes, held: Math.min(held, trend.id.length), of: trend.id.length };
-  })
-  .sort((left, right) => right.bytes - left.bytes);
-
-for (const row of rows) {
-  const trimmed = row.held < row.of;
-  output.write(
-    `  ${row.world.padEnd(9)} ${formatBytes(row.bytes).padStart(9)}` +
-      ` ${String(row.held).padStart(6)} ${String(row.of).padStart(4)}` +
-      `   ${trimmed ? "trimmed by the budget" : "whole history"}\n`,
-  );
-}
-
-const trimmedWorlds = rows.filter((row) => row.held < row.of);
-output.write(
-  `\n  ${trimmedWorlds.length} of ${rows.length} worlds meet the ceiling` +
-    `${trimmedWorlds.length > 0 ? `: ${trimmedWorlds.map((row) => row.world).join(", ")}` : ""}\n\n`,
-);
-
-// What the ranking moving under a walk cost that walk. Reading every `.f.json` in full
-// costs ~0.6 s against the whole tree, which is cheaper than a prefix and a pattern that
-// would go quietly wrong the day a field moves.
+// One pass over every `.f.json`, answering two questions at once: what a world's whole
+// history costs a filtering visitor, and what the ranking moving under a walk cost that
+// walk. Reading every file in full costs ~0.6 s against the whole tree, which is cheaper
+// than a prefix and a pattern that would go quietly wrong the day a field moves — and the
+// gzip is measured here rather than multiplied out of `bytes` in trends.json, because that
+// field prices the NEWEST snapshot only and §9.9 asks for a measurement, not a product.
+const historyBytes = new Map<string, number>();
 const overlaps: { world: string; id: string; overlapRows: number }[] = [];
 let counted = 0;
 
 for (const world of worldNames) {
   const directory = path.join(WORLDS_DIR, world);
+  let total = 0;
   for (const file of (await readdir(directory)).filter((name) => name.endsWith(FILTER_SUFFIX)).sort()) {
-    const reading = getValueFromJsonText(await Bun.file(path.join(directory, file)).text());
+    const bytes = await Bun.file(path.join(directory, file)).bytes();
+    total += Bun.gzipSync(bytes).length;
+
+    const reading = getValueFromJsonText(new TextDecoder().decode(bytes));
     if (!reading.ok) continue;
     const filters = readFilterFile(reading.value);
     // Absent is not zero — a snapshot written before anything counted repeats says nothing
@@ -118,7 +95,38 @@ for (const world of worldNames) {
       overlaps.push({ world, id: getTimestampFromFileName(file), overlapRows: filters.overlapRows });
     }
   }
+  historyBytes.set(world, total);
 }
+
+output.write(`\nWhat a filtering visitor downloads — AGENTS.md §9.9\n`);
+output.write(`(one snapshot for the cross-section; the whole history once a filter moves)\n\n`);
+output.write(`  world      snapshot   snapshots   whole history\n`);
+
+const rows = worldNames
+  .map((world) => {
+    const trend = trends.worlds[world];
+    assert(trend !== undefined, "a world listed in trends.json has a trend");
+    const whole = historyBytes.get(world);
+    assert(whole !== undefined, "every world in trends.json has its snapshots measured");
+    return { world, bytes: trend.bytes, of: trend.id.length, whole };
+  })
+  .sort((left, right) => right.whole - left.whole);
+
+for (const row of rows) {
+  output.write(
+    `  ${row.world.padEnd(9)} ${formatBytes(row.bytes).padStart(9)}` +
+      ` ${String(row.of).padStart(11)}   ${formatBytes(row.whole).padStart(9)} gzipped\n`,
+  );
+}
+
+// The worst case is the number worth carrying away: what the most expensive world costs
+// somebody who moves a filter, and the figure to watch as the history grows.
+const dearest = rows[0];
+assert(dearest !== undefined, "trends.json lists at least one world");
+output.write(
+  `\n  worst case  ${formatBytes(dearest.whole)} — ${dearest.world}, ` +
+    `the most a single filtering visitor downloads\n\n`,
+);
 
 output.write(`Rows a walk fetched twice and dropped before writing — AGENTS.md §9.2\n\n`);
 output.write(`  counted in  ${counted} of ${snapshots} snapshots`);

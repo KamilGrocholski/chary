@@ -784,58 +784,47 @@ describe("the view comes together — a filter set", () => {
     const getTotal = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.brutal
       .total.length;
 
-    // The stub prices a brutal snapshot at 300 KB, so exactly 6 of them fit into the 2 MiB
-    // budget — a constant, however many snapshots brutal gains later. Two different things
-    // are then missing from the chart at once, and the counter has to keep them apart: the
-    // budget is a decision, a failed fetch is an accident. Either way it counts against
-    // every snapshot the world has, because counting against the budget would report a
-    // trimmed history as a complete one.
-    expect(out.budgetInput.bytesPerSnapshot).toBe(300_000);
-    const planned = 6;
-
-    // A snapshot that did not arrive gets no point — and the view is to say so in the
-    // HISTORIA section, not in the error bar 1500 px higher, which is about the snapshot
-    // being cross-sectioned.
-    expect(out.partialHistory.status).toBe(
-      `${planned - 1} z ${getTotal} migawek · limit transferu 2,0 MB · 1 nie wczytano`,
-    );
-    expect(out.partialHistory.points).toBe(planned - 1);
+    // Every dated snapshot is fetched — there is no ceiling left to trim the plan, and that
+    // is the point of this whole round. The only thing missing from the chart is the one
+    // snapshot that answered 503, so the counter has exactly one reason to name and it is
+    // an accident rather than a decision.
+    expect(out.partialHistory.status).toBe(`${getTotal - 1} z ${getTotal} migawek · 1 nie wczytano`);
+    expect(out.partialHistory.points).toBe(getTotal - 1);
     expect(out.partialHistory.noteHidden).toBe(false);
     expect(out.partialHistory.note).toContain("Historia jest niepełna");
     expect(out.partialHistory.error).toBe("");
 
-    // The budget names what it left out and what the rest costs — a trimmed chart is
-    // indistinguishable from a world with a shorter history.
-    expect(out.partialHistory.budgetNoteHidden).toBe(false);
-    expect(out.partialHistory.budgetNote).toContain(`sięga ${planned} najnowszych migawek z ${getTotal}`);
-    expect(out.partialHistory.loadRestLabel).toMatch(/^Dociągnij resztę historii \(\+[\d, ]+ MB\)$/);
+    // The plan is every dated snapshot, and this world proves the guard is not vacuous: at
+    // the price the stub gives it, its whole history costs more than the 2 MiB ceiling that
+    // used to stand here, so under that ceiling only 6 of them would have been fetched and
+    // the counter above would read 6 rather than the whole set. Put a budget back and this
+    // test goes red — docs/2026-08-28-history-without-a-budget.md.
+    expect(out.priceInput.bytesPerSnapshot).toBe(300_000);
+    expect(out.priceInput.bytesPerSnapshot * getTotal).toBeGreaterThan(2 * 1024 * 1024);
 
-    // Pressing the button buys the rest: every snapshot is fetched, the note has nothing
-    // left to say, and the one that answers 503 is still the only point missing.
-    expect(out.afterLoadRest).toEqual({
-      status: `${getTotal - 1} z ${getTotal} migawek · 1 nie wczytano`,
-      budgetNoteHidden: true,
-      points: getTotal - 1,
-      axis: out.partialHistory.axis,
-    });
+    // Mid-flight the status carries the price. Nobody is stopped at a budget any more, so
+    // this line is the whole of what keeps the transfer knowingly bought — and it is
+    // approximate, because `bytes` prices the newest snapshot and the older ones are
+    // smaller. It says so with a `~` rather than looking exact (§9.6).
+    expect(out.loadingStatus).toMatch(
+      new RegExp(`^wczytywanie dokładnych danych… \\d+ z ${getTotal} migawek · ~[\\d, ]+ MB$`),
+    );
 
-    // The axis spans the world's whole history in all three states — that is the invariant
-    // the budget must not touch: filtering may take away points, never the period the chart
-    // describes. Compared against trends.json, so "equal to each other" cannot pass by all
-    // three being empty.
+    // The axis spans the world's whole history in both states — filtering may take away
+    // points, never the period the chart describes. Compared against trends.json, so "equal
+    // to each other" cannot pass by both being empty.
     const brutal = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.brutal;
     expect(out.partialHistory.axis).toEqual({
       min: new Date(brutal.startedAt[0]).getTime(),
       max: new Date(brutal.startedAt.at(-1)).getTime(),
     });
 
-    // Back at the default filter, the history comes from the complete aggregate — the whole
-    // of it, budget or no budget. The failure counter and the budget note from the previous
-    // filter have no business still describing it.
+    // Back at the default filter, the history comes from the complete aggregate — every
+    // snapshot, including the one whose file could not be fetched. The failure counter from
+    // the previous filter has no business still describing it.
     expect(out.afterReset).toEqual({
       status: `${getTotal} migawek`,
       noteHidden: true,
-      budgetNoteHidden: true,
       points: getTotal,
       axis: out.partialHistory.axis,
     });

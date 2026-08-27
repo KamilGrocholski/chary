@@ -391,8 +391,8 @@ public/            Exactly what lands on GitHub Pages. No build step — §1.
                    code. The one place `fetch` is spelled.
   filters.js       Filtering and counting: matches, countByLevel, summarizeFiltered, and
                    the filter's URL state.
-  history.js       One world's history: thresholds, series, typed arrays, fetching
-                   snapshots against a transfer budget.
+  history.js       One world's history: thresholds, series, typed arrays, and fetching
+                   every snapshot of one world once a filter moves.
   shared.js        The vocabulary of the data: professions, the activity scale, the counter
                    shapes, time. Read by the dashboard AND by src/ — the one module that
                    crosses (§9.1). Touches no DOM and runs nothing on import.
@@ -481,9 +481,10 @@ docs/              Dated specs and audits. docs/README.md indexes them.
   makes them testable outside a browser, and a test holds it. `fetch` in `history.js` is
   not an exception: it is not the document interface, and the tests substitute a stub.
 - `[ALWAYS] [tools]` **A tool may read `src/` and `public/` alike.** It ships nowhere, so
-  the layering above does not bind it — and a report about the transfer budget is only true
-  if it spends the constant the dashboard actually spends, rather than a copy of it
-  (`tools/data-status.ts` imports `HISTORY_BUDGET_BYTES` from `public/history.js`).
+  the layering above does not bind it — and a report about what the dashboard costs is only
+  true if it reads the same material the dashboard reads, rather than a copy of it
+  (`tools/data-status.ts` reads `trends.json` through `src/trends.ts` and gzips the
+  snapshots itself, because a price is measured and not multiplied out — §9.9).
 - `[ALWAYS] [any]` **A file holds one subject, however long that subject runs.** What
   forces a split is a **second** subject — never a line count, and never a docblock that
   got long.
@@ -795,8 +796,8 @@ tests too.
 - `[ALWAYS] [dash]` **The time axis comes from the aggregate, never from what was fetched.**
   Ticks, `scales.x.min/max` and the tooltips are built from that world's `trends.json`
   entry on both paths, so filtering can take points away but never the period the chart
-  describes. The gap the budget leaves stays empty and is named, with the button that
-  fetches the rest.
+  describes. A gap — a snapshot that failed, or one still in flight — stays empty and is
+  named where it falls.
 
 Two severities are enough, and a third is `[ASK]`:
 
@@ -807,19 +808,29 @@ Two severities are enough, and a third is `[ASK]`:
 
 **The two paths to one set of charts.** At the default filter the history is drawn from
 `trends.json` alone and no snapshot is fetched — that is why whoever does not filter does
-not pay for the largest world's whole history. Once the filter moves, the view fetches that
-one world's `.f.json` files, as many of the newest as fit a **transfer budget in bytes**,
-and computes the history itself, exactly, with no bucketing.
+not pay for the largest world's whole history. Once the filter moves, the view fetches
+**every** `.f.json` of that one world and computes the history itself, exactly, with no
+bucketing and no ceiling.
 
 `summarizeFiltered` in `filters.js` returns exactly the shape of a `trends.json` row, which
 is why the drawing cannot tell the two paths apart. Under the default filter the two must
 produce number for number what `summarizeSnapshot` in `src/trends.ts` produces, over every
 snapshot on disk — §9.1's last rule, and a test holds it.
 
-- `[ALWAYS] [dash]` **The budget is in bytes, never in snapshots.** A count priced the
-  largest world (177 KB a snapshot) like the smallest (20 KB), so it trimmed the cheapest
-  world of the twenty-one — saving 19 KB — and left the expensive one untouched.
-  `docs/2026-08-26-spec-history-budget.md`.
+- `[ALWAYS] [dash]` **A filtered history reaches every snapshot, and says what that costs
+  while it is being spent.** There is no ceiling and no button: measured on 2026-08-28 the
+  whole history of the most expensive world is 2.1 MB gzipped and the median world 0.9 MB,
+  so the ceiling was trimming one world by one snapshot while costing a note, a button and
+  four groups of tests. What is left of "transfer is bought knowingly" is the price in the
+  status line — a number nobody sees is a number bought blind. It carries a `~`, because
+  `bytes` prices the newest snapshot and the older ones are smaller.
+  `docs/2026-08-28-history-without-a-budget.md`.
+
+  ⚠️ The ceiling this replaced was itself a fix: before it, the cut was counted in snapshots
+  rather than bytes, which priced the largest world (177 KB a snapshot) like the smallest
+  (20 KB) and trimmed the cheapest of the twenty-one. Whatever comes back here when the
+  history outgrows a browser is **not** a count of snapshots
+  (`docs/2026-08-26-spec-history-budget.md`).
 - `[ALWAYS] [dash]` **`null` in `days` becomes `−1`** once a snapshot is converted to typed
   arrays, which cannot hold `null`. `−1 > maxDays` is **false**, so the `isNeverOnline`
   check comes **before** the threshold — otherwise accounts never used fall into every
@@ -890,21 +901,23 @@ behind them, are a deliberate exception on a different axis: they are the contra
 people have already shared, which is the entire reason `trends.html` still exists. A URL is
 not code style. `[NEVER]` rename them.
 
-### 9.9 The Pages budget
+### 9.9 The Pages budget, and the price of a filtered history
 
-GitHub Pages caps a published artefact at 1 GB, and every round adds to `public/`. Two
-budgets, and they are different things:
+GitHub Pages caps a published artefact at 1 GB, and every round adds to `public/`. One is a
+**budget** — a ceiling somebody enforces — and one is a **price**, which is watched rather
+than enforced:
 
-| Budget | Against | Spent by |
+| | Against | Spent by |
 |---|---|---|
-| **The artefact** | 1 GB, hard, imposed by Pages | Every snapshot ever scraped |
-| **The transfer** | 2 MiB, ours, per filtered history | The `.f.json` files one filtered world fetches |
+| **The artefact** — a budget | 1 GB, hard, imposed by Pages | Every snapshot ever scraped |
+| **The transfer** — a price | Nothing; it is reported, not capped | Every `.f.json` of the one world a visitor filtered |
 
 - `[ALWAYS] [any]` **Both are measured, never estimated in prose** — `bun run data:status`,
   and §5.
-- `[ALWAYS] [dash]` **The transfer budget is spent in `bytes` from `trends.json`**, which is
-  a gzip measurement. A raw size times a constant ratio will not do: the ratio is 4.18 for
-  one world and 4.85 for another, so a constant misjudges one of them by 15%.
+- `[ALWAYS] [any]` **Both are measured in gzip, over the files themselves.** A raw size
+  times a constant ratio will not do: the ratio is 4.18 for one world and 4.85 for another,
+  so a constant misjudges one of them by 15%. `bytes` in `trends.json` is that measurement
+  for one snapshot; a whole history is the sum of its files, not that figure multiplied out.
 - `[ASK] [any]` **Before anything that changes what a round costs** — a new field in a
   `.f.json`, a new world, a change of interval. `docs/2026-08-01-size-budget.md` works out
   how many rounds are left.
@@ -928,7 +941,7 @@ budgets, and they are different things:
 | **suspect** | A snapshot whose population dropped past the threshold against the previous one. Written, flagged, drawn — never discarded. |
 | **aggregate** | `public/trends.json` — every world's history folded to one number per snapshot. The default history path. |
 | **share** | A count as a percentage of the **unfiltered** population of that snapshot. |
-| **transfer budget** | The ceiling on what a filtered history may fetch, in bytes — §9.9. |
+| **price of a history** | What one filtered world costs a visitor over the wire, in gzipped bytes — measured, not capped. §9.9. |
 | **schema** | The version of the written format, `SNAPSHOT_SCHEMA`. Changing it is `[ASK]` and reaches every published file. |
 
 ---
@@ -945,8 +958,9 @@ budgets, and they are different things:
 | [`docs/2026-08-04-audit-3.md`](docs/2026-08-04-audit-3.md) | Audit #3: eight bugs the tests did not catch, a DOM stub gentler than a browser, `Retry-After: 0`, a non-atomic write. |
 | [`docs/2026-08-04-spec-filter-bar.md`](docs/2026-08-04-spec-filter-bar.md) | The pinned filter bar: page geometry measured in a browser, the variants, and the traps of `position: sticky` in this markup. |
 | [`docs/2026-08-05-audit-ui-ux.md`](docs/2026-08-05-audit-ui-ux.md) | Audit #4, the first about the interface: border contrast, chips squeezed to 0 px, focus lost on Escape. The measuring method and three hypotheses disproved. |
-| [`docs/2026-08-26-spec-history-budget.md`](docs/2026-08-26-spec-history-budget.md) | Pricing the history ceiling in bytes instead of snapshots, and why the time axis belongs to the aggregate. |
+| [`docs/2026-08-26-spec-history-budget.md`](docs/2026-08-26-spec-history-budget.md) | **Superseded** by the note below, except for the time axis, which still belongs to the aggregate. Pricing the history ceiling in bytes instead of snapshots. |
 | [`docs/2026-08-27-spec-rewrite.md`](docs/2026-08-27-spec-rewrite.md) | This rewrite: what changed, the four latent faults that fell out of it, what the published `public/lib/` costs, and the two guards that were wrong before they were right. |
+| [`docs/2026-08-28-history-without-a-budget.md`](docs/2026-08-28-history-without-a-budget.md) | Removing the transfer ceiling: what the whole history of every world actually costs, why the ceiling was trimming one world by one snapshot, and the price in the status line that replaced it. |
 | [`docs/2026-08-27-page-boundary-overlap.md`](docs/2026-08-27-page-boundary-overlap.md) | Luvia's population was right and the walk was not: paging through a live ranking fetched 150 rows twice and missed at least 20 characters, in silence. Why the `#` column cannot catch it and `charId` can. |
 | [`README.md`](README.md) | The manual, for a human. |
 

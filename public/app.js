@@ -3,9 +3,9 @@
 // logic sits in `filters.js` and `history.js` and is tested without a browser.
 //
 // Two data paths, deliberately unequal:
-//   • the default filter → history from `trends.json` (9 KB), fetched anyway
-//   • a filter set → history computed from that world's `.f.json` (up to 1.9 MB), pulled
-//     only after the first filter move and filling the chart in snapshot by snapshot
+//   • the default filter → history from `trends.json`, fetched anyway
+//   • a filter set → history computed from EVERY `.f.json` of that world, pulled only after
+//     the first filter move and filling the chart in snapshot by snapshot
 // Whoever does not filter does not pay a byte for the precision.
 //
 // The strings a reader sees are Polish — see "Language" in AGENTS.md.
@@ -23,9 +23,7 @@ import {
   getVisibleActivityBuckets,
 } from "./filters.js";
 import {
-  HISTORY_BUDGET_BYTES,
   getActiveCounts,
-  getBudgetedEntries,
   buildFilteredTrend,
   getCachedSnapshots,
   getChangeRows,
@@ -173,11 +171,6 @@ function startView() {
   let worldToken = 0; // invalidates a fetch after the world is switched
   let snapshotToken = 0; // the same for the single snapshot being cross-sectioned
   let progress = { loaded: 0, expected: 0, failed: 0, running: false };
-  // Worlds whose transfer budget the user has lifted by hand. Per world, because the choice
-  // is about that world's price — and it survives switching worlds and back, so the button
-  // does not have to be pressed twice for the same data.
-  /** @type {Set<string>} */
-  const lifted = new Set();
 
   /** @type {Record<string, ChartInstance>} */
   const charts = {};
@@ -187,9 +180,10 @@ function startView() {
   /** @type {number[]} */
   let tickValues = [];
   // The ends of the X axis, in the same epoch milliseconds. They come from the aggregate,
-  // never from the drawn series: the budget may leave the oldest snapshots unfetched, and an
-  // axis that shrank with them would move the left edge of the chart the moment somebody
-  // typed a level — the same world silently changing the period it describes.
+  // never from the drawn series: a snapshot can still be missing — one that failed to fetch,
+  // or one still in flight — and an axis that shrank with it would move the left edge of the
+  // chart the moment somebody typed a level, the same world silently changing the period it
+  // describes.
   /** @type {{ min: number, max: number } | null} */
   let axisRange = null;
   /** @type {Map<number, SnapshotEntry>} */
@@ -329,33 +323,19 @@ function startView() {
   const getBaseTrend = () => trends?.worlds[getCurrentWorld()] ?? null;
   const getCurrentSnapshot = () => getCachedSnapshots(getCurrentWorld()).get(getField("snapshotSelect").value) ?? null;
 
-  /** Every snapshot of this world that has a date, i.e. a place on the time axis. */
+  /**
+   * Every snapshot of this world that has a date, i.e. a place on the time axis — and, since
+   * the transfer budget was removed, the whole plan: a filtered history fetches all of them.
+   *
+   * The intersection with the manifest is what makes it a plan rather than a wish. A
+   * snapshot the aggregate knows and the manifest does not has no URL to fetch, so counting
+   * it as expected would leave "the history is incomplete" standing forever.
+   */
   function getDatedEntries() {
     const base = getBaseTrend();
     if (!base) return [];
     const dated = new Set(base.id);
     return getCurrentWorldEntries().filter((entry) => dated.has(entry.id));
-  }
-
-  /**
-   * The snapshots the filtered history is willing to fetch: the newest that fit into the
-   * transfer budget, or all of them once the user has lifted it for this world.
-   */
-  function getPlannedEntries() {
-    const entries = getDatedEntries();
-    if (lifted.has(getCurrentWorld())) return entries;
-    return getBudgetedEntries(entries, getBaseTrend()?.bytes ?? 0);
-  }
-
-  /**
-   * The snapshots the filtered history draws: the planned ones plus whatever is already in
-   * memory. A snapshot somebody has already paid for keeps its point — otherwise lifting the
-   * budget and then touching a filter would take the extra points away again.
-   */
-  function getDrawableEntries() {
-    const store = getCachedSnapshots(getCurrentWorld());
-    const planned = new Set(getPlannedEntries().map((entry) => entry.id));
-    return getDatedEntries().filter((entry) => planned.has(entry.id) || store.has(entry.id));
   }
 
   // ── Formatting numbers ────────────────────────────────────────────────────
@@ -870,8 +850,8 @@ function startView() {
     }
     const color = summary.delta < 0 ? "var(--danger)" : summary.delta > 0 ? "var(--ok)" : "var(--muted)";
     const span = summary.days === null ? "—" : `${Math.round(summary.days)} dni`;
-    // "Od pierwszej migawki" is a lie the moment the budget leaves the oldest ones unfetched:
-    // the axis still reaches April while the number counts from June. Then it says from when.
+    // "Od pierwszej migawki" is a lie the moment a snapshot is missing from the front: the
+    // axis still reaches April while the number counts from June. Then it says from when.
     const from =
       trend.startedAt[0] === base.startedAt[0]
         ? "pierwszej migawki"
@@ -966,19 +946,31 @@ function startView() {
   }
 
   /**
-   * The history counter, which doubles as the fetch progress bar.
+   * The history counter, which doubles as the fetch progress bar — and, while it is running,
+   * as the price of what is being fetched.
    *
-   * `available` is every dated snapshot of this world, `expected` only those this view is
-   * drawing — the two part company once the transfer budget starts cutting. The counter
-   * counts against `available`, because "10 migawek" under a world that has 12 reads as a
-   * complete set of data; trimming the range without saying so is worse than not trimming it.
-   */
-  /**
+   * It counts against every dated snapshot the world has, never against how many arrived:
+   * "10 migawek" under a world that has 12 reads as a complete set of data, and a range
+   * quietly short is worse than a range openly incomplete.
+   *
+   * The price is here because the transfer budget is not. Nobody is stopped at a ceiling any
+   * more, so the only thing left that keeps the transfer knowingly bought is naming it while
+   * it is being spent — a number nobody sees is a number bought blind.
+   *
+   * What it prices is what is still coming, not the whole set: snapshots already in memory
+   * from an earlier filter cost nothing to draw again, and a figure that counted them would
+   * overstate the transfer every time after the first.
+   *
+   * It is approximate and says so with a `~`: `bytes` in `trends.json` is the gzip size of
+   * the world's NEWEST snapshot and the older ones are smaller, because the population grew.
+   * Measured on aether, 12 × 98.5 KB = 1.15 MB against 1.156 MB actually on disk — close,
+   * but a number that might be wrong may not look like one that is right (§9.6).
+   *
    * @param {number} loaded
-   * @param {number} expected
    * @param {number} available
+   * @param {number} bytes gzip size of one snapshot; 0 = not measured
    */
-  function renderHistoryStatus(loaded, expected, available) {
+  function renderHistoryStatus(loaded, available, bytes) {
     const node = getElement("historyStatus");
     if (available === 0) {
       node.textContent = "brak datowanych migawek";
@@ -989,43 +981,17 @@ function startView() {
       return;
     }
     // Not the whole set. "Wczytywanie…" may be written only while something is still in
-    // flight — otherwise the status stays forever on a progress bar that has stopped, and
-    // the two reasons for a gap are named separately: the window is a decision, a failed
-    // fetch is an accident.
+    // flight — otherwise the status stays forever on a progress bar that has stopped.
     const parts = [
       progress.running
         ? `wczytywanie dokładnych danych… ${loaded} z ${available} migawek`
         : `${loaded} z ${available} migawek`,
     ];
-    if (available > expected) parts.push(`limit transferu ${formatBytes(HISTORY_BUDGET_BYTES)}`);
+    // Absent is not zero: a world whose price was never measured gets no figure rather than
+    // a "0 KB" nobody wrote (§9.5).
+    if (progress.running && bytes > 0) parts.push(`~${formatBytes((available - loaded) * bytes)}`);
     if (!progress.running && progress.failed > 0) parts.push(`${progress.failed} nie wczytano`);
     node.textContent = parts.join(" · ");
-  }
-
-  /**
-   * What the transfer budget left out, and the offer to buy it.
-   *
-   * A trimmed chart is indistinguishable from a world with a shorter history, so the ceiling
-   * has to be said out loud — and since the missing part is one click and a named number
-   * away, saying it without offering it would be worse than not trimming at all. Under the
-   * default filter nothing is trimmed: that path draws the whole aggregate for free.
-   */
-  /**
-   * @param {number} expected
-   * @param {number} available
-   * @param {number} bytes
-   */
-  function renderBudgetNote(expected, available, bytes) {
-    const missing = available - expected;
-    getElement("budgetNote").hidden = missing <= 0;
-    if (missing <= 0) return;
-
-    const rest = bytes > 0 ? ` (+${formatBytes(missing * bytes)})` : "";
-    getElement("budgetNoteText").innerHTML =
-      `<b>Historia pod filtrem sięga ${formatNumber(expected)} najnowszych migawek z ${formatNumber(available)}.</b> ` +
-      `Dokładne liczenie wymaga pobrania każdej migawki osobno, więc bierzemy tyle, ile mieści się ` +
-      `w ${formatBytes(HISTORY_BUDGET_BYTES)} — reszta czeka na kliknięcie. Wykresy bez filtra pokazują całość.`;
-    getElement("loadRestBtn").textContent = `Dociągnij resztę historii${rest}`;
   }
 
   // ── Rendering ─────────────────────────────────────────────────────────────
@@ -1093,17 +1059,15 @@ function startView() {
       return;
     }
 
-    const allowed = new Set(getDrawableEntries().map((entry) => entry.id));
-    const available = getDatedEntries().length;
+    const dated = getDatedEntries();
     const { trend, population, loaded, expected } = buildFilteredTrend(
       base,
       getCachedSnapshots(getCurrentWorld()),
       filters,
-      allowed,
+      new Set(dated.map((entry) => entry.id)),
     );
 
-    renderHistoryStatus(loaded, expected, available);
-    renderBudgetNote(expected, available, base.bytes ?? 0);
+    renderHistoryStatus(loaded, dated.length, base.bytes ?? 0);
     // The note hangs on how much is genuinely missing — not on whether anything is still in
     // flight. Otherwise a failed fetch made it disappear, leaving an incomplete chart with
     // nothing said about it.
@@ -1114,7 +1078,7 @@ function startView() {
         `<span aria-hidden="true">${stalled ? "⚠" : "⏳"}</span><span><b>` +
         (stalled ? "Historia jest niepełna." : "Historia dopełnia się w tle.") +
         `</b> Narysowane są tylko migawki już wczytane ` +
-        `(${loaded} z ${expected}${available > expected ? " pobieranych" : ""}) — ` +
+        `(${loaded} z ${expected}) — ` +
         `brakującym punktom nie podstawiamy niczego zmyślonego.` +
         (stalled && progress.failed > 0 ? ` ${progress.failed} nie udało się pobrać.` : "") +
         `</span>`;
@@ -1135,8 +1099,8 @@ function startView() {
     }
 
     renderSummary(trend, base);
-    // Ticks and tooltips for every snapshot the world has, not only the drawn ones: the gap
-    // the budget leaves keeps its dates on the axis, which is what makes it visible.
+    // Ticks and tooltips for every snapshot the world has, not only the drawn ones: a gap
+    // keeps its dates on the axis, which is what makes it visible rather than invisible.
     // Every snapshot in the aggregate carries a `startedAt` — one without it never enters
     // `trends.json`, because there is nowhere to put it on a time axis (§9.2). An
     // unreadable one here is therefore a broken aggregate, not a case to draw around.
@@ -1257,7 +1221,7 @@ function startView() {
     if (!manifest || !trends) return;
 
     const world = getCurrentWorld();
-    const entries = getPlannedEntries();
+    const entries = getDatedEntries();
     const store = getCachedSnapshots(world);
     if (entries.length === 0 || getLoadedCount(store, entries) === entries.length) return;
 
@@ -1280,13 +1244,6 @@ function startView() {
     // stands 1500 px away from the data in question.
     progress = { loaded: getLoadedCount(store, entries), expected: entries.length, failed: failed.length, running: false };
     render();
-
-    // The plan can grow while a pass is running: `loadHistory` hands a second caller the
-    // pass already in flight, and that pass was planned smaller. Without this, pressing
-    // "dociągnij resztę" mid-fetch would hide the note and quietly fetch nothing. Comparing
-    // lengths — not "is anything still missing" — is what makes it terminate: a snapshot
-    // that failed stays missing, and the plan only grows when the user lifts the budget.
-    if (getPlannedEntries().length > entries.length) void ensureHistory();
   }
 
   // ── The selects ───────────────────────────────────────────────────────────
@@ -1413,13 +1370,6 @@ function startView() {
   };
   getElement("resetBtn").addEventListener("click", resetAndRender);
   getElement("emptyResetBtn").addEventListener("click", resetAndRender);
-
-  // Lifting the budget is the one place where megabytes are bought on purpose, so it is a
-  // press of a button and nothing else — no filter change, no reload.
-  getElement("loadRestBtn").addEventListener("click", () => {
-    lifted.add(getCurrentWorld());
-    renderNow();
-  });
 
   // The bar's listeners are registered LAST. `test/dom-smoke.ts` calls a node's
   // first-registered listener (`handlers[0]`), so pushing anything ahead of the existing

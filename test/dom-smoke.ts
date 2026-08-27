@@ -104,10 +104,11 @@ const failUrls = new Set<string>();
 // rather than taken from real data — in live data such a world exists only until the second
 // scrape (`luvia` had 1 snapshot, today it has 2), so a test tied to a particular world name
 // breaks on every `bun run scrape`.
-// Brutal is the cheapest world there is (20 KB a snapshot), so nothing in real data makes
-// the transfer budget cut inside a test. The stub overstates its price instead: at 300 KB a
-// snapshot exactly 6 of the 13 fit into HISTORY_BUDGET_BYTES, which exercises the cut
-// without pulling gordion's 900 KB files into the suite.
+// The price the status line has to print while a history is in flight. Overstated on
+// purpose — brutal really costs 20 KB a snapshot, and a figure that small rounds to
+// something the format cannot tell apart from a rounding error. It also keeps the two
+// apart: what the status prints comes from `bytes` in trends.json, never from the size of
+// the file the stub actually answered with.
 const BRUTAL_BYTES = 300_000;
 
 const SMOKE_WORLD = "smoke-single";
@@ -396,9 +397,8 @@ if (scenario === "default") {
   // the user picks a world and types a level threshold straight away. Each of those events
   // wants the history, and none of them may start a second fetch.
   // One snapshot cannot be fetched — the incomplete-history path. The second newest, by
-  // position rather than by name: a hard-coded date drifts out of the transfer budget with
-  // every scrape round, and the fetch that never happens cannot fail.
-  result.budgetInput = { bytesPerSnapshot: BRUTAL_BYTES };
+  // position rather than by name, so a scrape round does not rename what this test breaks.
+  result.priceInput = { bytesPerSnapshot: BRUTAL_BYTES };
   const brutalFiles = JSON.parse(await Bun.file("public/manifest.json").text()).worlds.find(
     (world: { name: string }) => world.name === "brutal",
   ).files as { filters: string }[];
@@ -421,6 +421,11 @@ if (scenario === "default") {
     nodes.minLevel!.value = value;
     nodes.minLevel!.handlers[0]!();
     await new Promise((resolve) => setTimeout(resolve, 200));
+    // Sampled mid-flight, which is the only moment the price exists: the snapshots carry a
+    // 100 ms delay each and run four at a time, so after 200 ms the pass has started and is
+    // nowhere near done. This is what replaced the transfer budget — nobody is stopped, so
+    // the megabytes have to be named while they are being spent.
+    result.loadingStatus ??= nodes.historyStatus!.textContent;
   }
   await switching;
   await waitFor(() => (charts.popChart?.data.datasets[0]?.data.length ?? 0) > 1);
@@ -430,24 +435,9 @@ if (scenario === "default") {
     status: nodes.historyStatus!.textContent,
     noteHidden: nodes.partialNote!.hidden,
     note: getText("partialNote"),
-    budgetNoteHidden: nodes.budgetNote!.hidden,
-    budgetNote: getText("budgetNoteText"),
-    loadRestLabel: nodes.loadRestBtn!.textContent,
     points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
     axis: getAxis("popChart"),
     error: nodes.error!.textContent,
-  };
-
-  // Buying the rest by hand: the budget is lifted for this world and the snapshots it kept
-  // out are fetched. The one that answers 503 still cannot arrive.
-  nodes.loadRestBtn!.handlers[0]!();
-  await waitFor(() => !nodes.historyStatus!.textContent!.startsWith("wczytywanie"));
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  result.afterLoadRest = {
-    status: nodes.historyStatus!.textContent,
-    budgetNoteHidden: nodes.budgetNote!.hidden,
-    points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
-    axis: getAxis("popChart"),
   };
 
   // Back to the default filter: the history comes from the complete aggregate again, so the
@@ -457,7 +447,6 @@ if (scenario === "default") {
   result.afterReset = {
     status: nodes.historyStatus!.textContent,
     noteHidden: nodes.partialNote!.hidden,
-    budgetNoteHidden: nodes.budgetNote!.hidden,
     points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
     axis: getAxis("popChart"),
   };

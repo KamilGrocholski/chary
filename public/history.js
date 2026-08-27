@@ -2,9 +2,15 @@
 // fetching raw snapshots once the aggregate stops being enough.
 //
 // The view has two paths, and that is its entire point:
-//   • the default filter → `trends.json`, 9 KB, one fetch, immediately
-//   • a filter set → the `.f.json` files of that one world, up to 1.9 MB, on demand only
+//   • the default filter → `trends.json`, one fetch, immediately
+//   • a filter set → every `.f.json` of that one world, on demand only
 // Both end in an object of the same shape, so the drawing cannot tell them apart.
+//
+// The second path used to stop at a transfer budget and offer the rest behind a button. It
+// was removed once the sizes were read off the tree rather than feared: the whole history
+// of the most expensive world is 2.1 MB gzipped and the median world 0.9 MB, so the ceiling
+// was trimming one world by one snapshot while costing a note, a button and four groups of
+// tests. What replaced it is the price in the status line — docs/2026-08-28-history-without-a-budget.md.
 //
 // No DOM. `fetch` yes — that is not the browser's document interface, and the tests
 // substitute a stub for it.
@@ -22,7 +28,6 @@ import {
 import { isDefaultFilters, summarizeFiltered } from "./filters.js";
 import { getJsonFromUrl } from "./fetch-json.js";
 import { assertDefined } from "./lib/assert.js";
-import { BYTES_IN_MEGABYTE } from "./lib/byte-size.js";
 
 /**
  * @typedef {import("./shared.js").Filters} Filters
@@ -222,61 +227,6 @@ export function readViewFromParams(params) {
 // ── Raw snapshots: conversion, memory, fetching ─────────────────────────────
 
 /**
- * What one filtered world may cost over the wire, in gzipped bytes.
- *
- * 2 MB is the worst case the world-view spec already weighed and accepted (gordion, 1.86 MB
- * at the time). The history grows every round, so the ceiling has to be in the currency that
- * grows with it — **bytes, not snapshots**. A count treats gordion (180 KB a snapshot) and
- * brutal (19 KB) as the same purchase, which is how brutal came to be the one world trimmed:
- * it had one extra snapshot from a single-world scrape, and trimming it saved 19 KB while
- * gordion, the reason the ceiling exists at all, was untouched.
- *
- * Binary megabytes, because that is the unit the sizes next to it are quoted in.
- */
-export const HISTORY_BUDGET_BYTES = 2 * BYTES_IN_MEGABYTE;
-
-/**
- * The fallback ceiling, used only when a world's snapshot size is unknown.
- *
- * `trends.json` and this script are separate files on Pages with separate cache lifetimes,
- * so a fresh script meeting an aggregate built before `bytes` existed is a real state, not a
- * hypothetical one. Falling back to "everything" there would hand somebody gordion's whole
- * history without asking.
- */
-export const HISTORY_WINDOW = 12;
-
-/**
- * The last `HISTORY_WINDOW` snapshots — the entries arrive sorted by `startedAt`.
- *
- * @template {{ id: string }} Entry
- * @param {Entry[]} entries
- * @param {number} [size]
- * @returns {Entry[]}
- */
-export function getWindowedEntries(entries, size = HISTORY_WINDOW) {
-  return entries.length <= size ? entries.slice() : entries.slice(entries.length - size);
-}
-
-/**
- * The newest entries that fit into the transfer budget — the entries arrive sorted by
- * `startedAt`.
- *
- * Two at the minimum, even when they do not fit: one point is not a trend, and a chart with
- * a single dot answers nothing that the snapshot view above it does not already answer.
- *
- * @template {{ id: string }} Entry
- * @param {Entry[]} entries
- * @param {number} [bytesPerSnapshot] gzip size of one snapshot; 0 or missing = unknown
- * @param {number} [budget]
- * @returns {Entry[]}
- */
-export function getBudgetedEntries(entries, bytesPerSnapshot, budget = HISTORY_BUDGET_BYTES) {
-  if (!bytesPerSnapshot || bytesPerSnapshot <= 0) return getWindowedEntries(entries);
-  const affordable = Math.max(2, Math.floor(budget / bytesPerSnapshot));
-  return getWindowedEntries(entries, affordable);
-}
-
-/**
  * A raw `.f.json` → typed arrays. Plain JS arrays held for ten snapshots at once cost
  * several times the overhead; this comes to 11 B per row.
  *
@@ -453,9 +403,11 @@ async function loadMissingSnapshots(world, entries, options) {
  * denominator for "share" mode. A share computed against the filtered set would sum to 100%
  * and say nothing.
  *
- * `allowed` narrows the result to the snapshot window (`getWindowedEntries`). It does not
- * apply under the default filter: the aggregate is already fetched, so trimming it saves
- * nothing.
+ * `allowed` is the set of snapshots the view actually plans to fetch — `trends.json`
+ * intersected with the manifest, not a ceiling. Without it `expected` would count snapshots
+ * no fetch is ever planned for, and "the history is incomplete" would stand forever. It does
+ * not apply under the default filter: the aggregate is already fetched, so narrowing it
+ * saves nothing.
  *
  * @param {WorldTrend} base
  * @param {SnapshotStore} store

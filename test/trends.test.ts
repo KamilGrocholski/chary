@@ -7,10 +7,7 @@ import { getEmptyFilters, summarizeFiltered } from "@/public/filters.js";
 import {
   ACTIVITY_THRESHOLDS,
   DEFAULT_THRESHOLD,
-  HISTORY_BUDGET_BYTES,
-  HISTORY_WINDOW,
   getActiveCounts,
-  getBudgetedEntries,
   buildFilteredTrend,
   getCachedSnapshots,
   getChangeRows,
@@ -23,7 +20,6 @@ import {
   getUsableThresholds,
   readViewFromParams,
   composeViewParams,
-  getWindowedEntries,
 } from "@/public/history.js";
 
 // The reference is real data, not a reimplementation of the same arithmetic: the aggregate
@@ -455,67 +451,6 @@ describe("history under a filter", () => {
     expect(loaded).toBe(0);
     expect(summarize(trend)).toBeNull();
     expect(getChangeRows(trend)).toEqual([]);
-  });
-});
-
-describe("the snapshot window", () => {
-  const composeEntries = Array.from({ length: 20 }, (_, index) => ({ id: `s${index}` }));
-
-  test("takes the newest, because those answer \"what is happening now\"", () => {
-    const picked = getWindowedEntries(composeEntries, 5);
-    expect(picked.map((error: { id: string }) => error.id)).toEqual(["s15", "s16", "s17", "s18", "s19"]);
-  });
-
-  test("a shorter history passes through whole", () => {
-    expect(getWindowedEntries(composeEntries.slice(0, 3), 5)).toHaveLength(3);
-    expect(getWindowedEntries(composeEntries.slice(0, 5), 5)).toHaveLength(5);
-  });
-
-  test("an unknown size falls back to the count, rather than to everything", () => {
-    // `trends.json` and `history.js` are separate files on Pages with separate cache
-    // lifetimes, so a fresh script can meet an aggregate built before `bytes` existed.
-    // Treating that as "free" would hand somebody gordion's whole history unasked.
-    expect(getBudgetedEntries(composeEntries, 0)).toHaveLength(HISTORY_WINDOW);
-    expect(getBudgetedEntries(composeEntries, undefined)).toHaveLength(HISTORY_WINDOW);
-  });
-});
-
-describe("the transfer budget", () => {
-  const composeEntries = Array.from({ length: 20 }, (_, index) => ({ id: `s${index}` }));
-
-  test("buys the newest snapshots it can afford", () => {
-    // 200 KB apiece against 2 MiB: ten fit, and they are the ten newest.
-    const picked = getBudgetedEntries(composeEntries, 200 * 1024);
-    expect(picked).toHaveLength(10);
-    expect(picked.at(-1)).toEqual({ id: "s19" });
-    expect(picked[0]).toEqual({ id: "s10" });
-  });
-
-  test("a cheap world is never trimmed", () => {
-    // Brutal, priced as it really is: the whole history costs less than the budget.
-    expect(getBudgetedEntries(composeEntries, 20 * 1024)).toHaveLength(20);
-  });
-
-  test("two points at the minimum, even when they do not fit", () => {
-    // One dot is not a trend, and the snapshot view above already answers "how many are
-    // there now". A single snapshot too big for the budget would leave the chart saying
-    // nothing at all.
-    expect(getBudgetedEntries(composeEntries, 5 * 1024 * 1024)).toHaveLength(2);
-  });
-
-  test("the ceiling falls on the world that actually costs something", () => {
-    // The point of the whole thing, against real sizes: gordion is trimmed, brutal is not,
-    // even though brutal has MORE snapshots. A count-based window did the exact opposite.
-    const getBudgetedCount = (world: string) =>
-      getBudgetedEntries(
-        trends.worlds[world].id.map((id: string) => ({ id })),
-        trends.worlds[world].bytes,
-      ).length;
-
-    expect(trends.worlds.brutal.id.length).toBeGreaterThanOrEqual(trends.worlds.gordion.id.length);
-    expect(getBudgetedCount("gordion")).toBeLessThan(trends.worlds.gordion.id.length);
-    expect(getBudgetedCount("brutal")).toBe(trends.worlds.brutal.id.length);
-    expect(trends.worlds.gordion.bytes * getBudgetedCount("gordion")).toBeLessThanOrEqual(HISTORY_BUDGET_BYTES);
   });
 });
 
