@@ -70,7 +70,7 @@ bun install
 The list of tracked worlds is in `src/worlds.ts` — edit it by hand to add or remove a world.
 
 ```bash
-# Check whether the parser copes with the current markup (fetches page 1 only, writes nothing)
+# Check whether the parser copes with the current markup (fetches the first two pages, writes nothing)
 bun run scrape:check
 
 # Every world from src/worlds.ts
@@ -85,7 +85,7 @@ bun run scrape aether 2000
 
 The data lands in `public/worlds/<world>/<timestamp>.f.json` and `.n.json`, and `public/manifest.json` updates automatically.
 
-> **Before launching a full scrape, run `bun run scrape:check`.** Margonem can change the ranking table's layout — a dry run detects that in a dozen seconds instead of after an hour of fetching.
+> **Before launching a full scrape, run `bun run scrape:check`.** Margonem can change the ranking table's layout — a dry run detects that in under a minute instead of after an hour of fetching. It reads two pages of each world, not one, because pagination — the `page` parameter surviving a redirect — is only exercised above page 1.
 
 ### Logs
 

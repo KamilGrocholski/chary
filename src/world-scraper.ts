@@ -262,21 +262,63 @@ async function scrapeWorld(
 
 // ── Dry-run ───────────────────────────────────────────────────────────────────
 
-/** Fetches page 1 only and reports whether the parser copes with the current markup. */
-async function dryRunWorld(world: string): Promise<boolean> {
-  try {
-    const { rows, totalPages, badRows } = await scrapePage(world, 1);
-    const [first] = rows;
-    process.stdout.write(
-      `✓ ${world.padEnd(9)} ${String(rows.length).padStart(3)} rows, ${String(totalPages).padStart(4)} pages` +
-        `${badRows.length ? `, ${badRows.length} skipped` : ""}` +
-        `${first ? ` — #1 ${first[1]} (lvl ${first[3]}, prof ${first[4]}, PH ${first[5]})` : ""}\n`,
+/** How many pages of a world a dry run reads. */
+const DRY_RUN_PAGES = 2;
+
+/**
+ * Fetches the first pages of a world and reports whether the parser copes with the markup
+ * as it stands.
+ *
+ * Two pages, not one, because everything about pagination happens above page 1 and a
+ * check of page 1 alone exercises none of it: the `page` parameter surviving the answer,
+ * and `parseTotalPages` read once from page 1 and then trusted for the rest of an
+ * hour-long round. The old `/ladder/players,<world>` form 301s to a URL with no `page` on
+ * it and answers page 1 to every request — `getPage` refuses that, and a dry run that
+ * never asks for a second page never finds out whether the refusal still fires.
+ *
+ * A world that really is one page long is not a failure and not a gap: page 1 is then the
+ * last page as well, there is no second page to ask for, and the line says so.
+ */
+async function dryRunWorld(world: string, interval: number): Promise<boolean> {
+  const pageLines: string[] = [];
+  let totalPages = 1;
+  let firstRowText = "";
+
+  for (let page = 1; page <= DRY_RUN_PAGES; page++) {
+    if (page > totalPages) break;
+    if (page > 1) await sleep(interval);
+
+    let result: PageResult;
+    try {
+      result = await scrapePage(world, page);
+    } catch (e) {
+      process.stdout.write(
+        `✗ ${world.padEnd(9)} p.${page} ${e instanceof Error ? e.message : String(e)}\n`,
+      );
+      return false;
+    }
+
+    if (page === 1) {
+      totalPages = result.totalPages;
+      const [first] = result.rows;
+      firstRowText = first
+        ? ` — #1 ${first[1]} (lvl ${first[3]}, prof ${first[4]}, PH ${first[5]})`
+        : "";
+    }
+    pageLines.push(
+      `p.${page} ${String(result.rows.length).padStart(3)} rows` +
+        `${result.badRows.length ? `, ${result.badRows.length} skipped` : ""}`,
     );
-    return true;
-  } catch (e) {
-    process.stdout.write(`✗ ${world.padEnd(9)} ${e instanceof Error ? e.message : String(e)}\n`);
-    return false;
   }
+
+  const pagesText =
+    totalPages < DRY_RUN_PAGES
+      ? `${totalPages} page — the whole world, nothing to paginate`
+      : `${String(totalPages).padStart(4)} pages`;
+  process.stdout.write(
+    `✓ ${world.padEnd(9)} ${pageLines.join(", ")}, ${pagesText}${firstRowText}\n`,
+  );
+  return true;
 }
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
@@ -292,10 +334,13 @@ if (!reading.ok) {
 const { worlds, intervalMs, dropThreshold, dryRun } = reading.command;
 
 if (dryRun) {
-  process.stdout.write(`Dry run: checking the parser on page 1 (${worlds.length} worlds), writing nothing.\n\n`);
+  process.stdout.write(
+    `Dry run: checking the parser on the first ${DRY_RUN_PAGES} pages ` +
+      `(${worlds.length} worlds), writing nothing.\n\n`,
+  );
   let failed = 0;
   for (const [i, world] of worlds.entries()) {
-    if (!(await dryRunWorld(world))) failed++;
+    if (!(await dryRunWorld(world, intervalMs))) failed++;
     if (i < worlds.length - 1) await sleep(intervalMs);
   }
   process.stdout.write(`\n${worlds.length - failed}/${worlds.length} worlds OK\n`);

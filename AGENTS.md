@@ -158,7 +158,7 @@ There is no build step to run — §1.
 ### 6.2 Working commands
 
 ```bash
-bun run scrape:check                 # page 1 of every world, writes nothing — ALWAYS before a scrape
+bun run scrape:check                 # the first two pages of every world, writes nothing — ALWAYS before a scrape
 bun run scrape                       # every world in src/worlds.ts, ~1 req/s
 bun run scrape aether                # a single world
 bun run scrape aether,tempest 2000   # chosen worlds, custom interval in ms (min. 250)
