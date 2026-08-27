@@ -19,7 +19,7 @@ const SCOPES = ["scraper", "parser", "snapshot", "trends", "manifest", "dash", "
  */
 const RULES_LANDED_AT = "test/tools/commit-messages.test.ts";
 
-type Commit = { hash: string; subject: string; files: string[] };
+type Commit = { hash: string; subject: string; isRoot: boolean; files: string[] };
 
 /**
  * The history, read in ONE `git` call.
@@ -47,6 +47,21 @@ function readHistory(): HistoryReading {
       : { ok: false as const, text: new TextDecoder().decode(result.stderr).trim() };
   };
 
+  // ⚠️ A shallow clone cannot be judged, and the failure is not obvious: its oldest commit is
+  // grafted, so it has no parent, so `--name-only` lists its WHOLE TREE as added — 488 files
+  // under `public/worlds/` for this repository. Every push then reported "touches data
+  // without saying scrape" against a commit that touched no data at all, which is what
+  // `actions/checkout` at its default `fetch-depth: 1` did to CI on every run.
+  //
+  // Refused rather than worked around: with the history truncated there is nothing here to
+  // check, and a guard that passes on one commit while looking like it read them all is the
+  // failure the first test below exists to prevent.
+  const depth = read("rev-parse", "--is-shallow-repository");
+  if (!depth.ok) return { ok: false, reason: `git rev-parse failed: ${depth.text}` };
+  if (depth.text.trim() === "true") {
+    return { ok: false, reason: "the clone is shallow — give the checkout `fetch-depth: 0`" };
+  }
+
   const anchor = read("log", "--format=%H", "--reverse", "--", RULES_LANDED_AT);
   if (!anchor.ok) return { ok: false, reason: `git log over ${RULES_LANDED_AT} failed: ${anchor.text}` };
   const first = anchor.text.trim().split("\n")[0] ?? "";
@@ -56,16 +71,19 @@ function readHistory(): HistoryReading {
   // The exclusive range leaves out the very commit that lands this file — so the first run
   // of this guard would have judged nothing while looking exactly like a run that judged
   // everything, which is the failure the first test below exists to make impossible.
-  const history = read("log", `--format=${RECORD}%H${UNIT}%s`, "--name-only", "HEAD");
+  // `%P` is empty for a root commit, whose file list is its whole tree rather than what it
+  // changed — true of `init` here, and of the graft point of any truncated history.
+  const history = read("log", `--format=${RECORD}%H${UNIT}%s${UNIT}%P`, "--name-only", "HEAD");
   if (!history.ok) return { ok: false, reason: `git log over HEAD failed: ${history.text}` };
 
   const commits: Commit[] = [];
   for (const record of history.text.split(RECORD)) {
     if (record.trim() === "") continue;
     const [header = "", ...rest] = record.split("\n");
-    const [hash = "", subject = ""] = header.split(UNIT);
+    const [hash = "", subject = "", parents = ""] = header.split(UNIT);
     if (hash === "") continue;
-    commits.push({ hash, subject, files: rest.filter((file) => file.trim() !== "") });
+    const isRoot = parents.trim() === "";
+    commits.push({ hash, subject, isRoot, files: rest.filter((file) => file.trim() !== "") });
     if (hash === first) break;
   }
   return { ok: true, commits };
@@ -86,7 +104,9 @@ describe("§7.2 — commit messages", () => {
     // list, which is the quietest way for a guard to stop guarding. There is exactly one
     // honest reason for an empty range: the commit adding this file is the one being
     // written, so the rule has no history to judge yet.
-    if (commits.length > 0) return;
+    // A reading that failed is already reported by the test above; saying it twice would
+    // make one broken checkout look like two broken rules.
+    if (!reading.ok || commits.length > 0) return;
     const tracked = new TextDecoder().decode(Bun.spawnSync(["git", "ls-files", RULES_LANDED_AT]).stdout).trim();
     expect(`${RULES_LANDED_AT} is tracked: ${tracked !== ""}`).toBe(`${RULES_LANDED_AT} is tracked: false`);
   });
@@ -112,7 +132,10 @@ describe("§7.2 — commit messages", () => {
 
   test("a scrape round travels on its own", () => {
     const offenders: string[] = [];
-    for (const { hash, subject, files } of commits) {
+    for (const { hash, subject, isRoot, files } of commits) {
+      // A root commit lists its whole tree, so its file list says nothing about what it
+      // changed and this rule has nothing to read in it.
+      if (isRoot) continue;
       const isScrape = subject.startsWith("scrape:") || subject.startsWith("scrape(");
       const touchesData = files.some((file) => file.startsWith("public/worlds/"));
       const touchesCode = files.some((file) => /^(src|tools|test|public\/(app|filters|history|shared|lib))/.test(file));
