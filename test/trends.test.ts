@@ -1,30 +1,30 @@
 import { describe, expect, test } from "bun:test";
 import path from "node:path";
-import { normalizeLegacyRows, splitNormalized, type FilterFile } from "../src/snapshot.ts";
-import { activityBucket as activityBucketServer, buildWorldTrend, summarizeSnapshot } from "../src/trends.ts";
-import { activityBucket as activityBucketBrowser } from "../public/shared.js";
-import { emptyFilters, summarizeFiltered } from "../public/filters.js";
+import { normalizeLegacyRows, splitNormalized, type FilterFile } from "@/src/snapshot.ts";
+import { getActivityBucket as activityBucketServer, buildWorldTrend, summarizeSnapshot } from "@/src/trends.ts";
+import { getActivityBucket as activityBucketBrowser } from "@/public/shared.js";
+import { getEmptyFilters, summarizeFiltered } from "@/public/filters.js";
 import {
   ACTIVITY_THRESHOLDS,
   DEFAULT_THRESHOLD,
   HISTORY_BUDGET_BYTES,
   HISTORY_WINDOW,
-  activeCounts,
-  budgetedEntries,
+  getActiveCounts,
+  getBudgetedEntries,
   buildFilteredTrend,
-  cachedSnapshots,
-  changeRows,
+  getCachedSnapshots,
+  getChangeRows,
   loadHistory,
-  loadedCount,
-  shareSeries,
+  getLoadedCount,
+  getShareSeries,
   summarize,
-  thresholdByKey,
-  toTypedSnapshot,
-  usableThresholds,
-  viewFromParams,
-  viewToParams,
-  windowedEntries,
-} from "../public/history.js";
+  getThresholdByKey,
+  composeTypedSnapshot,
+  getUsableThresholds,
+  readViewFromParams,
+  composeViewParams,
+  getWindowedEntries,
+} from "@/public/history.js";
 
 // The reference is real data, not a reimplementation of the same arithmetic: the aggregate
 // is checked against a sample of a real snapshot in schema v1 (the same one dashboard.test.ts
@@ -166,8 +166,8 @@ describe("the published trends.json", () => {
   test("every column sums to the population of the same snapshot", () => {
     for (const trend of Object.values(trends.worlds) as any[]) {
       for (let i = 0; i < trend.total.length; i++) {
-        expect(trend.act.reduce((s: number, b: number[]) => s + b[i], 0)).toBe(trend.total[i]);
-        expect(trend.byProf.reduce((s: number, b: number[]) => s + b[i], 0)).toBe(trend.total[i]);
+        expect(trend.act.reduce((s: number, b: number[]) => s + (b[i] ?? 0), 0)).toBe(trend.total[i]);
+        expect(trend.byProf.reduce((s: number, b: number[]) => s + (b[i] ?? 0), 0)).toBe(trend.total[i]);
       }
     }
   });
@@ -222,7 +222,7 @@ describe("under the default filter the client computes exactly what the server d
     // look like a change in the data rather than a bug.
     //
     // A full pass over 64 MB takes ~0.9 s, so there is no reason to check a sample.
-    const noFilter = emptyFilters();
+    const noFilter = getEmptyFilters();
     let checked = 0;
 
     for (const world of manifest.worlds) {
@@ -230,7 +230,7 @@ describe("under the default filter the client computes exactly what the server d
         const f = JSON.parse(await Bun.file(path.join(PUBLIC_DIR, entry.filters)).text());
         expect(summarizeFiltered(f, noFilter)).toEqual(summarizeSnapshot(f));
         // and the same after the conversion to typed arrays the browser performs
-        expect(summarizeFiltered(toTypedSnapshot(f), noFilter)).toEqual(summarizeSnapshot(f));
+        expect(summarizeFiltered(composeTypedSnapshot(f), noFilter)).toEqual(summarizeSnapshot(f));
         checked += 1;
       }
     }
@@ -250,13 +250,13 @@ describe("the conversion to typed arrays", () => {
   };
 
   test("null becomes −1, not zero and not a huge number", () => {
-    const typed = toTypedSnapshot(raw);
+    const typed = composeTypedSnapshot(raw);
     expect([...typed.days]).toEqual([0, 7, -1, 6598, 31]);
-    expect(typed.suspect).toEqual({ reason: "test" });
+    expect(typed.suspect).toEqual({ reason: "test" } as typeof typed.suspect);
   });
 
   test("no column loses a value to its type", () => {
-    const typed = toTypedSnapshot(raw);
+    const typed = composeTypedSnapshot(raw);
     expect([...typed.level]).toEqual(raw.level);
     expect([...typed.profession]).toEqual(raw.profession);
     // honor can be negative and reaches 1.2M — Int16 would clip it
@@ -264,7 +264,7 @@ describe("the conversion to typed arrays", () => {
   });
 
   test("a missing suspect gives null, not undefined", () => {
-    expect(toTypedSnapshot({ ...raw, suspect: undefined }).suspect).toBeNull();
+    expect(composeTypedSnapshot({ ...raw, suspect: undefined }).suspect).toBeNull();
   });
 });
 
@@ -272,7 +272,7 @@ describe("the activity thresholds are cumulative", () => {
   const aether = trends.worlds.aether;
 
   test("\"≤ 7 days\" is the < 24h bucket together with 1-7 days", () => {
-    const counts = activeCounts(aether, "7d");
+    const counts = getActiveCounts(aether, "7d");
     for (let i = 0; i < counts.length; i++) {
       expect(counts[i]).toBe(aether.act[0][i] + aether.act[1][i]);
     }
@@ -289,14 +289,14 @@ describe("the activity thresholds are cumulative", () => {
         return f.level[row] >= 1 && f.profession[row] >= 1 && f.profession[row] <= 6;
       }).length;
 
-    expect(activeCounts(aether, "24h")[i]).toBe(raw(0));
-    expect(activeCounts(aether, "7d")[i]).toBe(raw(7));
-    expect(activeCounts(aether, "30d")[i]).toBe(raw(30));
+    expect(getActiveCounts(aether, "24h")[i]).toBe(raw(0));
+    expect(getActiveCounts(aether, "7d")[i]).toBe(raw(7));
+    expect(getActiveCounts(aether, "30d")[i]).toBe(raw(30));
   });
 
   test("the thresholds grow monotonically and never exceed the population", () => {
     const keys = ACTIVITY_THRESHOLDS.map((t) => t.key);
-    const series = keys.map((key) => activeCounts(aether, key));
+    const series = keys.map((key) => getActiveCounts(aether, key));
     for (let i = 0; i < aether.total.length; i++) {
       expect(series[0]![i]).toBeLessThanOrEqual(series[1]![i]!);
       expect(series[1]![i]).toBeLessThanOrEqual(series[2]![i]!);
@@ -305,16 +305,16 @@ describe("the activity thresholds are cumulative", () => {
   });
 
   test("an unknown threshold falls back to the default instead of breaking the view", () => {
-    expect(activeCounts(aether, "nonsense")).toEqual(activeCounts(aether, DEFAULT_THRESHOLD));
+    expect(getActiveCounts(aether, "nonsense")).toEqual(getActiveCounts(aether, DEFAULT_THRESHOLD));
   });
 
   test("the share is computed against the population of the same snapshot", () => {
-    const counts = activeCounts(aether, "7d");
-    const share = shareSeries(counts, aether.total);
+    const counts = getActiveCounts(aether, "7d");
+    const share = getShareSeries(counts, aether.total);
     expect(share[0]).toBeCloseTo((counts[0]! / aether.total[0]) * 100, 6);
     expect(share.every((s: number) => s >= 0 && s <= 100)).toBe(true);
     // A population of 0 must not produce a NaN on the chart.
-    expect(shareSeries([0], [0])).toEqual([0]);
+    expect(getShareSeries([0], [0])).toEqual([0]);
   });
 });
 
@@ -322,24 +322,24 @@ describe("the activity filter removes the thresholds that go silent under it", (
   // Under an "online ≤ 7 days" filter the set holds nobody past seven days, so the
   // "≤ 7 days" threshold would equal the match count, and "≤ 30 days" likewise.
   test("only thresholds narrower than the filter survive", () => {
-    expect(usableThresholds(Infinity).map((t) => t.key)).toEqual(["24h", "7d", "30d"]);
-    expect(usableThresholds(30).map((t) => t.key)).toEqual(["24h", "7d"]);
-    expect(usableThresholds(14).map((t) => t.key)).toEqual(["24h", "7d"]);
-    expect(usableThresholds(7).map((t) => t.key)).toEqual(["24h"]);
-    expect(usableThresholds(3).map((t) => t.key)).toEqual(["24h"]);
-    expect(usableThresholds(0)).toEqual([]);
+    expect(getUsableThresholds(Infinity).map((t) => t.key)).toEqual(["24h", "7d", "30d"]);
+    expect(getUsableThresholds(30).map((t) => t.key)).toEqual(["24h", "7d"]);
+    expect(getUsableThresholds(14).map((t) => t.key)).toEqual(["24h", "7d"]);
+    expect(getUsableThresholds(7).map((t) => t.key)).toEqual(["24h"]);
+    expect(getUsableThresholds(3).map((t) => t.key)).toEqual(["24h"]);
+    expect(getUsableThresholds(0)).toEqual([]);
   });
 
   test("the chosen threshold falls back to the nearest one that still says something", () => {
-    expect(thresholdByKey("30d", Infinity)!.key).toBe("30d");
-    expect(thresholdByKey("30d", 7)!.key).toBe("24h");
-    expect(thresholdByKey("7d", 7)!.key).toBe("24h");
+    expect(getThresholdByKey("30d", Infinity)!.key).toBe("30d");
+    expect(getThresholdByKey("30d", 7)!.key).toBe("24h");
+    expect(getThresholdByKey("7d", 7)!.key).toBe("24h");
     // a filter narrower than every threshold — nothing to show, and the view must cope
-    expect(thresholdByKey("24h", 0)).toBeNull();
+    expect(getThresholdByKey("24h", 0)).toBeNull();
   });
 
   test("with no usable threshold, \"active\" is simply everyone matching", () => {
-    expect(activeCounts(trends.worlds.aether, "24h", 0)).toEqual(trends.worlds.aether.total);
+    expect(getActiveCounts(trends.worlds.aether, "24h", 0)).toEqual(trends.worlds.aether.total);
   });
 });
 
@@ -351,10 +351,13 @@ describe("history under a filter", () => {
     act: [[10, 11, 12], [20, 22, 24], [30, 33, 36], [39, 43, 47], [1, 1, 1]],
     byProf: [[50, 55, 60], [10, 11, 12], [10, 11, 12], [10, 11, 12], [10, 11, 12], [10, 11, 12]],
     suspect: [0, 1, 0],
+    // Not spent on this path — the snapshots are handed in already loaded — but the
+    // aggregate's shape carries it, and a fixture that drops a field stops standing for one.
+    bytes: 0,
   };
 
   const snapshot = (levels: number[]) =>
-    toTypedSnapshot({
+    composeTypedSnapshot({
       count: levels.length,
       level: levels,
       profession: levels.map(() => 1),
@@ -364,7 +367,7 @@ describe("history under a filter", () => {
 
   test("the default filter returns the aggregate without touching a snapshot", () => {
     // This is the path on which nobody who does not filter pays a byte over 9 KB.
-    const result = buildFilteredTrend(base, new Map(), emptyFilters());
+    const result = buildFilteredTrend(base, new Map(), getEmptyFilters());
     expect(result.trend).toBe(base);
     expect(result.population).toBe(base.total);
     expect(result.loaded).toBe(3);
@@ -376,13 +379,14 @@ describe("history under a filter", () => {
       ["c", snapshot([300, 300])],
     ]);
     const { trend, population, loaded, expected } = buildFilteredTrend(base, store, {
-      ...emptyFilters(),
+      ...getEmptyFilters(),
       minLevel: 200,
     });
 
     expect(trend.id).toEqual(["a", "c"]); // "b" gets no point rather than an invented one
     expect(trend.total).toEqual([2, 2]);
-    expect(trend.startedAt).toEqual([base.startedAt[0], base.startedAt[2]]);
+    const [firstAt, , thirdAt] = base.startedAt as [string, string, string];
+    expect(trend.startedAt).toEqual([firstAt, thirdAt]);
     expect(trend.suspect).toEqual([0, 0]);
     expect(loaded).toBe(2);
     expect(expected).toBe(3);
@@ -395,8 +399,8 @@ describe("history under a filter", () => {
       ["a", snapshot([300])],
       ["c", snapshot([300, 300, 300])],
     ]);
-    const { trend } = buildFilteredTrend(base, store, { ...emptyFilters(), minLevel: 200 });
-    const rows = changeRows(trend);
+    const { trend } = buildFilteredTrend(base, store, { ...getEmptyFilters(), minLevel: 200 });
+    const rows = getChangeRows(trend);
 
     expect(rows).toHaveLength(1);
     expect(rows[0]!.delta).toBe(2);
@@ -409,7 +413,7 @@ describe("history under a filter", () => {
     const { trend, expected } = buildFilteredTrend(
       base,
       store,
-      { ...emptyFilters(), minLevel: 200 },
+      { ...getEmptyFilters(), minLevel: 200 },
       new Set(["b", "c"]),
     );
     expect(trend.id).toEqual(["b", "c"]);
@@ -417,11 +421,11 @@ describe("history under a filter", () => {
   });
 
   test("no snapshot at all gives an empty history, not a crash", () => {
-    const { trend, loaded } = buildFilteredTrend(base, new Map(), { ...emptyFilters(), minLevel: 200 });
+    const { trend, loaded } = buildFilteredTrend(base, new Map(), { ...getEmptyFilters(), minLevel: 200 });
     expect(trend.id).toEqual([]);
     expect(loaded).toBe(0);
     expect(summarize(trend)).toBeNull();
-    expect(changeRows(trend)).toEqual([]);
+    expect(getChangeRows(trend)).toEqual([]);
   });
 });
 
@@ -429,21 +433,21 @@ describe("the snapshot window", () => {
   const entries = Array.from({ length: 20 }, (_, i) => ({ id: `s${i}` }));
 
   test("takes the newest, because those answer \"what is happening now\"", () => {
-    const picked = windowedEntries(entries, 5);
+    const picked = getWindowedEntries(entries, 5);
     expect(picked.map((e: { id: string }) => e.id)).toEqual(["s15", "s16", "s17", "s18", "s19"]);
   });
 
   test("a shorter history passes through whole", () => {
-    expect(windowedEntries(entries.slice(0, 3), 5)).toHaveLength(3);
-    expect(windowedEntries(entries.slice(0, 5), 5)).toHaveLength(5);
+    expect(getWindowedEntries(entries.slice(0, 3), 5)).toHaveLength(3);
+    expect(getWindowedEntries(entries.slice(0, 5), 5)).toHaveLength(5);
   });
 
   test("an unknown size falls back to the count, rather than to everything", () => {
     // `trends.json` and `history.js` are separate files on Pages with separate cache
     // lifetimes, so a fresh script can meet an aggregate built before `bytes` existed.
     // Treating that as "free" would hand somebody gordion's whole history unasked.
-    expect(budgetedEntries(entries, 0)).toHaveLength(HISTORY_WINDOW);
-    expect(budgetedEntries(entries, undefined)).toHaveLength(HISTORY_WINDOW);
+    expect(getBudgetedEntries(entries, 0)).toHaveLength(HISTORY_WINDOW);
+    expect(getBudgetedEntries(entries, undefined)).toHaveLength(HISTORY_WINDOW);
   });
 });
 
@@ -452,7 +456,7 @@ describe("the transfer budget", () => {
 
   test("buys the newest snapshots it can afford", () => {
     // 200 KB apiece against 2 MiB: ten fit, and they are the ten newest.
-    const picked = budgetedEntries(entries, 200 * 1024);
+    const picked = getBudgetedEntries(entries, 200 * 1024);
     expect(picked).toHaveLength(10);
     expect(picked.at(-1)).toEqual({ id: "s19" });
     expect(picked[0]).toEqual({ id: "s10" });
@@ -460,21 +464,21 @@ describe("the transfer budget", () => {
 
   test("a cheap world is never trimmed", () => {
     // Brutal, priced as it really is: the whole history costs less than the budget.
-    expect(budgetedEntries(entries, 20 * 1024)).toHaveLength(20);
+    expect(getBudgetedEntries(entries, 20 * 1024)).toHaveLength(20);
   });
 
   test("two points at the minimum, even when they do not fit", () => {
     // One dot is not a trend, and the snapshot view above already answers "how many are
     // there now". A single snapshot too big for the budget would leave the chart saying
     // nothing at all.
-    expect(budgetedEntries(entries, 5 * 1024 * 1024)).toHaveLength(2);
+    expect(getBudgetedEntries(entries, 5 * 1024 * 1024)).toHaveLength(2);
   });
 
   test("the ceiling falls on the world that actually costs something", () => {
     // The point of the whole thing, against real sizes: gordion is trimmed, brutal is not,
     // even though brutal has MORE snapshots. A count-based window did the exact opposite.
     const fits = (world: string) =>
-      budgetedEntries(
+      getBudgetedEntries(
         trends.worlds[world].id.map((id: string) => ({ id })),
         trends.worlds[world].bytes,
       ).length;
@@ -492,6 +496,24 @@ describe("fetching the history", () => {
 
   const fakeSnapshot = { count: 1, level: [10], profession: [1], honor: [0], days: [0] };
 
+  /**
+   * A response the way a browser hands one over — a body, read as text.
+   *
+   * ⚠️ These stubs used to answer `{ ok, status, json }` with no `text()`, i.e. narrower
+   * than the thing they stand in for. The day the view started reading a body as text
+   * before parsing it, every one of them reported a failure the browser does not have.
+   * AGENTS.md §9.6: a stub gentler or narrower than a browser holds nothing about one.
+   */
+  const answer = (status: number, body: unknown) => {
+    const text = JSON.stringify(body);
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      text: async () => text,
+      json: async () => JSON.parse(text),
+    };
+  };
+
   async function withFetch(impl: (url: string) => Promise<any>, run: () => Promise<void>) {
     const original = globalThis.fetch;
     globalThis.fetch = impl as any;
@@ -505,14 +527,14 @@ describe("fetching the history", () => {
   test("fetches the full set and reports progress after every snapshot", async () => {
     const seen: number[] = [];
     await withFetch(
-      async () => ({ ok: true, status: 200, json: async () => fakeSnapshot }),
+      async () => answer(200, fakeSnapshot),
       async () => {
         const list = entries("w1", 7);
         const { failed } = await loadHistory("w1", list, {
           onProgress: (loaded: number) => seen.push(loaded),
         });
         expect(failed).toEqual([]);
-        expect(loadedCount(cachedSnapshots("w1"), list)).toBe(7);
+        expect(getLoadedCount(getCachedSnapshots("w1"), list)).toBe(7);
         expect(seen.at(-1)).toBe(7);
         expect(seen).toHaveLength(7);
       },
@@ -524,7 +546,7 @@ describe("fetching the history", () => {
     await withFetch(
       async () => {
         calls += 1;
-        return { ok: true, status: 200, json: async () => fakeSnapshot };
+        return answer(200, fakeSnapshot);
       },
       async () => {
         const list = entries("w2", 4);
@@ -540,20 +562,20 @@ describe("fetching the history", () => {
     await withFetch(
       async (url: string) =>
         url.endsWith("2.f.json")
-          ? { ok: false, status: 500, json: async () => ({}) }
-          : { ok: true, status: 200, json: async () => fakeSnapshot },
+          ? answer(500, {})
+          : answer(200, fakeSnapshot),
       async () => {
         const list = entries("w3", 5);
         const { failed } = await loadHistory("w3", list, {});
         expect(failed).toEqual(["w3-2"]);
-        expect(loadedCount(cachedSnapshots("w3"), list)).toBe(4);
+        expect(getLoadedCount(getCachedSnapshots("w3"), list)).toBe(4);
       },
     );
   });
 
   test("switching worlds abandons the work instead of feeding a dead view", async () => {
     await withFetch(
-      async () => ({ ok: true, status: 200, json: async () => fakeSnapshot }),
+      async () => answer(200, fakeSnapshot),
       async () => {
         const list = entries("w4", 8);
         let stale = false;
@@ -564,19 +586,19 @@ describe("fetching the history", () => {
             if (loaded >= 2) stale = true;
           },
         });
-        expect(loadedCount(cachedSnapshots("w4"), list)).toBeLessThan(8);
+        expect(getLoadedCount(getCachedSnapshots("w4"), list)).toBeLessThan(8);
       },
     );
   });
 
   test("memory holds at most two worlds — without it a tab collects all 21", () => {
-    cachedSnapshots("cache-a").set("x", {} as any);
-    cachedSnapshots("cache-b").set("x", {} as any);
-    cachedSnapshots("cache-c").set("x", {} as any);
-    expect(cachedSnapshots("cache-b").size).toBe(1);
-    expect(cachedSnapshots("cache-c").size).toBe(1);
+    getCachedSnapshots("cache-a").set("x", {} as any);
+    getCachedSnapshots("cache-b").set("x", {} as any);
+    getCachedSnapshots("cache-c").set("x", {} as any);
+    expect(getCachedSnapshots("cache-b").size).toBe(1);
+    expect(getCachedSnapshots("cache-c").size).toBe(1);
     // "cache-a" was evicted, so we get a fresh, empty map
-    expect(cachedSnapshots("cache-a").size).toBe(0);
+    expect(getCachedSnapshots("cache-a").size).toBe(0);
   });
 });
 
@@ -586,7 +608,7 @@ describe("changes between snapshots", () => {
   test("the delta is divided by the real interval, not per snapshot", () => {
     // The intervals run 3-17 days, so "−120 players" on two rows of the table means two
     // different things until it is divided by time.
-    const rows = changeRows(aether);
+    const rows = getChangeRows(aether);
     expect(rows).toHaveLength(aether.id.length - 1);
 
     for (const [i, row] of rows.entries()) {
@@ -599,13 +621,21 @@ describe("changes between snapshots", () => {
   });
 
   test("the intervals in this data really are uneven", () => {
-    const days = changeRows(aether).map((r) => r.days!);
+    const days = getChangeRows(aether).map((r) => r.days!);
     expect(Math.max(...days) - Math.min(...days)).toBeGreaterThan(3);
   });
 
   test("a world with a single snapshot gives an empty table, not an error", () => {
-    const single = { id: ["a"], startedAt: ["2026-08-04T10:45:20.548Z"], total: [39087], act: [[1], [1], [1], [1], [1]], byProf: [[1], [1], [1], [1], [1], [1]], suspect: [0] };
-    expect(changeRows(single)).toEqual([]);
+    const single = {
+      id: ["a"],
+      startedAt: ["2026-08-04T10:45:20.548Z"],
+      total: [39087],
+      act: [[1], [1], [1], [1], [1]],
+      byProf: [[1], [1], [1], [1], [1], [1]],
+      suspect: [0],
+      bytes: 0,
+    };
+    expect(getChangeRows(single)).toEqual([]);
     expect(summarize(single)).toMatchObject({ snapshots: 1, delta: 0, days: 0 });
   });
 });
@@ -625,18 +655,18 @@ describe("the history summary", () => {
 
 describe("the view state in the URL", () => {
   test("the default view puts nothing in the link beyond the world", () => {
-    expect(viewToParams({ world: "aether", threshold: DEFAULT_THRESHOLD, share: false }).toString()).toBe(
+    expect(composeViewParams({ world: "aether", date: null, threshold: DEFAULT_THRESHOLD, share: false }).toString()).toBe(
       "world=aether",
     );
   });
 
   test("a full set of settings survives the round trip", () => {
     const view = { world: "gordion", date: "2026-08-04T10-02-40", threshold: "30d", share: true };
-    expect(viewFromParams(new URLSearchParams(viewToParams(view).toString()))).toEqual(view);
+    expect(readViewFromParams(new URLSearchParams(composeViewParams(view).toString()))).toEqual(view);
   });
 
   test("junk in the URL does not break the view", () => {
-    expect(viewFromParams(new URLSearchParams("prog=xyz&udzial=nie"))).toEqual({
+    expect(readViewFromParams(new URLSearchParams("prog=xyz&udzial=nie"))).toEqual({
       world: null,
       date: null,
       threshold: DEFAULT_THRESHOLD,
@@ -647,7 +677,7 @@ describe("the view state in the URL", () => {
   test("the view state and the filter state do not collide on keys", () => {
     // The promise that links to the old trends.html still work hangs on this: one page
     // reads both sets of parameters at once.
-    const viewKeys = [...viewToParams({ world: "a", date: "b", threshold: "30d", share: true }).keys()];
+    const viewKeys = [...composeViewParams({ world: "a", date: "b", threshold: "30d", share: true }).keys()];
     expect(viewKeys.sort()).toEqual(["date", "prog", "udzial", "world"]);
     for (const key of viewKeys) {
       expect(["minLevel", "maxLevel", "minHonor", "maxHonor", "maxDays", "prof"]).not.toContain(key);

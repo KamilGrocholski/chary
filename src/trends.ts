@@ -1,8 +1,11 @@
 import { readdir } from "node:fs/promises";
 import path from "node:path";
-import { PUBLIC_DIR, WORLDS_DIR } from "./manifest.ts";
-import { timestampFromFileName, type FilterFile } from "./snapshot.ts";
-import { writeAtomic } from "./atomic.ts";
+import { PUBLIC_DIR, WORLDS_DIR } from "@/src/manifest.ts";
+import { getTimestampFromFileName, type FilterFile } from "@/src/snapshot.ts";
+import { writeAtomic } from "@/src/atomic.ts";
+import { assertDefined } from "@/public/lib/assert.js";
+import { getValueFromJsonText } from "@/public/lib/json.js";
+import { getTextOrder } from "@/public/lib/text-order.js";
 
 // The folded history of one world: a single number per snapshot instead of hundreds of
 // thousands of rows. The whole history (202 snapshots, 21 worlds) fits in ~24 KB, i.e.
@@ -21,11 +24,11 @@ export const TRENDS_FILE = path.join(PUBLIC_DIR, "trends.json");
  * The activity bucket: 0 = <24h, 1 = 1-7 days, 2 = 8-30 days, 3 = >30 days, 4 = never.
  *
  * The buckets are **disjoint**, not cumulative — "active ≤7 days" is the sum of buckets
- * 0 and 1. It must agree value for value with `activityBucket` in `public/shared.js`;
+ * 0 and 1. It must agree value for value with `getActivityBucket` in `public/shared.js`;
  * a test holds that, because the two drifting apart would give a chart that disagrees
  * with the snapshot dashboard.
  */
-export function activityBucket(days: number | null | undefined): number {
+export function getActivityBucket(days: number | null | undefined): number {
   if (days === null || days === undefined) return 4;
   if (days === 0) return 0;
   if (days <= 7) return 1;
@@ -35,7 +38,7 @@ export function activityBucket(days: number | null | undefined): number {
 
 export type SnapshotSummary = {
   total: number;
-  /** Activity bucket counts, indexed as in `activityBucket`. */
+  /** Activity bucket counts, indexed as in `getActivityBucket`. */
   act: number[];
   /** Counts for professions 1-6. */
   byProf: number[];
@@ -47,16 +50,20 @@ export function summarizeSnapshot(filters: FilterFile): SnapshotSummary {
   let total = 0;
 
   for (let i = 0; i < filters.count; i++) {
-    const level = filters.level[i]!;
-    const profession = filters.profession[i]!;
-    // The same condition as `matches` in public/filters.js: a row with no level, or with
+    // `count` is the row count of every column — the whole premise of the columnar format
+    // (§9.2), so a short column is a broken file rather than a case to handle.
+    const level = assertDefined(filters.level[i], "every .f.json column holds `count` rows");
+    const profession = assertDefined(filters.profession[i], "every .f.json column holds `count` rows");
+
+    // The same condition as `isMatch` in public/filters.js: a row with no level, or with
     // a profession outside 1-6, reaches no chart, so it must not count towards the
     // population.
     if (!level || level < 1 || profession < 1 || profession > 6) continue;
 
+    const bucket = getActivityBucket(filters.days[i]);
     total += 1;
-    byProf[profession - 1]! += 1;
-    act[activityBucket(filters.days[i])]! += 1;
+    byProf[profession - 1] = assertDefined(byProf[profession - 1], "professions are 1-6") + 1;
+    act[bucket] = assertDefined(act[bucket], "getActivityBucket answers 0-4") + 1;
   }
 
   return { total, act, byProf };
@@ -111,20 +118,52 @@ export function buildWorldTrend(snapshots: { id: string; filters: FilterFile }[]
     bytes,
   };
 
-  const dated = snapshots.filter((s) => typeof s.filters.startedAt === "string" && s.filters.startedAt !== "");
-  dated.sort((a, b) => a.filters.startedAt!.localeCompare(b.filters.startedAt!));
+  // Narrowed once, into a shape that carries the date — rather than filtered and then
+  // re-asserted with `!` at each of the three places that read it back.
+  const dated: { id: string; startedAt: string; filters: FilterFile }[] = [];
+  for (const { id, filters } of snapshots) {
+    const { startedAt } = filters;
+    if (typeof startedAt !== "string" || startedAt === "") continue;
+    dated.push({ id, startedAt, filters });
+  }
+  dated.sort((a, b) => getTextOrder(a.startedAt, b.startedAt));
 
-  for (const { id, filters } of dated) {
+  for (const { id, startedAt, filters } of dated) {
     const { total, act, byProf } = summarizeSnapshot(filters);
     trend.id.push(id);
-    trend.startedAt.push(filters.startedAt!);
+    trend.startedAt.push(startedAt);
     trend.total.push(total);
-    act.forEach((count, bucket) => trend.act[bucket]!.push(count));
-    byProf.forEach((count, index) => trend.byProf[index]!.push(count));
+    act.forEach((count, bucket) =>
+      assertDefined(trend.act[bucket], "a summary has one count per activity bucket").push(count),
+    );
+    byProf.forEach((count, index) =>
+      assertDefined(trend.byProf[index], "a summary has one count per profession").push(count),
+    );
     trend.suspect.push(filters.suspect ? 1 : 0);
   }
 
   return trend;
+}
+
+/**
+ * A parsed snapshot, or `null` — never a cast.
+ *
+ * `JSON.parse(...) as FilterFile` is how a file truncated mid-write became a snapshot with
+ * `undefined` columns: every field typed, none of them there, and the first sign of it was
+ * an aggregate silently missing a world. Checking the columns is cheap next to the pass
+ * over their contents that follows.
+ */
+function readFilterFile(value: unknown): FilterFile | null {
+  if (typeof value !== "object" || value === null) return null;
+  const candidate = value as Record<string, unknown>;
+
+  if (typeof candidate.count !== "number") return null;
+  for (const column of ["level", "profession", "honor", "days"]) {
+    const rows = candidate[column];
+    if (!Array.isArray(rows) || rows.length !== candidate.count) return null;
+  }
+
+  return candidate as unknown as FilterFile;
 }
 
 /** The size the browser actually downloads — GitHub Pages serves these files gzipped. */
@@ -155,14 +194,21 @@ export async function rebuildTrends(): Promise<{ trends: Trends; skipped: number
       // An unreadable file is skipped with a warning rather than taking down the whole
       // rebuild — otherwise a single snapshot truncated by Ctrl-C blocks `bun run rebuild`,
       // which is exactly the command meant to repair it.
-      let filters: FilterFile;
-      try {
-        filters = JSON.parse(await Bun.file(path.join(dir, file)).text()) as FilterFile;
-      } catch (e) {
-        console.warn(`⚠ skipped unreadable snapshot ${world}/${file}: ${e instanceof Error ? e.message : e}`);
+      const reading = getValueFromJsonText(await Bun.file(path.join(dir, file)).text());
+      if (!reading.ok) {
+        // The boundary with a file another process may have truncated (§9.5). Skipped with
+        // a warning rather than fatal: a snapshot cut short by a Ctrl-C must not block
+        // `bun run rebuild`, which is the command meant to repair it.
+        console.warn(`⚠ skipped unreadable snapshot ${world}/${file}: ${reading.error.message}`);
         continue;
       }
-      snapshots.push({ id: timestampFromFileName(file), filters });
+
+      const filters = readFilterFile(reading.value);
+      if (filters === null) {
+        console.warn(`⚠ skipped ${world}/${file}: readable JSON, but not a snapshot`);
+        continue;
+      }
+      snapshots.push({ id: getTimestampFromFileName(file), filters });
     }
 
     const trend = buildWorldTrend(snapshots);

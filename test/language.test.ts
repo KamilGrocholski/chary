@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Glob } from "bun";
-import { commentBlocks, stringLiterals } from "./source-text.ts";
+import { commentBlocks, stringLiterals } from "@/test/source-text.ts";
 
 // The guard for the language boundary in AGENTS.md: English everywhere except the text a
 // player reads and the keys that match material captured from Margonem.
@@ -45,7 +45,9 @@ const SPEAKS_POLISH: Array<{ file: string; phrase?: string }> = [
   { file: "test/snapshot.test.ts" },
 ];
 
-const SCANNED = ["src/**/*.ts", "test/*.ts", "public/*.js"];
+// Every directory holding a source of ours. A new one that is not here is a whole layer
+// the boundary stops being checked over, which is why the first test below counts.
+const SCANNED = ["src/**/*.ts", "test/*.ts", "public/*.js", "public/lib/*.js", "tools/*.ts"];
 
 const sources = new Map<string, string>();
 for (const pattern of SCANNED) {

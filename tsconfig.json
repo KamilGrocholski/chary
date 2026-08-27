@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     // Enable latest features
-    "lib": ["ESNext", "DOM"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
@@ -29,8 +29,19 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
 
-    // public/app.js is not checked (no "checkJs") — under strict it produces 25 DOM typing
-    // errors rather than real bugs. Worth revisiting with JSDoc annotations.
+    // An index into an array answers `T | undefined`, because it does. Three `!` in
+    // trends.ts were covering for its absence, and each of them stood over a real
+    // invariant that is now stated as one — see AGENTS.md §9.5.
+    "noUncheckedIndexedAccess": true,
+
+    // The dashboard ships as plain ES modules with no build step (§1), so the only way it
+    // gets typechecked at all is here, through JSDoc on its exports.
+    "checkJs": true,
+
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+
+  // Chart.js is vendored, minified and somebody else's — checking it would report their
+  // code, not ours. public/worlds/ is data. Neither is a source of this repository.
+  "exclude": ["node_modules", "public/vendor", "public/worlds"]
 }

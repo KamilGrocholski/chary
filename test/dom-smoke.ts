@@ -6,8 +6,8 @@
 // puts real data from public/ through the real render, so it catches what those cannot
 // see: an exception in the render, an empty series, a chart with no points.
 //
-//   bun test/dom_smoke.ts default    — the default filter: history from trends.json
-//   bun test/dom_smoke.ts filtered   — a filter set: history from raw .f.json
+//   bun test/dom-smoke.ts default    — the default filter: history from trends.json
+//   bun test/dom-smoke.ts filtered   — a filter set: history from raw .f.json
 //
 // The stub has to imitate a browser in the two places the code relies on it: a `<select>`
 // picks the first option by itself once innerHTML is set, and `querySelectorAll` descends
@@ -72,6 +72,23 @@ for (const [, id] of markup.matchAll(/id="([^"]+)"/g)) nodes[id!] = makeNode(id!
 // that is the node's default — i.e. they hold nothing.
 for (const tag of markup.matchAll(/<[a-z][^>]*\bid="([^"]+)"[^>]*>/g)) {
   if (/\shidden[\s>/]/.test(tag[0])) nodes[tag[1]!]!.hidden = true;
+}
+
+/**
+ * A response the way a browser hands one over: a body, read as text, parsed by the caller.
+ *
+ * ⚠️ The stub used to answer with `{ ok, status, json }` and no `text()` at all — narrower
+ * than the thing it stands in for, so the day the view started reading a body as text
+ * before parsing it, 25 assertions failed against code a browser runs correctly. A stub
+ * that cannot do what a browser does holds nothing about the browser (AGENTS.md §9.6).
+ */
+function answer(status: number, body: string) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    text: async () => body,
+    json: async () => JSON.parse(body),
+  };
 }
 
 // How many times each URL was fetched. A snapshot fetched twice is not a detail:
@@ -163,15 +180,15 @@ Object.assign(globalThis, {
     // the whole concurrent-fetch problem exists only while a fetch is IN FLIGHT — without
     // this the test passes with broken code too and holds nothing.
     if (url.endsWith(".f.json")) await new Promise((resolve) => setTimeout(resolve, 100));
-    if (failUrls.has(url)) return { ok: false, status: 503, json: async () => ({}) };
-    if (url === SMOKE_ENTRY.filters) {
-      return { ok: true, status: 200, json: async () => SMOKE_FILTERS };
-    }
+    if (failUrls.has(url)) return answer(503, "");
+    if (url === SMOKE_ENTRY.filters) return answer(200, JSON.stringify(SMOKE_FILTERS));
+
     if (url === "manifest.json") {
       const manifest = JSON.parse(await Bun.file(`public/${url}`).text());
       manifest.worlds.push({ name: SMOKE_WORLD, files: [SMOKE_ENTRY] });
-      return { ok: true, status: 200, json: async () => manifest };
+      return answer(200, JSON.stringify(manifest));
     }
+
     if (url === "trends.json") {
       const trends = JSON.parse(await Bun.file(`public/${url}`).text());
       trends.worlds.brutal.bytes = BRUTAL_BYTES;
@@ -184,13 +201,10 @@ Object.assign(globalThis, {
         suspect: [0],
         bytes: 1_000,
       };
-      return { ok: true, status: 200, json: async () => trends };
+      return answer(200, JSON.stringify(trends));
     }
-    return {
-      ok: true,
-      status: 200,
-      json: async () => JSON.parse(await Bun.file(`public/${url}`).text()),
-    };
+
+    return answer(200, await Bun.file(`public/${url}`).text());
   },
 });
 

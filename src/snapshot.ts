@@ -1,6 +1,9 @@
 import { readdir } from "node:fs/promises";
 import path from "node:path";
-import { parseLastOnlineDays, type PlayerRow } from "./parser.ts";
+import { parseLastOnlineDays, type PlayerRow } from "@/src/parser.ts";
+import { MargoStatToolError } from "@/src/margostat-tool-error.ts";
+import { getIntegerFromValue } from "@/public/lib/number.js";
+import { getValueFromJsonText } from "@/public/lib/json.js";
 
 // A snapshot is written as two complementary files sharing one row order
 // (row i ↔ rank i+1), so together they reconstruct it 1:1 and nothing is duplicated:
@@ -46,6 +49,20 @@ export type PopulationDrop = {
   /** The share of players lost, e.g. 0.12 = −12%. */
   drop: number;
 };
+
+/**
+ * A snapshot on disk could not be read as one.
+ *
+ * Thrown rather than substituted, and that is the whole point of it: everything under
+ * `public/worlds/` was fetched once from a ranking that keeps no history, so a row this
+ * code cannot understand is a row nobody can fetch again. Guessing at it writes a number
+ * nobody measured into the only copy there is (§9.2).
+ */
+export class SnapshotReadError extends MargoStatToolError {
+  constructor(message: string) {
+    super("SnapshotRead", message);
+  }
+}
 
 /** The default threshold: a drop of more than 5% of a world's population between rounds. */
 export const DEFAULT_DROP_THRESHOLD = 0.05;
@@ -137,27 +154,59 @@ export function splitSnapshot(rows: PlayerRow[], meta: SnapshotMeta): { filters:
 export function normalizeLegacyRows(payload: { schema?: number; rows: unknown[][] }): NormalizedRow[] {
   const schema = payload.schema ?? (typeof payload.rows[0]?.[5] === "string" ? 1 : 2);
 
-  return payload.rows.map((row) => {
+  return payload.rows.map((row, index) => {
+    const at = (column: number) => `row ${index}, column ${column}`;
+
+    // Every number goes through a reader that answers `null` rather than through `Number`,
+    // which answers `0` for an empty cell and `NaN` for a missing one — and `NaN` reaches
+    // the written file as `null` after `JSON.stringify`, so a value nobody wrote becomes a
+    // gap nobody notices. A row that cannot be read stops the migration instead.
+    const name = requireText(row[1], at(1));
+
     if (schema >= 2) {
       return {
-        name: String(row[1]),
-        charId: row[2] === null || row[2] === undefined ? null : Number(row[2]),
-        level: Number(row[3]),
-        profession: Number(row[4]),
-        honor: Number(row[5]),
-        days: row[6] === null || row[6] === undefined ? null : Number(row[6]),
+        name,
+        charId: readOptionalInteger(row[2], at(2)),
+        level: requireInteger(row[3], at(3)),
+        profession: requireInteger(row[4], at(4)),
+        honor: requireInteger(row[5], at(5)),
+        days: readOptionalInteger(row[6], at(6)),
       };
     }
-    const days = parseLastOnlineDays(String(row[5] ?? ""));
+
+    // v1 stored the "last online" column as the ranking's own sentence, so an unreadable
+    // one is `undefined` and becomes `null` — that is the schema's own gap, not ours.
+    const days = parseLastOnlineDays(requireText(row[5] ?? "", at(5)));
     return {
-      name: String(row[1]),
+      name,
       charId: null,
-      level: Number(row[2]),
-      profession: Number(row[3]),
-      honor: Number(row[4]),
+      level: requireInteger(row[2], at(2)),
+      profession: requireInteger(row[3], at(3)),
+      honor: requireInteger(row[4], at(4)),
       days: days === undefined ? null : days,
     };
   });
+}
+
+function requireText(value: unknown, where: string): string {
+  if (typeof value !== "string" || value === "") {
+    throw new SnapshotReadError(`${where}: expected a non-empty nickname, got ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+function requireInteger(value: unknown, where: string): number {
+  const integer = getIntegerFromValue(value);
+  if (integer === null) {
+    throw new SnapshotReadError(`${where}: expected a whole number, got ${JSON.stringify(value)}`);
+  }
+  return integer;
+}
+
+/** `null` and `undefined` are the schema's own "we do not know" and stay that way. */
+function readOptionalInteger(value: unknown, where: string): number | null {
+  if (value === null || value === undefined) return null;
+  return requireInteger(value, where);
 }
 
 export function splitNormalized(rows: NormalizedRow[], meta: SnapshotMeta): { filters: FilterFile; names: NamesFile } {
@@ -190,26 +239,41 @@ export function splitNormalized(rows: NormalizedRow[], meta: SnapshotMeta): { fi
  * A missing directory, no snapshots or an unreadable file is not an error: a new world
  * simply has nothing to compare against.
  */
-export async function latestSnapshotCount(dir: string): Promise<number | null> {
+export async function getLatestSnapshotCount(dir: string): Promise<number | null> {
+  let files: string[];
   try {
-    const files = (await readdir(dir)).filter((f) => f.endsWith(".f.json")).sort();
-    const last = files.at(-1);
-    if (!last) return null;
-
-    const { count } = JSON.parse(await Bun.file(path.join(dir, last)).text()) as { count?: number };
-    return typeof count === "number" ? count : null;
+    files = (await readdir(dir)).filter((f) => f.endsWith(".f.json")).sort();
   } catch {
+    // The only expected failure here, and the only one worth answering `null` to: a world
+    // scraped for the first time has no directory yet. The catch used to wrap the whole
+    // body and swallowed everything down to a typo of ours, which then read as "a new
+    // world" and disarmed the population guard for that round (§9.5).
     return null;
   }
+
+  const last = files.at(-1);
+  if (last === undefined) return null;
+
+  const reading = getValueFromJsonText(await Bun.file(path.join(dir, last)).text());
+  if (!reading.ok) {
+    // A truncated snapshot is a real possibility — a round can be interrupted mid-write —
+    // and it must not stop the next round. It disarms the guard for this world, so it says
+    // so rather than passing for a world with no history.
+    console.warn(`⚠ ${dir}/${last} could not be read, so the population guard has nothing to compare against`);
+    return null;
+  }
+
+  const count = getIntegerFromValue((reading.value as { count?: unknown } | null)?.count);
+  return count;
 }
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 
-export function filterPathFor(dir: string, timestamp: string) {
+export function composeFilterPath(dir: string, timestamp: string) {
   return path.join(dir, `${timestamp}.f.json`);
 }
 
-export function namesPathFor(dir: string, timestamp: string) {
+export function composeNamesPath(dir: string, timestamp: string) {
   return path.join(dir, `${timestamp}.n.json`);
 }
 
@@ -218,6 +282,6 @@ export function isLegacySnapshot(fileName: string) {
   return fileName.endsWith(".json") && !/\.(f|n)\.json$/.test(fileName);
 }
 
-export function timestampFromFileName(fileName: string) {
+export function getTimestampFromFileName(fileName: string) {
   return fileName.replace(/\.(f|n)?\.?json$/, "");
 }

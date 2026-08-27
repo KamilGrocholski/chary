@@ -1,6 +1,6 @@
 {
   "name": "margostat",
-  "module": "src/world_scraper.ts",
+  "module": "src/world-scraper.ts",
   "type": "module",
   "license": "MIT",
   "author": "Kamil Grocholski",
@@ -9,10 +9,12 @@
     "url": "git+https://github.com/KamilGrocholski/chary.git"
   },
   "scripts": {
-    "scrape": "bun src/world_scraper.ts",
-    "scrape:check": "bun src/world_scraper.ts --dry-run",
-    "rebuild": "bun src/rebuild_data.ts",
+    "check": "bun run typecheck && bun test",
+    "scrape": "bun src/world-scraper.ts",
+    "scrape:check": "bun src/world-scraper.ts --dry-run",
+    "rebuild": "bun src/rebuild-data.ts",
     "serve": "bun src/server.ts",
+    "data:status": "bun tools/data-status.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

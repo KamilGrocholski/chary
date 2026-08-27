@@ -28,7 +28,7 @@ margonem.pl/ladder  ──scrape──►  public/worlds/<world>/<ts>.f.json   (
                             over time, under the same filter
 ```
 
-- **The scraper** (`src/world_scraper.ts`) — walks the ranking pages of each world and writes a snapshot.
+- **The scraper** (`src/world-scraper.ts`) — walks the ranking pages of each world and writes a snapshot.
 - **The parser** (`src/parser.ts`) — pure logic for parsing the ranking HTML, covered by tests against a real page.
 - **The snapshot split** (`src/snapshot.ts`) — writing to two files sharing one row order.
 - **The manifest** (`public/manifest.json`) — an index of snapshots per world, linking to both files.
@@ -149,9 +149,13 @@ After swapping it, update the version number here and in the comment in `public/
 ## Tests
 
 ```bash
+bun run check   # typecheck + tests — the gate, and what CI runs
 bun test        # the parser (against a real ranking page in test/fixtures) + all the view logic
 bun run typecheck
 ```
+
+The typecheck covers `public/*.js` too, through JSDoc rather than a build step — see
+[`AGENTS.md`](AGENTS.md) §9.3.
 
 ## Local preview
 
@@ -172,34 +176,43 @@ git push
 
 The [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) workflow uploads the `public/` directory as an artifact and publishes it to GitHub Pages. It can also be run by hand from the **Actions** tab (`workflow_dispatch`).
 
-> **A caveat about size.** A published site on GitHub Pages has a hard 1 GB limit. As of 2026-08-01: `public/` weighs 118 MB and each scrape round adds ~14 MB → **~65 rounds remain, about two years** at the current pace. The full calculation and what to do once the headroom runs out: [`docs/2026-08-01-size-budget.md`](docs/2026-08-01-size-budget.md).
+> **A caveat about size.** A published site on GitHub Pages has a hard 1 GB limit, and every round adds to `public/`. Run `bun run data:status` for where the artefact stands today — the figure is measured rather than written down here, because a written one goes stale on the next round. The calculation and what to do once the headroom runs out: [`docs/2026-08-01-size-budget.md`](docs/2026-08-01-size-budget.md).
 
 ## Project structure
 
 ```
 src/
-  world_scraper.ts   # the ranking scraper (fetch, retry, writing)
+  world-scraper.ts   # the ranking scraper (fetch, retry, writing)
   parser.ts          # parsing the ranking HTML (pure functions)
   snapshot.ts        # the snapshot format: the .f/.n split and migrating old ones
   manifest.ts        # rebuilding public/manifest.json
   trends.ts          # a world's history aggregate → public/trends.json
-  rebuild_data.ts    # maintenance: migration + manifest + trends
+  rebuild-data.ts    # maintenance: migration + manifest + trends
   worlds.ts          # the list of tracked worlds
   server.ts          # a local static server for previewing
+  scraper-cli.ts     # reading the scraper's arguments (pure, so it can be tested)
+  margostat-tool-error.ts  # the base every terminal-side error extends
+tools/
+  data-status.ts     # what is in public/ right now — `bun run data:status`
 test/
   parser.test.ts     # parser tests against a capture of a real page
   snapshot.test.ts   # the snapshot format and migration from the old schemas
   dashboard.test.ts  # the cross-section: filters compared against pre-migration data
   trends.test.ts     # the history: the aggregate against .f.json, the client computing what the server does
   language.test.ts   # the language boundary: English everywhere except what a player reads
-  dom_smoke.ts       # a DOM stub, two scenarios (run from the tests in a subprocess)
+  lib.test.ts        # the value readers: everything JavaScript would otherwise invent
+  scraper-cli.test.ts  # every argument the scraper refuses
+  dom-smoke.ts       # a DOM stub, two scenarios (run from the tests in a subprocess)
   source-text.ts     # splitting a source into comments, code and string literals
+  tools/             # guards: the rules in AGENTS.md held over the tree itself
 public/              # what lands on GitHub Pages
   index.html         # the whole world view (markup + styles)
   app.js             # the only module that touches the DOM
   filters.js         # filtering, counting, the filter state in the URL (no DOM)
   history.js         # a world's history: thresholds, series, fetching snapshots (no DOM)
   shared.js          # constants, time, activity bucketing (no DOM)
+  fetch-json.js      # the one place `fetch` is spelled; refuses with a code
+  lib/               # the bottom layer: assert, and the only way to read a value
   vendor/            # Chart.js 4.4.7 (local, no CDN)
   trends.html        # a redirect to index.html (old links)
   manifest.json      # the snapshot index

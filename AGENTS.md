@@ -1,125 +1,461 @@
-# AGENTS.md — the entry point for an AI agent
+# AGENTS.md — the entry point for an agent
 
-Read this first. If you still do not know where to look for something after finishing this
-file, that is a bug in this document — add what is missing instead of leaving the next
-person with the same question.
+The single source of rules for anyone — human or agent — working in this repository.
+`CLAUDE.md` only imports this file. If a rule is not here, it is not a rule.
+
+Rules first. The reasoning behind a rule lives beside it where it is short, and in the
+file's own docblock, the guard that holds it or `docs/` where it is long. What never
+belongs here is a number describing the tree or the data as it stands today — §5.
 
 ---
 
-## What this is
+## 1. Project
 
-A ranking scraper for [Margonem](https://www.margonem.pl) plus a static dashboard on
-GitHub Pages. It periodically fetches the player rankings of every tracked world, writes
-snapshots to static JSON files, and lets you browse and filter them with no backend at all.
+MargoStat is a ranking scraper for [Margonem](https://www.margonem.pl), a browser-based
+MMORPG, plus a static dashboard on GitHub Pages. It periodically fetches the player ranking
+of every tracked world, writes snapshots as static JSON, and lets anyone browse and filter
+them with no backend at all.
+
+**It reads and does nothing else.** No account, no game client, no automation — one HTTP
+request per second against a public ranking page.
 
 - **Live:** https://kamilgrocholski.github.io/chary/
 - **Repo:** `git@github.com:KamilGrocholski/chary.git` — the project is called **MargoStat**,
   the repository `chary`, and the npm package id `margostat` (lowercase, because npm forbids
   capitals). None of the three disagreements is a mistake.
-- **Data source:** `https://www.margonem.pl/ladder/<world>/players?page=N`
-- **State:** 244 snapshots from 21 worlds, **12 rounds** since 2026-04-17, ~593k players per
-  round, `public/` 173 MB. Two worlds are off that grid: `brutal` has a 13th snapshot from a
-  single-world scrape on 2026-08-01, and `luvia` joined in the 10th round, so it has 3.
+- **Data source:** `https://www.margonem.pl/ladder/<world>?page=N`
+
+Stack: Bun + TypeScript for the scraper, plain ES modules for the dashboard, one runtime
+dependency (`cheerio`) and one vendored library (Chart.js). **There is no build step.**
+`public/` is byte for byte what GitHub Pages serves, which is why the dashboard is written
+in JavaScript and typechecked through `checkJs` rather than compiled — §9.3.
+
+For what is in `public/` right now — snapshots, rounds, the artefact against the Pages
+limit — run `bun run data:status`. It is not written down here, and §5 says why.
 
 ---
 
-## Language
+## 2. Boundary labels
 
-**Write English** — code, comments, tests, docs, commit messages. Two exceptions, and the
-line between them is what somebody is reading:
-
-| Stays Polish | Where |
+| Tag | Meaning |
 |---|---|
-| The text a player reads | `public/index.html` body copy, `aria-label`s, placeholders, `<title>`, `<meta description>`, `lang="pl"`, `trends.html`, `404.html` |
-| UI strings built in JS | chart titles, chips, table headings, status and error copy in `app.js`; `PROF` in `shared.js`; `activityLabel`/`filterChips` in `filters.js`; `ACTIVITY_THRESHOLDS[].label` in `history.js`; `toLocaleString("pl-PL")` |
-| Keys that match scraped material | `PROFESSION_BY_NAME`, `PROFESSION_BY_LETTER` and the `ł → l` folding in `parser.ts`; the captured page in `test/fixtures/` |
-| `suspect.reason` | written by `snapshot.ts` into every flagged `.f.json` and rendered verbatim by the dashboard — server-side code producing a sentence for a player |
-| The assertions that pin all of the above | the Polish expected values in `test/dashboard.test.ts` |
+| `[ALWAYS]` | Do it every time. No judgment call. |
+| `[ASK]` | Stop and ask the user before doing it. |
+| `[NEVER]` | Do not do it. Not "prefer not to". |
 
-**Identifiers around a Polish string stay English**, and a Polish sentence never carries
-our vocabulary: a player is told what the data cannot show, not why our reader could not
-read it. Everything else — every comment, every test name, every line the terminal prints,
-every word in `docs/` — is English. Guarded by `test/language.test.ts`.
+| Scope | Meaning | Paths |
+|---|---|---|
+| `[any]` | Everywhere in the repo | — |
+| `[lib]` | True in any project; knows nothing of this one | `public/lib/` |
+| `[scrape]` | Fetching, parsing, the snapshot format | `src/` |
+| `[dash]` | The dashboard and everything it draws | `public/*.js`, `public/index.html` |
+| `[data]` | Material taken from the ranking | `public/worlds/`, `test/fixtures/` |
+| `[tools]` | Runs in a terminal, never reaches a browser | `tools/` |
+| `[docs]` | Specs, audits and the notes behind them | `docs/` |
+| `[process]` | Commits, validation, workflow | `.github/workflows/` |
 
-The Polish query parameters `prog` and `udzial`, and the `liczba`/`udzial` option values
-behind them, are a deliberate exception on a different axis: they are the contract of links
-people have already shared, which is the entire reason `trends.html` still exists. A URL is
-not code style. Do not rename them.
-
----
-
-## Where things live
-
-```
-src/
-  world_scraper.ts   scraper CLI: fetching, retry, the guard, writing, the summary
-  parser.ts          parsing the ranking HTML — pure functions, zero I/O
-  snapshot.ts        snapshot format: the .f/.n split, migrating old ones, the population guard
-  manifest.ts        building public/manifest.json
-  atomic.ts          write to a temp file + rename — all of it or none of it
-  retry.ts           backoff and Retry-After — pure, because world_scraper.ts runs on import
-  trends.ts          per-world history aggregate → public/trends.json
-  rebuild_data.ts    data maintenance CLI (migration + manifest + trends)
-  worlds.ts          the list of tracked worlds — edited by hand
-  server.ts          local static server for previewing
-public/              exactly what lands on GitHub Pages
-  index.html         markup and styles: sticky filter bar + snapshot + history
-  app.js             the only module that touches the DOM — orchestration and drawing
-  filters.js         filtering and counting: matches, countByLevel, summarizeFiltered, URL state
-  history.js         world history: thresholds, series, typed arrays, fetching snapshots
-  shared.js          constants, time, activity bucketing — the shared vocabulary
-  vendor/            Chart.js 4.4.7 locally, no CDN + LICENSE.chartjs
-  trends.html        redirect to index.html, preserving the query string
-  manifest.json      the snapshot index
-  trends.json        the folded history of every world + what a snapshot costs (29 KB, 11 KB gz)
-  worlds/<world>/    <id>.f.json + <id>.n.json
-test/
-  parser.test.ts     the parser against a capture of a real ranking page
-  snapshot.test.ts   snapshot format, migration, the population guard
-  dashboard.test.ts  the snapshot view: filters, the −1 sentinel, snapshot time, agreement with index.html, smoke
-  trends.test.ts     history: the server aggregate, trends.json, history.js, client == server
-  language.test.ts   the language boundary above, over comments and string literals
-  dom_smoke.ts       a DOM stub — two scenarios, run from the tests in a subprocess
-  source-text.ts     splitting a source into comments, code and string literals
-  fixtures/          a capture of a ranking page + a sample snapshot in the old schema
-docs/                audits and notes
-.github/workflows/   deploy.yml (check + publish), ci.yml (pull requests)
-AGENTS.md            this file — the instructions for an agent
-CLAUDE.md            a pointer to AGENTS.md (Claude Code)
-LICENSE              MIT — covers the code ONLY, not the data
-```
-
-The code is ~4.4k lines including the tests. You can read all of it, and it is **worth**
-doing before a larger change — faster than guessing.
+Untagged prose is context and does not bind. A test is bound by the scope of the thing it
+tests. Keep this table true — a scope whose path is gone is the first sign the rules have
+drifted.
 
 ---
 
-## How to use it
+## 3. ALWAYS
+
+- `[ALWAYS] [any]` **Run the gate after every change**, including a one-line edit. §6.1.
+- `[ALWAYS] [process]` **Prove a new test can fail.** Break what it covers, watch it go
+  red, restore. Say in the commit what you broke and what lit up.
+- `[ALWAYS] [scrape]` **Run `bun run scrape:check` before a full scrape.** Margonem has
+  already changed the table layout once, and the scraper fell over on all twenty worlds
+  while exiting with code 0. A round is over an hour long and overwrites nothing that can
+  be fetched again — §9.2.
+- `[ALWAYS] [any]` **A claim about the ranking carries the date it was read.** Its markup,
+  its column order, what a cell says for an account nobody has used: that is somebody
+  else's system, so it is dated or it is a guess. Negative claims included.
+- `[ALWAYS] [any]` **A measurement over the data names the material it was taken on** — the
+  world and the snapshot, or the set and its date. A figure scoped to "the snapshots" goes
+  stale on the next round.
+- `[ALWAYS] [any]` **Make unknown input loud.** A cell the parser cannot read becomes a
+  rejected row with a reason, never a substituted value — §9.5.
+- `[ALWAYS] [any]` **Write English** — code, comments, tests, docs, commits. The exception
+  is the text a player reads, which is Polish. The boundary is §9.8 and
+  `test/language.test.ts` holds it.
+- `[ALWAYS] [process]` **Leave the gate green** — every commit on its own, including when
+  one change is split across several.
+- `[ALWAYS] [process]` **Work lands on `main`, and a push to `main` publishes.**
+  `deploy.yml` runs the gate first and does not publish without it, so a red commit reaches
+  Pages only if somebody turns that off.
+
+---
+
+## 4. ASK FIRST
+
+- `[ASK] [process]` **Committing or pushing.** Otherwise finish a round with the changes in
+  the working tree and a summary.
+- `[ASK] [data]` **Touching anything under `public/worlds/` or `test/fixtures/`** — §9.2.
+  This includes reformatting, and it includes a migration: one is `[ASK]` even when it is
+  provably lossless.
+- `[ASK] [any]` **Changing the data contract** — `SNAPSHOT_SCHEMA`, the shape of a
+  `.f.json`/`.n.json` pair, or `trends.json`. Every published file and every shared link is
+  downstream of it.
+- `[ASK] [any]` **Deleting or skipping a test**, including "it's obsolete".
+- `[ASK] [any]` **Adding a dependency.** One runtime dependency is a feature; a dashboard
+  that fetches nothing from a CDN is a promise.
+- `[ASK] [any]` **Turning off a compiler flag or a guard test** to pass.
+- `[ASK] [any]` **Adding a file nothing uses yet** — §7.1.
+- `[ASK] [scrape]` **Adding or removing a world in `src/worlds.ts`.** A world that leaves
+  the list stops being scraped and its history stops growing; one that joins starts a
+  history that cannot be backfilled.
+
+---
+
+## 5. NEVER
+
+- `[NEVER] [data]` **Edit captured material to make a test pass.** If the fixture
+  contradicts the code, the code or the understanding is wrong.
+- `[NEVER] [any]` **Invent data the ranking does not carry.** `0` is a measurement, so a
+  field that could not be read never becomes `0`, never copies its neighbour and never
+  borrows the previous snapshot's value. Unknown is a value with a spelling of its own —
+  §9.5.
+- `[NEVER] [dash]` **Fetch anything the repository does not publish.** The dashboard reads
+  `manifest.json`, `trends.json` and files under `worlds/`, all same-origin. No CDN, no
+  analytics, no font host. Chart.js is vendored for this reason.
+- `[NEVER] [any]` **Comment the obvious.** §9.3.
+- `[NEVER] [any]` **Leave a number in prose that a machine could compute of the tree or the
+  data as it stands** — snapshot counts, round counts, file sizes, test counts, line counts.
+  Measure at read time: `bun run data:status`.
+
+  ⚠️ This rule replaces a workflow rule that asked for the figures in this file to be
+  refreshed by hand after every round. They were not, and a stale number here reads exactly
+  like a measured one — the last drift stood for two rounds. A historical measurement is a
+  different thing and stays: "the split cut `public/` from 620 MB to 118 MB" describes
+  something that happened and cannot go stale.
+
+- `[NEVER] [any]` **Put `public/worlds/` or `test/fixtures/` under an open-source licence.**
+  The ranking database belongs to the publisher of Margonem (terms `XIX.2` / `VII.2.m)`
+  plus the sui generis database right), and a `.n.json` holds nicknames, which are personal
+  data. `LICENSE` is plain MIT and covers the code only — with not a word about the data,
+  because GitHub detects a licence by similarity to a template and a note about scope would
+  change the detected licence to "Other". The scope lives in `README.md`.
+- `[NEVER] [scrape]` **Disguise the scraper as a browser.** The user agent says who is
+  knocking: `Mozilla/5.0 (margostat scraper)`.
+
+---
+
+## 6. Commands
+
+### 6.1 The gate
 
 ```bash
-bun install
-
-bun run scrape:check   # ALWAYS before a full scrape — checks the parser on page 1 of every world
-bun run scrape         # every world from src/worlds.ts (~1.6 h at 1 req/s)
-bun run scrape aether  # a single world
-bun run scrape aether,tempest 2000   # chosen worlds, custom interval in ms (min. 250)
-
-bun run serve          # http://localhost:3000 — the dashboard locally
-bun test               # 188 tests
-bun run typecheck
-bun run rebuild        # data maintenance: migrate old schemas + manifest + trends
+bun run check      # typecheck + tests — THE GATE, must pass
+bun test           # tests only, while iterating
+bun run typecheck  # types only
 ```
 
-Deploying happens by itself after a push to `main`, but only once typecheck and the tests
-pass.
+The gate is one command so there is no version of "I ran the tests but not the typecheck".
+There is no build step to run — §1.
+
+### 6.2 Working commands
+
+```bash
+bun run scrape:check                 # page 1 of every world, writes nothing — ALWAYS before a scrape
+bun run scrape                       # every world in src/worlds.ts, ~1 req/s
+bun run scrape aether                # a single world
+bun run scrape aether,tempest 2000   # chosen worlds, custom interval in ms (min. 250)
+bun run rebuild                      # data maintenance: migrate old schemas + manifest + trends
+bun run serve                        # http://localhost:3000 — the dashboard locally
+bun run data:status                  # what is in public/ right now — §5
+```
+
+### 6.3 Tooling
+
+A tool arrives with the question it answers (§7.1).
+
+| Tool | Answers |
+|---|---|
+| `tools/data-status.ts` | *What is in `public/` right now?* Snapshots, rounds, the artefact against the Pages limit, what one snapshot costs a visitor. The figures §5 keeps out of prose. |
 
 ---
 
-## The data format — you have to understand this
+## 7. Workflow
 
-One snapshot is **two files with the same row order**. Row *i* corresponds to rank *i+1*,
-so the rank is never stored anywhere, and the two files together reconstruct the snapshot
-1:1 without duplicating anything.
+### 7.1 Shape of a round
+
+**Nothing exists before it is needed** — files, directories, modules, tools and guards
+alike. A file is created in the commit that uses it; a directory appears with its first
+file; a shared module appears at the **second** consumer; a guard appears when there is
+something to guard; a tool appears with its question.
+
+This repository has already deleted a constant and an entire module that existed "for
+later": `aggregate.ts` produced fields no view read, and `NEVER_ONLINE_DAYS` survived a
+format rebuild in the dashboard because nobody was holding it. If something has no consumer
+today, describe the idea in `docs/` and do not commit the code.
+
+A round: understand the problem → change the smallest thing that addresses it → run the
+gate (§6.1) → report (§7.4). If you catch yourself writing a plan, the change deserves one
+written down before the code.
+
+### 7.2 Commits
+
+Conventional Commits, English: `type(scope): effect`.
+
+| Type | For |
+|---|---|
+| `feat` | Something the user can now do |
+| `fix` | Behaviour that was wrong |
+| `perf` | Same behaviour, measured faster or smaller |
+| `refactor` | Same behaviour, different shape |
+| `docs` | `AGENTS.md`, `README.md`, `docs/` |
+| `test` | Tests and guards only |
+| `build` | `package.json`, `tsconfig.json`, the lockfile |
+| `chore` | Everything else that ships no behaviour |
+| `scrape` | A round of data, and nothing else |
+
+Scopes are the parts of the tree, not the activity: `scraper`, `parser`, `snapshot`,
+`trends`, `manifest`, `dash`, `lib`, `tools`, `docs`, `ci`. A commit touching one file
+takes that file's scope; one touching the whole repo takes none.
+
+- `[ALWAYS] [process]` **A scrape round is committed on its own, as `scrape: …`** — no
+  source change in the same commit. A round rewrites `manifest.json` and `trends.json` and
+  adds tens of megabytes; a code change hiding inside that diff is a code change nobody
+  will ever read.
+
+**The header names the effect, not the activity** — "the history ceiling is priced in
+bytes", not "change the snapshot window".
+
+**The body is the primary record of reasoning**, with no length limit: numbers rather than
+adjectives, what decided it (a measurement, or taste — say which), the rejected
+alternatives, what you broke and what lit up (§3), and what stays open.
+
+### 7.3 Parallelism and subagents
+
+Independent tool calls go in one message. Delegate when answering means reading across many
+files and you only need the conclusion; never a single-file lookup, and never a search you
+have already delegated.
+
+### 7.4 Reporting
+
+End a round with: what changed, what you validated and what came back, what you did **not**
+do and why. Report failures with the output, and say when a step was skipped. Nothing is
+done until the gate is green.
+
+### 7.5 What a round teaches
+
+Three places, in order: **a guard**, if a machine can check it; **a rule here**, if it needs
+judgment, naming the cost that produced it; **the commit message**, if it is neither. There
+is no place for a file of accumulated lessons — an append-only list with no consumer is
+exactly what §7.1 forbids.
+
+Rules that arrived this way, each paid for at least once:
+
+- `[ALWAYS] [any]` **Do not trust a hypothesis — measure.** "The chart is unreadable
+  because of level 1" was false, and one command over the data on disk said so. The data is
+  right there; checking costs seconds.
+- `[ALWAYS] [any]` **Read back the result of a scripted edit.** A pattern that no longer
+  matches does nothing and says nothing.
+- `[ALWAYS] [any]` **Test the boundary from both sides, and zero is the boundary.** Zero is
+  a legitimate reading of every number here — a level cannot be zero but honor can, and
+  `days: 0` means "today". A test at `0` needs one at `1` beside it, and one below where the
+  type allows: honor reaches −35 and `days` carries −1 for an account never used.
+- `[ALWAYS] [any]` **A test compares against the truth, not against itself.** The parser is
+  checked against a capture of a real ranking page and the filters against a real snapshot
+  in the old schema. A test that checks a reimplementation of itself holds nothing.
+- `[ALWAYS] [any]` **A rule narrowed in a docblock is a rule nobody else will read that
+  way.** Where a round finds that the tree has stopped matching what a rule says, the rule
+  moves — here — in the same commit.
+- `[ALWAYS] [dash]` **Two modules computing one answer need a guard holding them to it.**
+  `getActivityBucket` exists in `src/trends.ts` and in `public/shared.js` because the server
+  folds the history and the browser filters it, and they must agree value for value. A test
+  holds them; without it the history chart would quietly disagree with the snapshot view.
+
+### 7.6 Working from the ranking
+
+The ranking is somebody else's service and our only source. What it looks like, what its
+columns mean, what it prints for an account nobody has used: dated claims, per §3.
+
+- `[ALWAYS] [scrape]` **One request per second is the default, and 250 ms is the floor.**
+  At 400 ms the ranking answers `429`. `robots.txt` does not forbid `/ladder` and
+  Margonem's own `sitemap.xml` lists those paths, but that is not an invitation to hammer
+  it.
+- `[ALWAYS] [scrape]` **A retry retries one page.** It used to rewind the whole world to
+  page 1 — for the largest world that is hundreds of pages, up to four times, after a
+  quarter of an hour of work.
+- `[ALWAYS] [scrape]` **The server's hint may lengthen a pause and never shorten it.**
+  `Retry-After: 0` is a real answer, and `suggested ?? own` let it through — because
+  `0 ?? x` is `0` — so four requests went out back to back (`src/retry.ts`).
+- `[ALWAYS] [scrape]` **One strange row must not take down a world.** A row that cannot be
+  read is rejected with a reason; only above 1% of a page do we assume the markup changed
+  and abort.
+- `[ALWAYS] [scrape]` **The population guard writes rather than rejects.** A snapshot whose
+  population dropped more than the threshold against the previous one is written and
+  flagged `suspect`. Losing a whole round hurts more than a snapshot with a warning, and
+  the warning reaches the dashboard.
+
+### 7.7 Reading the whole tree at once
+
+An **audit** is one round that reads the whole repository and writes down what it found,
+dated by the commit it read. It measures the half the gate cannot report, since a guarded
+rule passes by construction: prose drifted from the tree, duplication past §7.1's second
+consumer, an exported name no test names, a rule written and never guarded.
+
+- `[ALWAYS] [process]` **Say what was not read.** *Not looked at*, *looked at and clean*
+  and *a finding* are three answers.
+- `[ALWAYS] [process]` **An audit carries the commit it read.**
+- `[ALWAYS] [process]` **A finding names a file, and a line where there is one.**
+- `[ALWAYS] [process]` **Every finding closes into one of §7.5's three places, or is
+  declined with a reason.** Leaving it open is not an answer.
+- `[NEVER] [process]` **Fix while auditing** — reading and fixing are separate commits.
+- `[NEVER] [docs]` **Append to a closed audit.** The next one is a new file.
+- `[ASK] [docs]` **Deleting an audit**, closed ones included.
+
+Open one without being asked: when the same class of fault turns up in two rounds, and when
+a round touches a layer no audit has read.
+
+---
+
+## 8. Structure
+
+Reflects the tree as it is, not as it is going to be. **Update it in the same commit that
+changes the tree.** Why a file is the way it is belongs in its own docblock, not here.
+
+```
+AGENTS.md          These rules. The only place they live.
+CLAUDE.md          One line importing AGENTS.md.
+README.md          The manual, for a human: what this is, how to run it, and what the
+                   licence does and does not cover.
+LICENSE            MIT — covers the code ONLY, never the data. §5.
+package.json       Scripts: the gate, the scrape, the rebuild, the local server.
+tsconfig.json      Strict flags standing in for a linter, and why checkJs is on.
+.github/workflows/ ci.yml on a pull request; deploy.yml runs the gate and publishes
+                   public/ to Pages on a push to main.
+
+src/               The scraper and the data format. Runs in a terminal, never in a browser.
+  margostat-tool-error.ts
+                   Base for everything the scraper and the tools throw — §9.5.
+  world-scraper.ts
+                   The round itself: fetching, retry, the population guard, writing, the
+                   summary. Runs on import — which is why the pure parts are not here.
+  scraper-cli.ts   Reading that command line. Pure, and answers a result rather than
+                   throwing: the caller is a person who mistyped a flag.
+  parser.ts        The ranking HTML into rows. Pure functions, zero I/O.
+  snapshot.ts      The snapshot format: the .f/.n split, migrating older schemas, the
+                   population guard's arithmetic.
+  manifest.ts      public/manifest.json — the snapshot index the dashboard opens with.
+  trends.ts        Every world's history folded to one number per snapshot →
+                   public/trends.json.
+  atomic.ts        Write to a temp file, then rename. All of it or none of it.
+  retry.ts         Backoff and Retry-After. Pure, because world-scraper.ts runs on import.
+  rebuild-data.ts  Data maintenance CLI: migration, then the manifest, then the trends.
+  worlds.ts        The worlds we track. Edited by hand — §4.
+  server.ts        A local static server for previewing public/.
+
+public/            Exactly what lands on GitHub Pages. No build step — §1.
+  lib/             The bottom layer: true in any project, and published because that is
+                   the only directory both sides can import from — §9.1.
+    assert.js      Assertions and their failure type. Outside both error hierarchies.
+    margostat-error.js
+                   Base for everything the dashboard throws — §9.5.
+    number.js      Every number read or written. Reading returns null, writing asserts.
+    json.js        JSON both ways: the value or the SyntaxError, never a bare null.
+    timestamp.js   Date.parse without the NaN.
+    text-order.js  Two pieces of text in order, by code unit, deterministic.
+  index.html       Markup and styles: the sticky filter bar, the snapshot, the history.
+  app.js           The only module that touches the DOM. Orchestration and drawing.
+  fetch-json.js    Fetching one of the documents this repo publishes, or refusing with a
+                   code. The one place `fetch` is spelled.
+  filters.js       Filtering and counting: matches, countByLevel, summarizeFiltered, and
+                   the filter's URL state.
+  history.js       One world's history: thresholds, series, typed arrays, fetching
+                   snapshots against a transfer budget.
+  shared.js        Constants, time and activity bucketing — the vocabulary the other three
+                   share. Touches no DOM and runs nothing on import.
+  trends.html      A redirect to index.html that keeps the query string. Shared links.
+  404.html         Pages' own.
+  manifest.json    GENERATED by src/manifest.ts.
+  trends.json      GENERATED by src/trends.ts.
+  vendor/          Chart.js, local, no CDN — plus the full MIT text beside it, because a
+                   banner in a minified build is lost on further minification.
+  worlds/<world>/  <id>.f.json + <id>.n.json. Material — §9.2. NOT ours to license.
+
+tools/             Never ships. §6.3 says what each answers.
+  data-status.ts   What is in public/ right now, so §5 can keep it out of prose.
+
+test/              A test sits beside the thing it tests.
+  parser.test.ts     The parser against a capture of a real ranking page.
+  snapshot.test.ts   The snapshot format, the migration, the population guard.
+  dashboard.test.ts  The snapshot view: filters, the −1 sentinel, snapshot time, agreement
+                     with index.html, smoke.
+  trends.test.ts     History: the server aggregate, trends.json, history.js, and that the
+                     client and the server agree number for number.
+  lib.test.ts        The floor: every value JavaScript would otherwise have invented.
+  scraper-cli.test.ts
+                     Every argument the scraper refuses, and why each refusal exists.
+  language.test.ts   The language boundary of §9.8, over comments and string literals.
+  dom-smoke.ts       A DOM stub — two scenarios, run from the tests in a subprocess.
+  source-text.ts     Splitting a source into comments, code and string literals.
+  fixtures/          A capture of a ranking page, and one snapshot in the old schema.
+
+docs/              Dated specs and audits. docs/README.md indexes them.
+```
+
+---
+
+## 9. Rules
+
+### 9.1 Architecture
+
+- `[ALWAYS] [lib]` **`public/lib/` is the bottom layer** and knows nothing of the ranking,
+  the scraper or the document. Everything may read it; it reads nothing.
+
+  ⚠️ It sits under `public/` for one reason: there is no build step, so the published
+  directory is the only place **both** sides can import from — `src/*.ts` by path and the
+  dashboard over HTTP. The alternative was one copy of `assert` and one of every value
+  reader per side, and `getActivityBucket` has already shown what two copies of one answer
+  cost. A visitor downloads only what a dashboard module imports, so a reader used by the
+  scraper alone costs them nothing.
+- `[ALWAYS] [scrape]` **`src/` may read `public/lib/` and nothing else under `public/`.**
+  The scraper never imports a dashboard module: `app.js` starts the view on import, and
+  `filters.js`/`history.js` are written against the browser's `fetch`.
+- `[ALWAYS] [dash]` **`app.js` is the only module that touches the DOM.** `shared.js`,
+  `filters.js` and `history.js` touch no document and run nothing on import — that is what
+  makes them testable outside a browser, and a test holds it. `fetch` in `history.js` is
+  not an exception: it is not the document interface, and the tests substitute a stub.
+- `[ALWAYS] [tools]` **A tool may read `src/` and `public/` alike.** It ships nowhere, so
+  the layering above does not bind it — and a report about the transfer budget is only true
+  if it spends the constant the dashboard actually spends, rather than a copy of it
+  (`tools/data-status.ts` imports `HISTORY_BUDGET_BYTES` from `public/history.js`).
+- `[ALWAYS] [any]` **A file holds one subject, however long that subject runs.** What
+  forces a split is a **second** subject — never a line count, and never a docblock that
+  got long.
+- `[ALWAYS] [any]` **Two spellings of one answer need a guard.** §7.5's last rule, stated
+  as architecture: where the server and the browser must agree — the activity buckets, the
+  filter predicate, the snapshot summary — one of them is the reference and a test compares
+  the other against it over real material.
+
+### 9.2 Data
+
+`public/worlds/` is the ranking as it stood at a moment in time. **The ranking has no
+history**, so whatever was not scraped then cannot be recovered now: this is evidence, not
+test data, and neither is `test/fixtures/`.
+
+- `[NEVER] [data]` Edit either to make anything pass.
+- `[ASK] [data]` Any change at all, including reformatting and including a migration.
+- `[ALWAYS] [data]` **A migration is lossless and verified row by row against the
+  originals in git**, and it refuses rather than substitutes — a row it cannot read stops
+  the migration (§9.5).
+- `[ALWAYS] [data]` **Snapshots are discovered by reading the directory**, never from a
+  hand-maintained list of names.
+- `[ALWAYS] [data]` **Every write into `public/` is atomic** — a temp file and a rename,
+  via `src/atomic.ts`. `Bun.write` truncates first, so a Ctrl-C mid-write leaves a
+  truncated snapshot, and a truncated snapshot took down `JSON.parse` in the manifest
+  build — which is both the tail of an hour-long round and the `bun run rebuild` meant to
+  repair it.
+- `[ALWAYS] [data]` **An empty world directory fails its own test.**
+
+**The format — you have to understand this.** One snapshot is **two files with the same row
+order**. Row *i* is rank *i+1*, so the rank is never stored and the pair reconstructs the
+snapshot 1:1 without duplicating anything. Nicknames are about two thirds of the volume and
+filtering has no use for them; the split cut `public/` from 620 MB to 118 MB.
 
 `public/worlds/<world>/<id>.f.json` — everything filtering needs:
 
@@ -130,146 +466,353 @@ so the rank is never stored anywhere, and the two files together reconstruct the
   "honor": [8749, 4715, ...], "days": [0, 0, 30, null, ...] }
 ```
 
-`public/worlds/<world>/<id>.n.json` — player identity:
+`public/worlds/<world>/<id>.n.json` — player identity: `name`, `charId`.
 
-```json
-{ "schema": 3, "kind": "names", "count": 39037,
-  "name": ["essobe", ...], "charId": [729, ...] }
-```
-
-**The traps you have to watch for:**
+**The traps:**
 
 - `days`: `0` = "less than 24 h ago", `N` = "N days ago", **`null` = an account never
-  used** (the ranking then shows ~20655 days, a date in 1969). Accounts with `null` fall
-  out of every activity threshold.
-- `honor` **can be negative** (the lowest observed is −35). No `Math.max(0, …)`.
-- **A snapshot's `id` (the stem of the filename) is NOT a date.** Files from before August
-  2026 carry local time in the name, newer ones UTC. Displaying a date and measuring the
-  interval between snapshots use `startedAt` from the manifest or the file, and nothing
-  else. The same goes for the `timestamp` field **inside** the data files — that is an
-  identifier, not a timestamp.
-- `charId` exists only in snapshots from August 2026 onwards. Older ones are joined by
-  nickname, and a nickname **is not stable** — see "the charId seam" in audit #2.
-- `suspect` in `.f.json` marks a snapshot whose population dropped by more than 5% against
-  the previous one. The data is written, but it may be truncated.
+  used** — the ranking shows about 20655 days for those, a date in 1969. They fall out of
+  every activity threshold.
+- **`honor` can be negative.** The lowest observed is −35. No `Math.max(0, …)`.
+- **A snapshot's `id` is NOT a date.** Files from before August 2026 carry local time in
+  the name, newer ones UTC. Displaying a date and measuring an interval use `startedAt`
+  from the manifest or the file, and nothing else. The same goes for the `timestamp` field
+  **inside** the data files — that is an identifier, and it keeps its name because renaming
+  it would mean rewriting every published file for cosmetics.
+- **`charId` exists only from August 2026 onwards.** Older snapshots join by nickname, and
+  a nickname is not stable — "the charId seam" in `docs/2026-08-01-audit-2.md`.
+- **`suspect` marks a snapshot whose population dropped past the threshold** against the
+  previous one. The data is written; it may be truncated. Its `reason` is Polish because
+  the dashboard renders it to a player verbatim — §9.8.
 - Professions: 1 Wojownik, 2 Mag, 3 Paladyn, 4 Tropiciel, 5 Tancerz ostrzy, 6 Łowca.
 
-The level, profession, honor and activity filters are computed **exactly**, always, from
-a single `.f.json` (20-180 KB gzipped). Nicknames are not fetched at all until a player
-search exists.
+**`public/trends.json` — history, not a snapshot.** Every world's history folded to one
+number per snapshot. Columnar: row *i* of every column is the same snapshot, the same
+convention as the `.f.json`/`.n.json` pair. **The `act` buckets are disjoint** — §10 — so
+"active ≤ 7 days" is the sum of the first two, and `ACTIVITY_THRESHOLDS` in `history.js` is
+the only place allowed to mix the two scales. A snapshot with no `startedAt` drops out of
+it, because there is nowhere to put it on a time axis, and how many dropped is reported
+rather than swallowed.
 
-### `public/trends.json` — history, not a snapshot
+`bytes` in it is the odd one out: not history but a **price** — the gzip size of that
+world's newest `.f.json`, i.e. what one snapshot costs a client. One number per world, not
+per snapshot, because per-snapshot sizes in the manifest measured 5835 → 7164 B gzip
+(+1.3 KB on every visit for everyone) against +96 B for this.
 
-The folded history of every world, one number per snapshot instead of hundreds of thousands
-of rows: 28 KB raw, **11 KB gzipped for all 244 snapshots**. This is the **default** history
-path — as long as the filter is at its defaults, the view draws its charts from this file
-alone and fetches no snapshot at all.
+### 9.3 Code
 
-```json
-{ "schema": 2, "builtAt": "...", "worlds": { "aether": {
-  "id": [...], "startedAt": [...], "total": [39849, ...],
-  "act": [[<24h], [1-7 days], [8-30 days], [>30 days], [never]],
-  "byProf": [[wojownik], ..., [łowca]], "suspect": [0, ...], "bytes": 98543 } } }
-```
+- **No linter, by choice — the compiler replaces it.** `strict`, `noUnusedLocals`,
+  `noUnusedParameters`, `noUncheckedIndexedAccess`, `checkJs`. `[ASK]` before weakening any.
+  Dead code has already survived two rebuilds here.
+- **`checkJs` is on and there is no build step**, so the dashboard is typed through JSDoc
+  on its exports. That is the price of `public/` being byte for byte what Pages serves;
+  the alternative was a bundler and a generated artefact in git.
+- **Comments say WHY, never WHAT**, and only what earns it: a decision with a rejected
+  alternative, a measurement, a constraint the ranking imposes, a trap someone will
+  otherwise fall into twice. Length is not the axis; what it carries is. A comment that
+  only describes may never exist.
+- **Unknown is loud, never zero.** A failed read returns `null` or an explicit unknown; it
+  never substitutes `0` and never copies a neighbour.
+- `[ALWAYS] [any]` **Imports are written from the repository root.**
 
-Columnar: row *i* of every column is the same snapshot — the same convention as the
-`.f.json`/`.n.json` pair. **The `act` buckets are disjoint**, so "active ≤7 days" is the
-sum of the first two; `ACTIVITY_THRESHOLDS` in `history.js` does that summing and is the
-only place allowed to mix the two scales. Rebuilt in full by `bun run rebuild` and at the
-end of every scrape round; a snapshot without `startedAt` drops out of it, because there is
-nowhere to put it on the time axis.
+  ```ts
+  import { parseTable } from "@/src/parser.ts";   // yes
+  import { parseTable } from "./parser.ts";       // no — even a sibling
+  ```
 
-`bytes` is the odd one out — not history but a price: the gzip size of that world's **newest**
-`.f.json`, i.e. what one snapshot costs the client. The transfer budget below spends it. One
-number per world rather than one per snapshot, because per-snapshot sizes in the manifest
-measured +1.3 KB gzip on every visit against +96 B for this.
+  `@/*` maps to the repository root: a path reads the same wherever it appears, and moving
+  a file does not rewrite its neighbours' imports. There is no depth at which `../../` is
+  acceptable. The dashboard is the one exception and it is the browser's, not ours —
+  a `<script type="module">` resolves relative URLs and knows nothing of `tsconfig.json`,
+  so `public/*.js` imports its siblings as `./shared.js`.
 
-The full reasoning behind its shape and the traps in the "last online" metric:
-[`docs/2026-08-04-spec-trends.md`](docs/2026-08-04-spec-trends.md).
+### 9.4 Naming
 
-### History under a filter — the second path to the same charts
+Follows the [naming cheatsheet][cheatsheet] by kettanaito. The binding subset plus what it
+leaves open.
 
-Once the filter stops being the default one, the aggregate is no longer enough:
-`trends.json` knows only global totals. The view then fetches the `.f.json` files of
-**that one world** — as many of the newest as fit into a **2 MiB transfer budget**, so
-0.2-2.0 MB gzipped — converts them to typed arrays and computes the history itself: exactly,
-with no bucketing.
+[cheatsheet]: https://github.com/kettanaito/naming-cheatsheet
 
-The heart of it is `summarizeFiltered` from `filters.js`: it returns
-`{ total, act[5], byProf[6] }`, which is **exactly the shape of a `trends.json` row**. That
-is why `activeCounts`, `changeRows`, `summarize` and all the drawing cannot tell the two
-paths apart and have no separate code for them. Under the default filter both must produce
-number-for-number what `summarizeSnapshot` from `src/trends.ts` produces — a test checks
-that across all 244 snapshots (~1.5 s).
+**`[ALWAYS] [any]` A function name starts with the action it performs.**
 
-The traps on this path:
+| Action | Means |
+|---|---|
+| `get` | Accesses data immediately. `getSnapshotCount()` |
+| `set` | Assigns a variable from one value to another. `setFilters(next)` |
+| `reset` | Restores a variable to its initial state. `resetFilters()` |
+| `remove` | Takes something **out of** somewhere. `removeProfession(id, filters)` |
+| `delete` | Erases something from existence. `deleteLegacySnapshot(path)` |
+| `compose` | Creates new data **from** existing data. `composeSnapshotUrl(world, id)` |
+| `handle` | Handles an action; the usual callback name. `handleWorldChange()` |
+| `parse` | Text → structure, throwing on anything unexpected. `parseTable(html, world, page)` |
+| `read` | A file or a response → a value, refusing what it cannot read. `readFilterFile(path)` |
+| `build` | Assembles an artefact this repo publishes. `buildWorldTrend(snapshots)` |
+| `summarize` | Many rows → the few numbers a chart draws. `summarizeSnapshot(filters)` |
+| `require` | A value narrowed to a type, or throws. `requireWorldName(text)` |
+| `expect` | Fails a test unless something holds. A test's action and nobody else's. |
 
-- **`null` in `days` becomes `−1`** — typed arrays cannot hold `null`. `−1 > maxDays` is
-  **false**, so the `isNeverOnline` check has to come **before** the threshold, otherwise
-  never-used accounts fall into every activity threshold. One place: `shared.js`.
-- **A snapshot that did not load gets no point.** No interpolation, no substituting the
-  unfiltered number from the aggregate — a hole makes a longer interval, and `perDay`
-  divides by real elapsed time, so it stays honest.
-- **The denominator of "share" is the unfiltered population**, not the filtered set (that
-  one would sum to 100%).
-- **The activity filter eats thresholds wider than itself** — at "≤ 3 days" the "≤ 7 days"
-  threshold counts the same players as the matches chart. `usableThresholds` removes them.
-- Memory holds at most **two worlds**, and the fetch is capped by a **transfer budget**, not
-  by a number of snapshots: `HISTORY_BUDGET_BYTES` (2 MiB) against `trends.json`'s per-world
-  `bytes`. Today it trims gordion alone — 11 of 12 snapshots — and nothing else, because
-  gordion costs 177 KB a snapshot against brutal's 20 KB. A count did the opposite: it
-  trimmed brutal, the cheapest world of the 21, and left gordion alone.
-  [`docs/2026-08-26-spec-history-budget.md`](docs/2026-08-26-spec-history-budget.md).
-- **The time axis comes from the aggregate, never from what was fetched.** `tickValues`,
-  `scales.x.min/max` and the tooltips are built from the world's `trends.json` entry on both
-  paths, so filtering can take points away but never the period the chart describes. The gap
-  the budget leaves stays empty — nothing is interpolated into it — and `#budgetNote` names
-  it, with the button that fetches the rest.
-- **Fetching starts only from behind the debounce, and only once per world.**
-  `loadHistory` holds a `world → Promise` map; calling it from the `input` handler pulled
-  the same set of files once per keystroke. A test counts fetches per URL.
-- **Replacing the `innerHTML` of a `<select>` clears the selection** — the browser picks
-  the first option even when the previous value is still on the list. The value has to be
-  read **before** the replacement. The DOM stub now does the same; it used to be gentler
-  and that is what hid this bug.
+You `add` to somewhere, so its inverse is `remove`; you `create` with no destination, so
+its inverse is `delete`. `parse` and `read` are not synonyms: `parse` knows a grammar and
+throws, `read` takes what somebody else produced and may answer `null` (§9.5). Other verbs
+are allowed where they are more precise, but `[NEVER]` a **synonym** for one in the table:
+no `fetch` where `get` fits, no `update` where `set` fits.
 
-Measurements, the transfer budget and why the views were merged:
-[`docs/2026-08-04-spec-world-view.md`](docs/2026-08-04-spec-world-view.md).
-Eight bugs that 165 tests did not catch:
-[`docs/2026-08-04-audit-3.md`](docs/2026-08-04-audit-3.md).
+**`[ALWAYS] [any]` Names follow A/HC/LC** — `prefix? + action + high context + low
+context?`. `getSnapshotCountByWorld` = get + SnapshotCount + ByWorld.
+
+**`[ALWAYS] [any]` Boolean names carry a prefix:**
+
+| Prefix | Means |
+|---|---|
+| `is` | A characteristic or state of the current context. `isNeverOnline` |
+| `has` | The context possesses a value or state. `hasCharIds` |
+| `should` | A positive conditional coupled with an action. `shouldRefetchHistory` |
+| `min` / `max` | A boundary. `maxDays` |
+| `prev` / `next` | A state transition. `prevSnapshot`, `nextSnapshot` |
+
+- **S-I-D — short, intuitive, descriptive**, all three.
+- **Reflect the expected result.** `isDisabled`, not `isEnabled` used negated.
+- **No contractions.** `button`, not `btn`. Abbreviate only where the ranking does, and say
+  so in a comment.
+- **Do not duplicate the context a name already sits in.**
+- **Singular is one thing, plural is a collection.**
+- **Files are kebab-case and name their contents, not their category.** `utils`, `helpers`,
+  `common`, `misc` and `index` `[NEVER]` get created here.
+- **Types name the thing, not its shape.** `SnapshotSummary`, not `SnapshotData`.
+
+### 9.5 Errors and assertions
+
+The heart of this repository's second rewrite. Two rules decide everything below:
+**nothing produces a value nobody wrote**, and **a failure is either something a caller can
+act on — an error with a code — or a broken invariant, which is an assertion.**
+
+**`[ALWAYS] [any]` Every error we throw belongs to a branded hierarchy.** `[NEVER]` a bare
+`new Error(...)`, `[NEVER]` `extends Error` outside a base file. The brand goes in `name`,
+where a console shows it first.
+
+| Base | Where | Runs | `name` looks like |
+|---|---|---|---|
+| `MargoStatError` — `public/lib/margostat-error.js` | the dashboard | a player's browser | `MargoStat/…` |
+| `MargoStatToolError` — `src/margostat-tool-error.ts` | the scraper and the tools | a terminal | `MargoStatTool/…` |
+
+Deliberately disjoint, so a `catch` on one side cannot swallow the other believing it
+caught its own. Both bases are **abstract**: every kind of failure gets a named subclass
+and a `code`, so callers never match on message text.
+
+- `[ALWAYS] [any]` **Catch narrowly — exactly the error you expect.** One exception, and it
+  is a place: **at the boundary with somebody else's program.** In this repository that is
+  the `fetch` against the ranking, the `fetch` in the dashboard, and `JSON.parse` over a
+  file somebody else's process may have truncated. **Away from such a boundary a broad
+  catch is a bug** — `getLatestSnapshotCount` swallowed everything down to a typo of ours and
+  answered `null`, which reads as "a world with no history".
+- `[ALWAYS] [any]` **Pass the original in `cause` when wrapping.**
+- `[ALWAYS] [dash]` **An expected failure in the dashboard is DATA**, not an exception that
+  propagates: it becomes something the view can draw — §9.6. In `src/` and `tools/`,
+  throwing loudly is the correct behaviour, because the caller is a person at a terminal.
+- `[ALWAYS] [scrape]` **A rejected row is data too.** The parser collects rejections with
+  reasons and the caller decides on the threshold; that is why one strange row cannot take
+  down a world and why a changed table layout still can.
+
+**Assertions are a different category.** An error class and a `code` exist so a failure can
+be recognised and handled; a broken invariant cannot be, so it gets neither.
+`public/lib/assert.js` sits outside both hierarchies: `AssertionFailure`, no `code`, its
+own root. Where it broke comes from the stack, and what broke from a message naming the
+invariant.
+
+- `[ALWAYS] [any]` `assert` / `assertDefined` for what must never happen. `[NEVER]` for a
+  failure you know can occur — that is an error class.
+- `[ALWAYS] [any]` The message names the **invariant**, not the condition.
+- `[NEVER] [any]` **`!` in `src/`, `tools/` or `public/`.** Use `assertDefined` — but first
+  ask whether the type can be made precise; an assert over a type that could have been
+  exact is covering for a loose type. Tests keep `!`.
+
+**Reading a value: who produced it, and can anyone act on the failure.**
+
+| Where the value came from | Mechanism | Why |
+|---|---|---|
+| **Inside** — our own regex or invariant guarantees it | `assert` / `assertDefined` | Nobody can handle it; a break means the program is wrong. |
+| **Outside, in `src/` or `tools/`** — a snapshot file, a ranking page | a branded subclass with a `code`, thrown | A terminal command refuses bad material loudly. |
+| **Outside, in the dashboard** — a fetched file, a URL parameter | **data**: `null` → an explicit unknown → something drawn | An exception here blanks the page. |
+| A default that makes the number look right | **never** | `0` is a measurement. |
+
+`[NEVER] [any]` **a cast off `JSON.parse`** — parsed text wearing a type is external data
+nobody checked, and `JSON.parse(…) as FilterFile` is how a truncated file became a snapshot
+with `undefined` columns.
+
+**One way to read a value, and it lives in `public/lib/`.** `Number("")` is `0`,
+`Number(" 5 ")` is `5`, `Number("0x10")` is `16`, `parseInt("12abc")` is `12`,
+`Date.parse("nope")` is `NaN` and `NaN > limit` is `false`, `JSON.parse` throws and hands
+back `any` — each produces a value nobody wrote. The first is the expensive one here:
+`0` is a perfectly good honor reading, so a cell that arrived empty would be
+indistinguishable from one that arrived as zero.
+
+**`[ALWAYS] [any]` A construct belongs to a primitive in `public/lib/` if it has more than
+one spelling in JavaScript, or can answer with a value nobody wrote.**
+
+| Owner | Owns | Reading gives |
+|---|---|---|
+| `public/lib/number.js` | `Number()`, `parseInt`, `parseFloat`, unary `+`, `typeof … === "number"`, `String()` on a number | `getIntegerFromText`, `getFiniteNumberFromText`, `getIntegerFromValue`, `getFiniteNumberFromValue`. Writing asserts: `composeIntegerText` |
+| `public/lib/json.js` | `JSON.parse` and its `try`/`catch`, `JSON.stringify` | `getValueFromJsonText` → the value **or** the `SyntaxError`; `composeJsonText` refuses a value with no JSON |
+| `public/lib/timestamp.js` | `Date.parse`, `new Date(text)` | `getMillisecondsFromIsoText` → a number or `null`, never `NaN` |
+| `public/lib/text-order.js` | `localeCompare` | `getTextOrder`, by code unit, deterministic — a sort that decides which snapshot is newest must not depend on a locale |
+
+Look in `public/lib/` first; if it is not there and meets the criterion, add it there rather
+than at the call site, even for one caller. **Reading returns `null` and throws nothing** —
+the caller picks assert, error or unknown, and only the caller knows which. **Writing
+asserts**, because the number is ours by then. A new primitive lands with its row here and
+in §8.
+
+Held by `test/tools/source-layout.test.ts`: no unbranded error, none outside the base
+files, each subclass extending the base of its side, no `!` outside tests, no cast off
+`JSON.parse`, and every construct in the register above spelled only by its owner — in
+tests too.
+
+### 9.6 The dashboard
+
+- **The panel of controls says what it controls.** The world picker and the match counter
+  live in the sticky bar and there is exactly one copy of each, so there is nothing to keep
+  in sync. It was 961 px from the filter to the first history chart — more than a screen —
+  so a control and the thing it controls were never visible at once.
+- **The filter fields are an absolutely positioned drawer in that bar.** It opens where the
+  user is looking, takes no space in the layout, so opening and closing does not move the
+  page, and its initial state lives in the markup rather than in JS after some `fetch`es.
+- `[ALWAYS] [dash]` **A number that might be wrong must never look like a number that is
+  right.**
+- `[NEVER] [dash]` **Interrupt.** No `alert`, `confirm`, `prompt`, modal, stolen focus.
+- `[NEVER] [dash]` **Vanish.** A failure never blanks the page; only the part that failed is
+  replaced, in place, by a short marker.
+- `[NEVER] [dash]` **Swallow silently.** Every caught failure produces a visible mark and
+  exactly one branded console entry — once, not per render.
+- `[ALWAYS] [dash]` **Put the warning where the consequence is**, next to the figure it
+  concerns, not in a global banner. A `suspect` snapshot marks its own point.
+- `[ALWAYS] [dash]` **Keep "unknown" and "zero" apart on screen**, not only in the data.
+  Zero happened and measured nothing; unknown could not be read.
+- `[ALWAYS] [dash]` **A snapshot that did not load gets no point.** No interpolation, no
+  substituting the unfiltered number from the aggregate. A hole makes a longer interval,
+  and `perDay` divides by real elapsed time, so it stays honest.
+- `[ALWAYS] [dash]` **The time axis comes from the aggregate, never from what was fetched.**
+  Ticks, `scales.x.min/max` and the tooltips are built from that world's `trends.json`
+  entry on both paths, so filtering can take points away but never the period the chart
+  describes. The gap the budget leaves stays empty and is named, with the button that
+  fetches the rest.
+
+Two severities are enough, and a third is `[ASK]`:
+
+| Severity | Means | Shown as |
+|---|---|---|
+| **Suspect** | The numbers drew, but the material may be short | A mark next to the affected figure; detail on demand |
+| **Undrawn** | A section could not be rendered at all | That section replaced in place; everything else unaffected |
+
+**The two paths to one set of charts.** At the default filter the history is drawn from
+`trends.json` alone and no snapshot is fetched — that is why whoever does not filter does
+not pay for the largest world's whole history. Once the filter moves, the view fetches that
+one world's `.f.json` files, as many of the newest as fit a **transfer budget in bytes**,
+and computes the history itself, exactly, with no bucketing.
+
+`summarizeFiltered` in `filters.js` returns exactly the shape of a `trends.json` row, which
+is why the drawing cannot tell the two paths apart. Under the default filter the two must
+produce number for number what `summarizeSnapshot` in `src/trends.ts` produces, over every
+snapshot on disk — §9.1's last rule, and a test holds it.
+
+- `[ALWAYS] [dash]` **The budget is in bytes, never in snapshots.** A count priced the
+  largest world (177 KB a snapshot) like the smallest (20 KB), so it trimmed the cheapest
+  world of the twenty-one — saving 19 KB — and left the expensive one untouched.
+  `docs/2026-08-26-spec-history-budget.md`.
+- `[ALWAYS] [dash]` **`null` in `days` becomes `−1`** once a snapshot is converted to typed
+  arrays, which cannot hold `null`. `−1 > maxDays` is **false**, so the `isNeverOnline`
+  check comes **before** the threshold — otherwise accounts never used fall into every
+  activity threshold. One place: `shared.js`.
+- `[ALWAYS] [dash]` **The denominator of a share is the unfiltered population**, not the
+  filtered set — that one would sum to 100%.
+- `[ALWAYS] [dash]` **An activity filter eats thresholds wider than itself.** At "≤ 3 days"
+  the "≤ 7 days" threshold counts the same players as the matches chart, and three lines on
+  top of each other look like confirmation of something. `usableThresholds` removes them.
+- `[ALWAYS] [dash]` **Fetching starts only from behind the debounce, and only once per
+  world.** `loadHistory` holds a `world → Promise` map; calling it from the `input` handler
+  pulled the same set of files once per keystroke. A test counts fetches per URL.
+- `[ALWAYS] [dash]` **Read a `<select>`'s value before replacing its `innerHTML`.** The
+  browser picks the first option even when the previous value is still on the list. The DOM
+  stub used to be gentler than a browser and that is what hid it.
+
+### 9.7 Design system
+
+- **Tokens, not literals.** A raw hex in a rule is a bug.
+- **Two border tokens, and the split is load-bearing.** The borders of controls and cards
+  need 3:1 (WCAG 2.2 SC 1.4.11); dividers inside a table do not. One shared value measured
+  1.48:1 and a form field was indistinguishable from the card behind it.
+- **Contrast is checked, not eyeballed.**
+- **Colour never carries meaning alone** — it accompanies a label or a number.
+- **Nothing is clipped that a keyboard can reach.** `overflow: hidden` left the filter chips
+  a measured 0 px between 721 and 1100 px — three chips invisible, their close buttons with
+  them. They scroll instead.
+
+### 9.8 Language
+
+**Write English.** Two exceptions, and the line between them is what somebody is reading.
+
+| Stays Polish | Where |
+|---|---|
+| The text a player reads | `public/index.html` body copy, `aria-label`s, placeholders, `<title>`, `<meta description>`, `lang="pl"`, `trends.html`, `404.html` |
+| UI strings built in JS | chart titles, chips, table headings, status and error copy in `app.js`; `PROF` in `shared.js`; `activityLabel`/`filterChips` in `filters.js`; `ACTIVITY_THRESHOLDS[].label` in `history.js`; `toLocaleString("pl-PL")` |
+| Keys that match scraped material | `PROFESSION_BY_NAME`, `PROFESSION_BY_LETTER` and the `ł → l` folding in `parser.ts`; the captured page in `test/fixtures/` |
+| `suspect.reason` | written by `snapshot.ts` into every flagged `.f.json` and rendered verbatim by the dashboard — server-side code composing a sentence for a player |
+| The assertions pinning all of the above | the Polish expected values in `test/dashboard.test.ts` |
+
+**Identifiers around a Polish string stay English**, and a Polish sentence never carries our
+vocabulary: a player is told what the data cannot show, not why our reader could not read
+it. A branded error's `code` and message are English even where the sentence drawn from it
+is Polish — the code is ours, the sentence is theirs.
+
+Everything else — every comment, every test name, every line a terminal prints, every word
+in `docs/` — is English. Guarded by `test/language.test.ts`, which holds the list of files
+allowed to speak Polish **in both directions**: a file that stops speaking it drops off the
+list rather than guarding nothing.
+
+The Polish query parameters `prog` and `udzial`, and the `liczba`/`udzial` option values
+behind them, are a deliberate exception on a different axis: they are the contract of links
+people have already shared, which is the entire reason `trends.html` still exists. A URL is
+not code style. `[NEVER]` rename them.
+
+### 9.9 The Pages budget
+
+GitHub Pages caps a published artefact at 1 GB, and every round adds to `public/`. Two
+budgets, and they are different things:
+
+| Budget | Against | Spent by |
+|---|---|---|
+| **The artefact** | 1 GB, hard, imposed by Pages | Every snapshot ever scraped |
+| **The transfer** | 2 MiB, ours, per filtered history | The `.f.json` files one filtered world fetches |
+
+- `[ALWAYS] [any]` **Both are measured, never estimated in prose** — `bun run data:status`,
+  and §5.
+- `[ALWAYS] [dash]` **The transfer budget is spent in `bytes` from `trends.json`**, which is
+  a gzip measurement. A raw size times a constant ratio will not do: the ratio is 4.18 for
+  one world and 4.85 for another, so a constant misjudges one of them by 15%.
+- `[ASK] [any]` **Before anything that changes what a round costs** — a new field in a
+  `.f.json`, a new world, a change of interval. `docs/2026-08-01-size-budget.md` works out
+  how many rounds are left.
 
 ---
 
-## Why this way and not another
+## 10. Glossary
 
-Decisions that look odd until you know the reason:
-
-| Decision | Reason |
+| Term | Meaning |
 |---|---|
-| A snapshot in two files | Nicknames are ~2/3 of the volume and filtering has no use for them. The split cut `public/` from 620 MB to 118 MB. |
-| `trends.json` computes only what the view draws | The previous aggregate module was deleted for having fields with no consumer. This one has population, activity and professions — no level distribution (a 43× larger file) and no honor, neither of which the history view reads. |
-| Trends in their own file, not in the manifest | The manifest is fetched on every visit, and the history may never be drawn without a filter. 11 KB added for everyone is a cost with nothing behind it. |
-| One view instead of two pages | A snapshot and its history under the same filter is the one question that could not be answered before. The duplicated CSS and the second URL state went away with it. `trends.html` became a redirect so shared links keep working. |
-| World picker and match counter in the sticky bar | It was 961 px from the filter to the first history chart — more than a screen, so a control and the thing it controls were never visible at once. The bar holds the **only copy** of both, so there is nothing to keep in sync. |
-| The filter fields as a `position: absolute` drawer in the bar | It opens where the user is looking — a panel at the top of the document was off-screen after scrolling, so the "Filtry" button did nothing. It takes no space in the layout, so opening and closing **does not move the page**, and the initial state lives in the markup (`hidden`), not in JS after some `fetch`es. |
-| Two border variables: `--border` and `--border-strong` | The borders of controls and cards need 3:1 (WCAG 2.2 SC 1.4.11); dividers inside a table do not. One shared value gave 1.48:1 and a form field was indistinguishable from the card behind it. |
-| Chips scroll rather than get clipped | `overflow: hidden` at 800 px left them a measured **0 px** — three chips entirely invisible, their close buttons with them. Scrolling keeps them reachable by keyboard too. |
-| History fetched lazily, only after the filter moves | The default filter is served by `trends.json` for 11 KB. Whoever does not filter does not pay for gordion's 2.2 MB. |
-| The ceiling on a filtered history in bytes, not in snapshots | A count priced gordion (177 KB a snapshot) like brutal (20 KB), so it trimmed brutal — saving 19 KB — and left gordion untouched. It fired on brutal's one-off scrape from 2026-08-01 rather than on the size of anything. |
-| The size of a snapshot in `trends.json`, one number per world | Per-snapshot sizes in the manifest measured **5835 → 7164 B gzip**, i.e. +1.3 KB on every visit for everyone; the per-world field cost +96 B. Raw size × a constant ratio will not do: the ratio is 4.18 for brutal and 4.85 for gordion. |
-| The history counter counts against every snapshot, not against the plan | `11 z 12 migawek · limit transferu 2,0 MB` keeps the ceiling and a failed fetch apart. Counting against the plan would report a trimmed history as the complete set — which is what the old window did. |
-| Filtering on the client instead of a precomputed cube | A pass over 813k rows is 2.8-7 ms — bucketing would cost accuracy and would not cover honor at all (−35 .. 1.2M). |
-| The logic in `filters.js`/`history.js`, not in `app.js` | `app.js` starts the view immediately on import, so a module sewn to it cannot be tested outside a browser. A test holds this. |
-| Chart.js vendored | A CDN without SRI is a dependency nobody controls; locally it also works offline. |
-| Retry per page | It used to rewind the whole world to page 1 — for gordion (797 pages) up to 4× after ~13 min. |
-| Faulty rows skipped | One strange row must not take down an entire world; we abort only above 1% of a page. |
-| The guard writes rather than rejects | Losing a whole run hurts more than a snapshot with a warning. |
-| `noUnusedLocals` on | Dead code has already survived two rebuilds here. |
-| The licence split: MIT for the code, a separate notice for the data | You can only license what you have rights to. The ranking database is Margonem's and nicknames are personal data — putting `public/worlds/` under MIT would be claiming rights we do not have, and inviting others to do what `VII.2.k)` forbids. |
-| The full Chart.js licence text next to the file, despite the banner in the minified build | MIT requires the notice in every copy, and banners are lost on further minification. |
-| `LICENSE` is plain MIT with not a word about the data | GitHub detects a licence by similarity to a template (~98% threshold) — a note about scope would change the detected licence to "Other". The scope lives in `README.md`. |
-
-Full reasoning and history: the audits below.
+| **world** | One Margonem game world, e.g. `aether`. The unit everything is scoped to. A name goes into a URL **and** into a file path, so it is validated against `[a-z0-9-]` before either. |
+| **round** | One pass over every world in `src/worlds.ts`. Run by hand, hence the uneven 3-17 day intervals. |
+| **snapshot** | One world's whole ranking at one moment, written as a `.f.json` / `.n.json` pair. |
+| **id** | A snapshot's identifier and the stem of its filenames. ⚠️ **Not a date** — §9.2. |
+| **`startedAt`** | When the scrape of that world began, ISO 8601 UTC. The only trustworthy time in the system. |
+| **filter file** | `<id>.f.json` — level, profession, honor, days. Everything filtering needs, and the only file the dashboard ever fetches per snapshot. |
+| **names file** | `<id>.n.json` — nickname and `charId`. Personal data. Nothing reads it today. |
+| **days** | How long ago a player was last online. `0` = under 24 h, `N` = N days, `null` = never used, `−1` = the same thing after conversion to a typed array. |
+| **bucket** | One of five **disjoint** activity classes: `<24h`, `1-7`, `8-30`, `>30`, never. What `trends.json` stores. |
+| **threshold** | A **cumulative** activity cut: "≤ 7 days" is buckets 0 and 1 together. ⚠️ Two scales, one subject — confusing them understates a chart by the whole `<24h` bucket. Only `ACTIVITY_THRESHOLDS` may cross between them. |
+| **suspect** | A snapshot whose population dropped past the threshold against the previous one. Written, flagged, drawn — never discarded. |
+| **aggregate** | `public/trends.json` — every world's history folded to one number per snapshot. The default history path. |
+| **share** | A count as a percentage of the **unfiltered** population of that snapshot. |
+| **transfer budget** | The ceiling on what a filtered history may fetch, in bytes — §9.9. |
+| **schema** | The version of the written format, `SNAPSHOT_SCHEMA`. Changing it is `[ASK]` and reaches every published file. |
 
 ---
 
@@ -278,83 +821,16 @@ Full reasoning and history: the audits below.
 | File | What for |
 |---|---|
 | [`docs/2026-08-01-audit.md`](docs/2026-08-01-audit.md) | Audit #1: is the data real (it is — verified against the live ranking), what was broken, what was deleted, what is missing. |
-| [`docs/2026-08-01-audit-2.md`](docs/2026-08-01-audit-2.md) | Audit #2 after the fixes: what held up, what was corrected, **the debt ahead and a list of ideas**. |
-| [`docs/2026-08-01-size-budget.md`](docs/2026-08-01-size-budget.md) | How many scrape rounds are left before the 1 GB Pages limit (~65 ≈ 2 years) and what to do when they run out. |
-| [`docs/2026-08-04-spec-trends.md`](docs/2026-08-04-spec-trends.md) | The spec for one world's trends over time: what to show, `trends.json` (**9.0 KB gzip for the whole history**), the traps in the "last online" metric. |
-| [`docs/2026-08-04-spec-world-view.md`](docs/2026-08-04-spec-world-view.md) | The spec for merging `index.html` and `trends.html` into one view per world, filtering **the whole history** on the client: measurements (**7 ms over 813k rows**), lazy fetching, the traps and the snapshot-window threshold. |
-| [`docs/2026-08-04-audit-3.md`](docs/2026-08-04-audit-3.md) | Audit #3: **eight bugs that 165 tests did not catch**, a DOM stub gentler than a browser, `Retry-After: 0`, a non-atomic write, CLI validation — plus debt and ideas. |
-| [`docs/2026-08-04-spec-filter-bar.md`](docs/2026-08-04-spec-filter-bar.md) | The spec for the pinned filter bar: page geometry (**2806 px**, the filter 961 px from the first history chart, **87% of the screen on a phone**), the variants, the research and the traps of `position: sticky` in this markup. |
-| [`docs/2026-08-05-audit-ui-ux.md`](docs/2026-08-05-audit-ui-ux.md) | Audit #4, the first one about the **interface**: border contrast (it was **1.48:1** against a 3:1 threshold), chips squeezed to **0 px** between 721 and 1100 px, focus lost on Escape and on the close button, geometry measured in a browser. The measuring method, the debt and three hypotheses disproved. |
-| [`docs/2026-08-26-spec-history-budget.md`](docs/2026-08-26-spec-history-budget.md) | The ceiling on a filtered history in **bytes instead of snapshots**: a count priced gordion (**177 KB** a snapshot) like brutal (**20 KB**) and trimmed the wrong one. The budget, where the size comes from, why the axis belongs to the aggregate, and how many rounds each world has before it meets the ceiling. |
+| [`docs/2026-08-01-audit-2.md`](docs/2026-08-01-audit-2.md) | Audit #2 after the fixes: what held up, what was corrected, the debt ahead, and **the charId seam**. |
+| [`docs/2026-08-01-size-budget.md`](docs/2026-08-01-size-budget.md) | How many rounds are left before the 1 GB Pages limit, and what to do when they run out. |
+| [`docs/2026-08-04-spec-trends.md`](docs/2026-08-04-spec-trends.md) | The spec for one world's history: what to show, the shape of `trends.json`, the traps in the "last online" metric. |
+| [`docs/2026-08-04-spec-world-view.md`](docs/2026-08-04-spec-world-view.md) | Merging the two pages into one view and filtering the whole history on the client: the measurements, lazy fetching, the traps. |
+| [`docs/2026-08-04-audit-3.md`](docs/2026-08-04-audit-3.md) | Audit #3: eight bugs the tests did not catch, a DOM stub gentler than a browser, `Retry-After: 0`, a non-atomic write. |
+| [`docs/2026-08-04-spec-filter-bar.md`](docs/2026-08-04-spec-filter-bar.md) | The pinned filter bar: page geometry measured in a browser, the variants, and the traps of `position: sticky` in this markup. |
+| [`docs/2026-08-05-audit-ui-ux.md`](docs/2026-08-05-audit-ui-ux.md) | Audit #4, the first about the interface: border contrast, chips squeezed to 0 px, focus lost on Escape. The measuring method and three hypotheses disproved. |
+| [`docs/2026-08-26-spec-history-budget.md`](docs/2026-08-26-spec-history-budget.md) | Pricing the history ceiling in bytes instead of snapshots, and why the time axis belongs to the aggregate. |
+| [`docs/2026-08-27-spec-rewrite.md`](docs/2026-08-27-spec-rewrite.md) | This rewrite: what changed, the four latent faults that fell out of it, what the published `public/lib/` costs, and the two guards that were wrong before they were right. |
 | [`README.md`](README.md) | The manual, for a human. |
 
----
-
-## How we work in this repo
-
-1. **English everywhere except what a player reads.** The rule and its exceptions are in
-   "Language" above; `test/language.test.ts` holds it. Commit messages are English too —
-   Conventional Commits, `type(scope): effect`, and the header names the effect rather than
-   the activity.
-2. **Do not trust a hypothesis — measure.** During audit #2, "the chart is unreadable
-   because of level 1" turned out to be false after a single command. The data is on disk;
-   checking costs seconds.
-3. **Run `bun run scrape:check` before a full scrape.** Margonem has already changed the
-   table layout once, and the scraper fell over on all 20 worlds while exiting with code 0.
-4. **Do not write code on spec.** This project has already deleted a constant and an entire
-   module that existed "for later". If something has no consumer today, describe the idea
-   in `docs/` and do not commit the code.
-5. **Respect the service.** 1 req/s is the default interval; at 400 ms the ranking answers
-   `429`. `robots.txt` does not forbid `/ladder` (and Margonem's own `sitemap.xml` lists
-   those paths), but that is not an invitation to hammer it. Do not disguise the UA as a
-   browser — `Mozilla/5.0 (margostat scraper)` says plainly who is knocking.
-6. **The data in `public/worlds/` cannot be reproduced.** The ranking has no history —
-   whatever we did not scrape back then cannot be recovered today. Make format migrations
-   lossless and verify them row by row against the originals in git.
-7. **Tests compare against the truth, not against themselves.** The parser is checked
-   against a capture of a real page, the filters against a sample of a real snapshot in the
-   old schema. Keep that arrangement — a test that checks a reimplementation of itself
-   holds nothing.
-8. **Notes and audits go to `docs/`**, named `YYYY-MM-DD-<topic>.md`, and are added to the
-   table in [`docs/README.md`](docs/README.md) as well as to "What to read next" above.
-9. **The code is ours, the data is not.** The MIT licence in `LICENSE` covers the code
-   only. The ranking database belongs to the publisher of Margonem (terms `XIX.2`/`VII.2.m)`
-   plus the sui generis database right), and `.n.json` contains nicknames, which are
-   personal data. Never put `public/worlds/` or `test/fixtures/` under an open-source
-   licence, never label them `CC-BY`/`ODbL`, and never invite commercial use in the README
-   — that would be claiming rights we do not have. If you change which fields get
-   published, weigh what personal data goes with them.
-10. **After a scrape round, refresh the numbers in this file.** Every round makes the
-    "State" line, the `trends.json` sizes and the per-world history figures wrong by one
-    round, and a stale number here is read as a measured one — the last drift went unnoticed
-    for two rounds. Each is one command:
-    ```bash
-    ls public/worlds/*/*.f.json | wc -l    # snapshots
-    du -sh public                          # the Pages artifact against the 1 GB limit
-    gzip -c public/trends.json | wc -c     # what every visitor downloads
-    ```
-    The number of rounds is the longest history — the largest `worlds.<w>.id.length` in
-    `trends.json`. The tests read their figures from `public/` and so move with the data on
-    their own; this file does not.
-
----
-
-## What is deliberately not here
-
-- **A player search and single-character progression** — even though the data is sitting
-  ready: an `.n.json` accompanies every snapshot and nobody reads it today. Note that this
-  analysis is cut across by "the `charId` seam" from audit #2 — population trends are not,
-  because they count people rather than following individuals.
-- **Global totals and comparisons between worlds** — `trends.json` has all the data for it,
-  but a total falls apart on a changing set of worlds (`luvia` exists only in the last
-  round and is 41.3% online), and a comparison needs normalisation, because gordion
-  flattens brutal. Deliberately deferred — see the trends spec.
-- **Downsampling the old end of a history** — one point a month past six months, which would
-  let a filtered gordion reach further back than the 11 snapshots its budget buys. The
-  aggregate already holds every point, so it would cost nothing to store; nothing needs it
-  yet. See the history-budget spec.
-- **An automated scrape (cron)** — it is run by hand, hence the uneven 3-17 day intervals.
-- **37 legacy/private worlds** — the ranking exposes ~57 in total; we track 21.
-- **Typechecking `public/*.js`** — `checkJs` produces dozens of DOM typing errors rather
-  than real bugs, and would need JSDoc annotations. The reason is recorded in
-  `tsconfig.json`.
+New notes go to `docs/`, named `YYYY-MM-DD-<topic>.md`, and are added to the table in
+[`docs/README.md`](docs/README.md) as well as to this one.

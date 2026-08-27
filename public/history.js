@@ -11,8 +11,20 @@
 //
 // The labels below are Polish because a player reads them — see "Language" in AGENTS.md.
 
-import { daysBetween } from "./shared.js";
+import { getDaysBetween } from "./shared.js";
 import { isDefaultFilters, summarizeFiltered } from "./filters.js";
+import { getJsonFromUrl } from "./fetch-json.js";
+import { assertDefined } from "./lib/assert.js";
+
+/**
+ * @typedef {import("./shared.js").Filters} Filters
+ * @typedef {import("./shared.js").SnapshotEntry} SnapshotEntry
+ * @typedef {import("./shared.js").ManifestEntry} ManifestEntry
+ * @typedef {import("./shared.js").TypedSnapshot} TypedSnapshot
+ * @typedef {import("./shared.js").WorldTrend} WorldTrend
+ * @typedef {Map<string, TypedSnapshot>} SnapshotStore Loaded snapshots of one world, by id.
+ * @typedef {{ world: string|null, date: string|null, threshold: string, share: boolean }} ViewState
+ */
 
 /**
  * The activity thresholds — **cumulative**, unlike the disjoint `act` buckets in the file
@@ -20,7 +32,7 @@ import { isDefaultFilters, summarizeFiltered } from "./filters.js";
  * the two scales would give a chart understated by the whole "< 24h" bucket.
  *
  * `bound` is the highest number of days a threshold still covers — it is what detects the
- * thresholds that stop saying anything under an activity filter (`usableThresholds`).
+ * thresholds that stop saying anything under an activity filter (`getUsableThresholds`).
  */
 export const ACTIVITY_THRESHOLDS = [
   { key: "24h", label: "< 24h", buckets: [0], bound: 0 },
@@ -41,34 +53,70 @@ export const DEFAULT_THRESHOLD = "7d";
  * of each other look like confirmation of something, while being the same question asked
  * three times, so a threshold wider than the filter simply leaves the picker.
  */
-export function usableThresholds(maxDays = Infinity) {
+/**
+ * @param {number} [maxDays]
+ * @returns {typeof ACTIVITY_THRESHOLDS}
+ */
+export function getUsableThresholds(maxDays = Infinity) {
   return ACTIVITY_THRESHOLDS.filter((t) => t.bound < maxDays);
 }
 
-export function thresholdByKey(key, maxDays = Infinity) {
-  const usable = usableThresholds(maxDays);
+/**
+ * @param {string | null} key
+ * @param {number} [maxDays]
+ * @returns {(typeof ACTIVITY_THRESHOLDS)[number] | null}
+ */
+export function getThresholdByKey(key, maxDays = Infinity) {
+  const usable = getUsableThresholds(maxDays);
   if (usable.length === 0) return null;
   return (
     usable.find((t) => t.key === key) ??
     usable.find((t) => t.key === DEFAULT_THRESHOLD) ??
-    usable[usable.length - 1]
+    // `usable` is non-empty here — the line above returned for the empty case.
+    assertDefined(usable[usable.length - 1], "a non-empty threshold list has a last entry")
   );
 }
 
-/** The number of active players in each snapshot at a given threshold. */
-export function activeCounts(trend, key, maxDays = Infinity) {
-  const threshold = thresholdByKey(key, maxDays);
+/**
+ * The number of active players in each snapshot at a given threshold.
+ *
+ * @param {WorldTrend} trend
+ * @param {string | null} key
+ * @param {number} [maxDays]
+ * @returns {number[]}
+ */
+export function getActiveCounts(trend, key, maxDays = Infinity) {
+  const threshold = getThresholdByKey(key, maxDays);
   if (!threshold) return trend.total.slice();
-  return trend.total.map((_, i) => threshold.buckets.reduce((sum, bucket) => sum + trend.act[bucket][i], 0));
+  return trend.total.map((_, i) =>
+    threshold.buckets.reduce(
+      (sum, bucket) => sum + assertDefined(trend.act[bucket]?.[i], "every activity bucket has a count per snapshot"),
+      0,
+    ),
+  );
 }
 
-/** The share of the population, as a percentage. A snapshot with no players gives 0, not NaN. */
-export function shareSeries(counts, totals) {
-  return counts.map((count, i) => (totals[i] > 0 ? (count / totals[i]) * 100 : 0));
+/**
+ * The share of the population, as a percentage. A snapshot with no players gives 0, not NaN.
+ *
+ * @param {number[]} counts
+ * @param {number[]} totals the **unfiltered** population — §9.6
+ * @returns {number[]}
+ */
+export function getShareSeries(counts, totals) {
+  return counts.map((count, i) => {
+    const total = totals[i] ?? 0;
+    return total > 0 ? (count / total) * 100 : 0;
+  });
 }
 
-/** Snapshots as `{ id, startedAt }` entries — the format the functions in shared.js read. */
-export function snapshotEntries(trend) {
+/**
+ * Snapshots as `{ id, startedAt }` entries — the format the functions in shared.js read.
+ *
+ * @param {WorldTrend} trend
+ * @returns {SnapshotEntry[]}
+ */
+export function getSnapshotEntries(trend) {
   return trend.id.map((id, i) => ({ id, startedAt: trend.startedAt[i], suspect: trend.suspect[i] === 1 }));
 }
 
@@ -80,16 +128,20 @@ export function snapshotEntries(trend) {
  * That same division rescues a partially loaded history: a missing snapshot makes a longer
  * interval rather than a false jump, because `perDay` divides by real elapsed time.
  */
-export function changeRows(trend) {
-  const entries = snapshotEntries(trend);
+/**
+ * @param {WorldTrend} trend
+ */
+export function getChangeRows(trend) {
+  const entries = getSnapshotEntries(trend);
   const rows = [];
 
   for (let i = 1; i < entries.length; i++) {
-    const days = daysBetween(entries[i - 1], entries[i]);
-    const delta = trend.total[i] - trend.total[i - 1];
+    const days = getDaysBetween(entries[i - 1], entries[i]);
+    const total = assertDefined(trend.total[i], "every snapshot has a population");
+    const delta = total - assertDefined(trend.total[i - 1], "every snapshot has a population");
     rows.push({
       entry: entries[i],
-      total: trend.total[i],
+      total,
       delta,
       days,
       perDay: days && days > 0 ? delta / days : null,
@@ -98,20 +150,25 @@ export function changeRows(trend) {
   return rows;
 }
 
-/** A world's whole history summarised — from the first snapshot to the last. */
+/**
+ * A world's whole history summarised — from the first snapshot to the last.
+ *
+ * @param {WorldTrend} trend
+ */
 export function summarize(trend) {
   const last = trend.total.length - 1;
   if (last < 0) return null;
 
-  const entries = snapshotEntries(trend);
-  const first = trend.total[0];
-  const delta = trend.total[last] - first;
+  const entries = getSnapshotEntries(trend);
+  const first = assertDefined(trend.total[0], "a history with a last snapshot has a first");
+  const total = assertDefined(trend.total[last], "a history with a last snapshot has its population");
+  const delta = total - first;
   return {
     snapshots: trend.total.length,
-    total: trend.total[last],
+    total,
     delta,
     percent: first > 0 ? (delta / first) * 100 : 0,
-    days: daysBetween(entries[0], entries[last]),
+    days: getDaysBetween(entries[0], entries[last]),
   };
 }
 
@@ -120,7 +177,11 @@ export function summarize(trend) {
 // `prog` and `udzial` are Polish and stay that way: they are the contract of links people
 // have already shared, which is why trends.html still exists. See "Language" in AGENTS.md.
 
-export function viewToParams(view) {
+/**
+ * @param {ViewState} view
+ * @returns {URLSearchParams}
+ */
+export function composeViewParams(view) {
   const params = new URLSearchParams();
   if (view.world) params.set("world", view.world);
   if (view.date) params.set("date", view.date);
@@ -129,12 +190,17 @@ export function viewToParams(view) {
   return params;
 }
 
-export function viewFromParams(params) {
+/**
+ * @param {URLSearchParams} params
+ * @returns {ViewState}
+ */
+export function readViewFromParams(params) {
   const threshold = params.get("prog");
   return {
     world: params.get("world") || null,
     date: params.get("date") || null,
-    threshold: ACTIVITY_THRESHOLDS.some((t) => t.key === threshold) ? threshold : DEFAULT_THRESHOLD,
+    threshold:
+      threshold !== null && ACTIVITY_THRESHOLDS.some((t) => t.key === threshold) ? threshold : DEFAULT_THRESHOLD,
     share: params.get("udzial") === "1",
   };
 }
@@ -165,8 +231,15 @@ export const HISTORY_BUDGET_BYTES = 2 * 1024 * 1024;
  */
 export const HISTORY_WINDOW = 12;
 
-/** The last `HISTORY_WINDOW` snapshots — the entries arrive sorted by `startedAt`. */
-export function windowedEntries(entries, size = HISTORY_WINDOW) {
+/**
+ * The last `HISTORY_WINDOW` snapshots — the entries arrive sorted by `startedAt`.
+ *
+ * @template {{ id: string }} Entry
+ * @param {Entry[]} entries
+ * @param {number} [size]
+ * @returns {Entry[]}
+ */
+export function getWindowedEntries(entries, size = HISTORY_WINDOW) {
   return entries.length <= size ? entries.slice() : entries.slice(entries.length - size);
 }
 
@@ -177,12 +250,16 @@ export function windowedEntries(entries, size = HISTORY_WINDOW) {
  * Two at the minimum, even when they do not fit: one point is not a trend, and a chart with
  * a single dot answers nothing that the snapshot view above it does not already answer.
  *
+ * @template {{ id: string }} Entry
+ * @param {Entry[]} entries
  * @param {number} [bytesPerSnapshot] gzip size of one snapshot; 0 or missing = unknown
+ * @param {number} [budget]
+ * @returns {Entry[]}
  */
-export function budgetedEntries(entries, bytesPerSnapshot, budget = HISTORY_BUDGET_BYTES) {
-  if (!bytesPerSnapshot || bytesPerSnapshot <= 0) return windowedEntries(entries);
+export function getBudgetedEntries(entries, bytesPerSnapshot, budget = HISTORY_BUDGET_BYTES) {
+  if (!bytesPerSnapshot || bytesPerSnapshot <= 0) return getWindowedEntries(entries);
   const fits = Math.max(2, Math.floor(budget / bytesPerSnapshot));
-  return windowedEntries(entries, fits);
+  return getWindowedEntries(entries, fits);
 }
 
 /**
@@ -194,41 +271,80 @@ export function budgetedEntries(entries, bytesPerSnapshot, budget = HISTORY_BUDG
  * silently turn a player from years ago into an account never used. Two bytes per row is a
  * cheap price for not having that class of bug.
  */
-export function toTypedSnapshot(json) {
-  const count = json.count;
-  const days = new Int32Array(count);
-  for (let i = 0; i < count; i++) {
-    const d = json.days[i];
+/**
+ * @param {unknown} json a parsed `.f.json`
+ * @returns {TypedSnapshot & { suspect: unknown }}
+ */
+export function composeTypedSnapshot(json) {
+  // The one place a fetched `.f.json` becomes ours. Read rather than cast: a truncated
+  // file parses as perfectly good JSON, and every column below would then be `undefined`
+  // — which `Int16Array.from` turns into a snapshot full of zeros rather than an error
+  // anybody could see (§9.5).
+  const file = /** @type {Record<string, unknown>} */ (json);
+  const count = file.count;
+  assertDefined(count, "a .f.json states its row count");
+
+  const rows = /** @type {number} */ (count);
+  const source = {
+    level: /** @type {number[]} */ (file.level),
+    profession: /** @type {number[]} */ (file.profession),
+    honor: /** @type {number[]} */ (file.honor),
+    days: /** @type {(number|null)[]} */ (file.days),
+  };
+  for (const [column, values] of Object.entries(source)) {
+    assertDefined(values, `a .f.json holds a ${column} column`);
+  }
+
+  const days = new Int32Array(rows);
+  for (let i = 0; i < rows; i++) {
+    const d = source.days[i];
     days[i] = d === null || d === undefined ? -1 : d;
   }
 
   return {
-    count,
-    level: Int16Array.from(json.level),
-    profession: Uint8Array.from(json.profession),
-    honor: Int32Array.from(json.honor),
+    count: rows,
+    level: Int16Array.from(source.level),
+    profession: Uint8Array.from(source.profession),
+    honor: Int32Array.from(source.honor),
     days,
-    suspect: json.suspect ?? null,
+    // Read for the one field the view draws. The scraper writes four; naming only the
+    // sentence keeps this type honest about what is actually consumed (§9.2).
+    suspect: /** @type {{ reason: string } | null} */ (file.suspect ?? null),
   };
 }
 
 // The snapshots are held in memory per world. Without a ceiling, switching worlds one by
 // one would collect all 21 in the tab, well over 100 MB.
 const MAX_CACHED_WORLDS = 2;
+/** @type {Map<string, SnapshotStore>} */
 const cache = new Map();
 
-export function cachedSnapshots(world) {
+/**
+ * @param {string} world
+ * @returns {SnapshotStore}
+ */
+export function getCachedSnapshots(world) {
   let store = cache.get(world);
   if (!store) {
     store = new Map();
     cache.set(world, store);
-    while (cache.size > MAX_CACHED_WORLDS) cache.delete(cache.keys().next().value);
+    while (cache.size > MAX_CACHED_WORLDS) {
+      // The oldest world in insertion order. A Map with more entries than the ceiling
+      // always has a first key, so there is nothing here to answer `undefined`.
+      cache.delete(assertDefined(cache.keys().next().value, "a Map over its ceiling has a first key"));
+    }
   }
   return store;
 }
 
-/** How many of the given snapshots are already in memory. */
-export function loadedCount(store, entries) {
+/**
+ * How many of the given snapshots are already in memory.
+ *
+ * @param {SnapshotStore} store
+ * @param {SnapshotEntry[]} entries
+ * @returns {number}
+ */
+export function getLoadedCount(store, entries) {
   return entries.reduce((n, e) => n + (store.has(e.id) ? 1 : 0), 0);
 }
 
@@ -238,6 +354,14 @@ export function loadedCount(store, entries) {
 // missing snapshots is computed at start, so three characters typed into "Min level" pulled
 // the same set of files three times. For gordion that is 5.7 MB instead of 1.9 MB — the
 // exact opposite of the promise that transfer is bought knowingly.
+/**
+ * @typedef {object} FetchOptions
+ * @property {number} [concurrency]
+ * @property {(loaded: number, total: number, failed: number) => void} [onProgress]
+ * @property {() => boolean} [isStale] answers true once the reader has moved on
+ */
+
+/** @type {Map<string, Promise<{ store: SnapshotStore, failed: string[] }>>} */
 const inFlight = new Map();
 
 /**
@@ -249,6 +373,12 @@ const inFlight = new Map();
  * not be fetched lands in `failed` and simply has no point on the chart: one broken
  * response must not take down the whole history.
  */
+/**
+ * @param {string} world
+ * @param {ManifestEntry[]} entries
+ * @param {FetchOptions} [options]
+ * @returns {Promise<{ store: SnapshotStore, failed: string[] }>}
+ */
 export function loadHistory(world, entries, options = {}) {
   const running = inFlight.get(world);
   if (running) return running;
@@ -258,10 +388,16 @@ export function loadHistory(world, entries, options = {}) {
   return run;
 }
 
+/**
+ * @param {string} world
+ * @param {ManifestEntry[]} entries
+ * @param {FetchOptions} options
+ */
 async function fetchMissing(world, entries, options) {
   const { concurrency = 4, onProgress = () => {}, isStale = () => false } = options;
-  const store = cachedSnapshots(world);
+  const store = getCachedSnapshots(world);
   const missing = entries.filter((e) => !store.has(e.id));
+  /** @type {string[]} */
   const failed = [];
   let next = 0;
 
@@ -269,16 +405,18 @@ async function fetchMissing(world, entries, options) {
     while (next < missing.length) {
       if (isStale()) return;
       const entry = missing[next++];
+      if (entry === undefined) return;
       try {
-        const res = await fetch(entry.filters);
-        if (!res.ok) throw new Error(`HTTP ${res.status} for ${entry.filters}`);
-        const json = await res.json();
+        const json = await getJsonFromUrl(entry.filters);
         if (isStale()) return;
-        store.set(entry.id, toTypedSnapshot(json));
+        store.set(entry.id, composeTypedSnapshot(json));
       } catch {
+        // The boundary with the network (§9.5): whatever came back, this snapshot is not
+        // loaded. It gets no point and no substitute — a hole stays a hole, and `perDay`
+        // divides by the real elapsed time, so the chart stays honest about the gap.
         failed.push(entry.id);
       }
-      onProgress(loadedCount(store, entries), entries.length, failed.length);
+      onProgress(getLoadedCount(store, entries), entries.length, failed.length);
     }
   };
 
@@ -301,17 +439,22 @@ async function fetchMissing(world, entries, options) {
  * denominator for "share" mode. A share computed against the filtered set would sum to 100%
  * and say nothing.
  *
- * `allowed` narrows the result to the snapshot window (`windowedEntries`). It does not
+ * `allowed` narrows the result to the snapshot window (`getWindowedEntries`). It does not
  * apply under the default filter: the aggregate is already fetched, so trimming it saves
  * nothing.
  *
+ * @param {WorldTrend} base
+ * @param {SnapshotStore} store
+ * @param {Filters} filters
  * @param {Set<string>|null} [allowed]
+ * @returns {{ trend: WorldTrend, population: number[], loaded: number, expected: number }}
  */
 export function buildFilteredTrend(base, store, filters, allowed = null) {
   if (isDefaultFilters(filters)) {
     return { trend: base, population: base.total, loaded: base.id.length, expected: base.id.length };
   }
 
+  /** @type {WorldTrend} */
   const trend = {
     id: [],
     startedAt: [],
@@ -319,25 +462,38 @@ export function buildFilteredTrend(base, store, filters, allowed = null) {
     act: [[], [], [], [], []],
     byProf: [[], [], [], [], [], []],
     suspect: [],
+    // Not spent on this path: the snapshots are already fetched by the time a filtered
+    // trend is built, so there is nothing left to price.
+    bytes: base.bytes,
   };
+  /** @type {number[]} */
   const population = [];
 
   let expected = 0;
   for (let i = 0; i < base.id.length; i++) {
-    if (allowed && !allowed.has(base.id[i])) continue;
+    // Every column of the aggregate is the same length — that is what columnar means
+    // (§9.2) — so a short one is a broken file rather than a snapshot to skip.
+    const id = assertDefined(base.id[i], "every column of trends.json is the same length");
+    if (allowed && !allowed.has(id)) continue;
     expected += 1;
 
-    const snapshot = store.get(base.id[i]);
+    const snapshot = store.get(id);
+    // A snapshot that did not load gets no point: no interpolation, no substituting the
+    // unfiltered number from the aggregate. The hole stays a hole — §9.6.
     if (!snapshot) continue;
 
     const s = summarizeFiltered(snapshot, filters);
-    trend.id.push(base.id[i]);
-    trend.startedAt.push(base.startedAt[i]);
-    trend.suspect.push(base.suspect[i]);
+    trend.id.push(id);
+    trend.startedAt.push(assertDefined(base.startedAt[i], "every column of trends.json is the same length"));
+    trend.suspect.push(assertDefined(base.suspect[i], "every column of trends.json is the same length"));
     trend.total.push(s.total);
-    for (let b = 0; b < 5; b++) trend.act[b].push(s.act[b]);
-    for (let p = 0; p < 6; p++) trend.byProf[p].push(s.byProf[p]);
-    population.push(base.total[i]);
+    for (let b = 0; b < 5; b++) {
+      assertDefined(trend.act[b], "five activity buckets").push(assertDefined(s.act[b], "five activity buckets"));
+    }
+    for (let p = 0; p < 6; p++) {
+      assertDefined(trend.byProf[p], "six professions").push(assertDefined(s.byProf[p], "six professions"));
+    }
+    population.push(assertDefined(base.total[i], "every column of trends.json is the same length"));
   }
 
   return { trend, population, loaded: trend.id.length, expected };

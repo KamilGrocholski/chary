@@ -10,46 +10,117 @@
 //
 // The strings a reader sees are Polish — see "Language" in AGENTS.md.
 
-import { PROF, PROF_COLORS, capitalize, formatSnapshotDate, shortDate, utcTime } from "./shared.js";
+import { PROF_COLORS, getProfessionEntries, capitalize, formatSnapshotDate, formatShortDate, formatUtcTime } from "./shared.js";
 import {
-  activityLabel,
+  getActivityLabel,
   countByActivity,
   countByLevel,
   describeFilters,
-  filtersFromParams,
-  filtersToParams,
+  readFiltersFromParams,
+  composeFiltersParams,
   isDefaultFilters,
-  totalsFromCounts,
-  visibleActivityBuckets,
+  getTotalsFromCounts,
+  getVisibleActivityBuckets,
 } from "./filters.js";
 import {
   HISTORY_BUDGET_BYTES,
-  activeCounts,
-  budgetedEntries,
+  getActiveCounts,
+  getBudgetedEntries,
   buildFilteredTrend,
-  cachedSnapshots,
-  changeRows,
+  getCachedSnapshots,
+  getChangeRows,
   loadHistory,
-  loadedCount,
-  shareSeries,
-  snapshotEntries,
+  getLoadedCount,
+  getShareSeries,
+  getSnapshotEntries,
   summarize,
-  thresholdByKey,
-  toTypedSnapshot,
-  usableThresholds,
-  viewFromParams,
-  viewToParams,
+  getThresholdByKey,
+  composeTypedSnapshot,
+  getUsableThresholds,
+  readViewFromParams,
+  composeViewParams,
 } from "./history.js";
+import { MargoStatError } from "./lib/margostat-error.js";
+import { assert, assertDefined } from "./lib/assert.js";
+import { getFiniteNumberFromText, getIntegerFromText } from "./lib/number.js";
+import { getMillisecondsFromIsoText } from "./lib/timestamp.js";
+import { ResourceFetchError, ResourceParseError, getJsonFromUrl } from "./fetch-json.js";
+
+/**
+ * @typedef {import("./shared.js").Filters} Filters
+ * @typedef {import("./shared.js").SnapshotEntry} SnapshotEntry
+ * @typedef {import("./shared.js").ManifestEntry} ManifestEntry
+ * @typedef {import("./shared.js").TypedSnapshot} TypedSnapshot
+ * @typedef {import("./shared.js").WorldTrend} WorldTrend
+ * @typedef {import("./shared.js").SnapshotSummary} SnapshotSummary
+ * @typedef {{ name: string, files: ManifestEntry[] }} ManifestWorld
+ * @typedef {{ worlds: ManifestWorld[] }} Manifest
+ * @typedef {{ schema: number, builtAt: string, worlds: Record<string, WorldTrend> }} Trends
+ *
+ * @typedef {any} ChartInstance Chart.js is vendored, minified and carries no types
+ *   (§9.3). Naming the hole here is the point: it is one name, in one place, rather
+ *   than an implicit `any` spreading out of every chart the view touches.
+ */
+
+/**
+ * A node this view expects `index.html` to hold.
+ *
+ * Its own class rather than a bare `Error` because it is the one failure here that is
+ * ours: the markup and this file ship together, so a missing id means they went out of
+ * step, and the code says that at a glance in a console shared with nothing.
+ */
+class MissingElementError extends MargoStatError {
+  /**
+   * @param {string} id
+   */
+  constructor(id) {
+    super("MissingElement", `index.html has no element #${id}`);
+    this.elementId = id;
+  }
+}
 
 function setupView() {
+  /**
+   * A node `index.html` is expected to hold.
+   *
+   * @param {string} id
+   * @returns {HTMLElement}
+   */
   const el = (id) => {
     const node = document.getElementById(id);
-    if (!node) throw new Error(`no element #${id}`);
+    if (!node) throw new MissingElementError(id);
     return node;
   };
 
+  /**
+   * A form control this view reads or writes.
+   *
+   * Its own lookup because `HTMLElement` has no `.value`, and asking a `<div>` for one is a
+   * bug nothing could see while every node came back as the same type. Which ids are
+   * really `<input>`s and `<select>`s is held statically: `dashboard.test.ts` reads the
+   * ids passed to `field()` out of this file and checks each against the markup, so the
+   * pairing is proved where it is written rather than asserted where it is used.
+   *
+   * @param {string} id
+   * @returns {HTMLInputElement | HTMLSelectElement}
+   */
+  const field = (id) => /** @type {HTMLInputElement | HTMLSelectElement} */ (el(id));
+
+  /**
+   * The checkable inputs inside a container — the profession checkboxes.
+   *
+   * @param {string} id
+   * @param {string} [selector]
+   * @returns {HTMLInputElement[]}
+   */
+  const checkboxes = (id, selector = "input") =>
+    /** @type {HTMLInputElement[]} */ ([...el(id).querySelectorAll(selector)]);
+
+  /** @type {Manifest | null} */
   let manifest = null;
+  /** @type {Trends | null} */
   let trends = null;
+  /** @type {ReturnType<typeof setTimeout> | null} */
   let renderTimer = null;
 
   // The history is bought knowingly: as long as nobody has moved the filter, `trends.json`
@@ -60,22 +131,31 @@ function setupView() {
   // Worlds whose transfer budget the user has lifted by hand. Per world, because the choice
   // is about that world's price — and it survives switching worlds and back, so the button
   // does not have to be pressed twice for the same data.
+  /** @type {Set<string>} */
   const lifted = new Set();
 
+  /** @type {Record<string, ChartInstance>} */
   const charts = {};
   // The X axis is linear in epoch milliseconds, so 3-17 day intervals are visibly
   // different. Chart.js has a time scale for this, but it needs a date adapter we do not
   // vendor — so we generate the labels ourselves and put the ticks exactly at the snapshots.
+  /** @type {number[]} */
   let tickValues = [];
   // The ends of the X axis, in the same epoch milliseconds. They come from the aggregate,
   // never from the drawn series: the budget may leave the oldest snapshots unfetched, and an
   // axis that shrank with them would move the left edge of the chart the moment somebody
   // typed a level — the same world silently changing the period it describes.
+  /** @type {{ min: number, max: number } | null} */
   let axisRange = null;
+  /** @type {Map<number, SnapshotEntry>} */
   let entriesByTime = new Map();
   let thresholdKeys = ""; // the last set of thresholds filled in, so the choice is not cleared
 
-  if (window.Chart) {
+  // Chart.js arrives as a global from `vendor/`, minified and with no type information —
+  // so it is named once, here, and the hole it leaves is `ChartInstance` rather than an
+  // implicit `any` on every chart the view touches (§9.3).
+  const Chart = /** @type {any} */ (/** @type {any} */ (window).Chart);
+  if (Chart) {
     Chart.defaults.color = "#a0a09a";
     Chart.defaults.borderColor = "rgba(255, 255, 255, 0.06)";
     Chart.defaults.font.family = 'ui-sans-serif, system-ui, "Segoe UI", sans-serif';
@@ -83,13 +163,13 @@ function setupView() {
 
   (function buildProfCheckboxes() {
     const container = el("profCheckboxes");
-    Object.entries(PROF).forEach(([id, name]) => {
-      const color = PROF_COLORS[id];
+    getProfessionEntries().forEach(([id, name]) => {
+      const color = assertDefined(PROF_COLORS[id], `profession ${id} has a colour`);
       const lbl = document.createElement("label");
       lbl.style.color = color;
       const cb = document.createElement("input");
       cb.type = "checkbox";
-      cb.value = id;
+      cb.value = String(id);
       cb.checked = true;
       cb.style.accentColor = color;
       lbl.appendChild(cb);
@@ -100,11 +180,33 @@ function setupView() {
 
   // ── Reading the state out of the form ─────────────────────────────────────
 
+  /**
+   * @param {string} id
+   * @param {number} fallback
+   * @returns {number}
+   */
   function numberOr(id, fallback) {
-    const value = el(id).value;
+    const value = field(id).value;
     if (value === "") return fallback;
-    const n = Number(value);
-    return Number.isFinite(n) ? n : fallback;
+    // A field left holding something unreadable falls back rather than becoming a number:
+    // `Number("")` is 0, and a "0" in `minLevel` is a filter somebody could have meant.
+    return getFiniteNumberFromText(value.trim()) ?? fallback;
+  }
+
+  /**
+   * A profession id out of our own markup or out of `PROF`.
+   *
+   * An assertion rather than a fallback: these come from `index.html` and from a constant
+   * in `shared.js`, both ours, so a value that is not 1-6 means the two went out of step
+   * and no reading here could repair it (§9.5).
+   *
+   * @param {string | number} value
+   * @returns {number}
+   */
+  function professionId(value) {
+    const id = assertDefined(getIntegerFromText(String(value)), `a profession id is a whole number, got "${value}"`);
+    assert(id >= 1 && id <= 6, `a profession id is 1-6, got ${id}`);
+    return id;
   }
 
   function readFilters() {
@@ -116,47 +218,50 @@ function setupView() {
       maxHonor: numberOr("maxHonor", Infinity),
       maxDays: maxDays < 0 ? Infinity : maxDays,
       professions: new Set(
-        [...el("profCheckboxes").querySelectorAll("input:checked")].map((cb) => Number(cb.value)),
+        checkboxes("profCheckboxes", "input:checked").map((cb) => professionId(cb.value)),
       ),
     };
   }
 
   function readView() {
     return {
-      world: el("worldSelect").value,
-      date: el("snapshotSelect").value,
-      threshold: el("thresholdSelect").value,
-      share: el("modeSelect").value === "udzial",
+      world: field("worldSelect").value,
+      date: field("snapshotSelect").value,
+      threshold: field("thresholdSelect").value,
+      share: field("modeSelect").value === "udzial",
     };
   }
 
   /** The inverse of readFilters — puts the state from the URL back into the form fields. */
+  /**
+   * @param {Filters} f
+   */
   function applyFilters(f) {
-    const put = (id, value) => {
-      el(id).value = Number.isFinite(value) ? String(value) : "";
+    const put = (/** @type {string} */ id, /** @type {number} */ value) => {
+      field(id).value = Number.isFinite(value) ? String(value) : "";
     };
     put("minLevel", f.minLevel);
     put("maxLevel", f.maxLevel);
     put("minHonor", f.minHonor);
     put("maxHonor", f.maxHonor);
     put("onlineValue", f.maxDays);
-    el("onlinePreset").value = Number.isFinite(f.maxDays) ? String(f.maxDays) : "all";
-    for (const cb of el("profCheckboxes").querySelectorAll("input")) {
-      cb.checked = f.professions.has(Number(cb.value));
+    field("onlinePreset").value = Number.isFinite(f.maxDays) ? String(f.maxDays) : "all";
+    for (const cb of checkboxes("profCheckboxes")) {
+      cb.checked = f.professions.has(professionId(cb.value));
     }
   }
 
   function resetFilters() {
     for (const id of ["minLevel", "maxLevel", "minHonor", "maxHonor", "onlineValue"]) {
-      el(id).value = "";
+      field(id).value = "";
     }
-    el("onlinePreset").value = "all";
-    for (const cb of el("profCheckboxes").querySelectorAll("input")) cb.checked = true;
+    field("onlinePreset").value = "all";
+    for (const cb of checkboxes("profCheckboxes")) cb.checked = true;
   }
 
   function writeUrlState() {
-    const params = filtersToParams(readFilters());
-    for (const [key, value] of viewToParams(readView())) params.set(key, value);
+    const params = composeFiltersParams(readFilters());
+    for (const [key, value] of composeViewParams(readView())) params.set(key, value);
     params.sort();
     // The anchor stays: without it the first filter change after clicking "Historia"
     // wiped the anchor out of the address, so a reload returned to the top of the page.
@@ -173,11 +278,11 @@ function setupView() {
   // ── Data ──────────────────────────────────────────────────────────────────
 
   const getWorlds = () => manifest?.worlds || [];
-  const currentWorld = () => el("worldSelect").value;
+  const currentWorld = () => field("worldSelect").value;
   const currentWorldEntries = () => getWorlds().find((w) => w.name === currentWorld())?.files || [];
-  const selectedEntry = () => currentWorldEntries().find((f) => f.id === el("snapshotSelect").value);
+  const selectedEntry = () => currentWorldEntries().find((f) => f.id === field("snapshotSelect").value);
   const baseTrend = () => trends?.worlds[currentWorld()] ?? null;
-  const currentSnapshot = () => cachedSnapshots(currentWorld()).get(el("snapshotSelect").value) ?? null;
+  const currentSnapshot = () => getCachedSnapshots(currentWorld()).get(field("snapshotSelect").value) ?? null;
 
   /** Every snapshot of this world that has a date, i.e. a place on the time axis. */
   function datedEntries() {
@@ -194,7 +299,7 @@ function setupView() {
   function plannedEntries() {
     const entries = datedEntries();
     if (lifted.has(currentWorld())) return entries;
-    return budgetedEntries(entries, baseTrend()?.bytes ?? 0);
+    return getBudgetedEntries(entries, baseTrend()?.bytes ?? 0);
   }
 
   /**
@@ -203,23 +308,23 @@ function setupView() {
    * budget and then touching a filter would take the extra points away again.
    */
   function drawableEntries() {
-    const store = cachedSnapshots(currentWorld());
+    const store = getCachedSnapshots(currentWorld());
     const planned = new Set(plannedEntries().map((e) => e.id));
     return datedEntries().filter((e) => planned.has(e.id) || store.has(e.id));
   }
 
   // ── Formatting numbers ────────────────────────────────────────────────────
 
-  const num = (n) => n.toLocaleString("pl-PL");
+  const num = (/** @type {number} */ n) => n.toLocaleString("pl-PL");
   // Fractions in Polish too — "−5,3%" next to "23 719" rather than "−5.3%", two
   // conventions at once.
-  const dec = (n, digits = 1) =>
+  const dec = (/** @type {number} */ n, digits = 1) =>
     n.toLocaleString("pl-PL", { minimumFractionDigits: digits, maximumFractionDigits: digits });
-  const signed = (n, format = num) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${format(Math.abs(n))}`;
+  const signed = (/** @type {number} */ n, format = num) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${format(Math.abs(n))}`;
   // A transfer, as the person paying for it reads it. Under a megabyte in whole kilobytes:
   // "0,4 MB" says less than "360 KB" to somebody deciding whether to press the button.
   const MB = 1024 * 1024;
-  const formatBytes = (n) => (n >= MB ? `${dec(n / MB)} MB` : `${num(Math.round(n / 1024))} KB`);
+  const formatBytes = (/** @type {number} */ n) => (n >= MB ? `${dec(n / MB)} MB` : `${num(Math.round(n / 1024))} KB`);
 
   /**
    * An exception turned into a message for a person. The error bar used to carry the raw
@@ -227,12 +332,27 @@ function setupView() {
    * i.e. a message in English, with a file path and no hint about what to do. The path does
    * not disappear from the view: it stands in the "Plik" field in the filter drawer.
    */
+  /**
+   * What to tell the player about a failure.
+   *
+   * Switches on the failure's `code`, never on its message. It used to match the message
+   * with a regular expression, which made every one of those English sentences load-bearing
+   * — rewording `HTTP 404 — …` would have quietly changed which Polish sentence appeared,
+   * with every test still green (§9.5).
+   */
+  /**
+   * @param {unknown} error
+   * @param {string} what what could not be fetched, in Polish, for the sentence
+   * @returns {string}
+   */
   function describeFailure(error, what) {
-    const message = String(error?.message ?? error);
-    const http = message.match(/^HTTP (\d{3})/);
-    if (http) return `Nie udało się pobrać ${what}: serwer odpowiedział kodem ${http[1]}.`;
-    if (/JSON|Unexpected token/i.test(message)) {
-      return `Nie udało się odczytać ${what}: plik nie jest poprawnym JSON-em.`;
+    if (error instanceof ResourceFetchError) {
+      return `Nie udało się pobrać ${what}: serwer odpowiedział kodem ${error.status}.`;
+    }
+    if (error instanceof MargoStatError) {
+      if (error.code === "ResourceParse") {
+        return `Nie udało się odczytać ${what}: plik nie jest poprawnym JSON-em.`;
+      }
     }
     return `Nie udało się pobrać ${what} — wygląda na brak połączenia. Odśwież stronę i spróbuj ponownie.`;
   }
@@ -256,6 +376,9 @@ function setupView() {
     };
   }
 
+  /**
+   * @param {{ chart: ChartInstance, tooltip: any }} context
+   */
   function renderLevelTooltip({ chart, tooltip }) {
     let node = document.getElementById("profTooltip");
     if (!node) {
@@ -266,23 +389,23 @@ function setupView() {
       document.body.appendChild(node);
     }
     if (tooltip.opacity === 0) {
-      node.style.opacity = 0;
+      node.style.opacity = "0";
       return;
     }
 
     const dataIndex = tooltip.dataPoints?.[0]?.dataIndex;
     if (dataIndex == null) {
-      node.style.opacity = 0;
+      node.style.opacity = "0";
       return;
     }
 
-    const total = chart.data.datasets.reduce((sum, ds) => sum + (ds.data[dataIndex] || 0), 0);
+    const total = chart.data.datasets.reduce((/** @type {number} */ sum, /** @type {any} */ ds) => sum + (ds.data[dataIndex] || 0), 0);
     const level = chart.data.labels[dataIndex];
     const rows = chart.data.datasets
-      .map((ds) => ({ label: ds.label, color: ds.backgroundColor, val: ds.data[dataIndex] || 0 }))
-      .filter((e) => e.val > 0)
-      .sort((a, b) => b.val - a.val)
-      .map((e) => {
+      .map((/** @type {any} */ ds) => ({ label: ds.label, color: ds.backgroundColor, val: ds.data[dataIndex] || 0 }))
+      .filter((/** @type {{ val: number }} */ e) => e.val > 0)
+      .sort((/** @type {{ val: number }} */ a, /** @type {{ val: number }} */ b) => b.val - a.val)
+      .map((/** @type {{ label: string, color: string, val: number }} */ e) => {
         // The same notation as in the bar and the table: "12,3%" and "1 234", not "12.3%".
         const pct = total ? dec((e.val / total) * 100, 1) : dec(0, 1);
         return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
@@ -301,7 +424,7 @@ function setupView() {
     `;
 
     const pos = chart.canvas.getBoundingClientRect();
-    node.style.opacity = 1;
+    node.style.opacity = "1";
 
     let x = pos.left + tooltip.caretX + 12;
     let y = pos.top + tooltip.caretY - 10;
@@ -316,11 +439,14 @@ function setupView() {
     node.style.top = `${y}px`;
   }
 
+  /**
+   * @param {Map<number, number[]>} counts
+   */
   function renderLevelChart(counts) {
     const labels = [...counts.keys()].sort((a, b) => a - b);
-    const datasets = Object.entries(PROF).map(([id, name]) => ({
+    const datasets = getProfessionEntries().map(([id, name]) => ({
       label: name,
-      data: labels.map((level) => counts.get(level)[id - 1] || 0),
+      data: labels.map((level) => counts.get(level)?.[id - 1] || 0),
       backgroundColor: PROF_COLORS[id],
       barPercentage: 1.0,
       categoryPercentage: 1.0,
@@ -347,6 +473,11 @@ function setupView() {
 
   // ── The history charts ────────────────────────────────────────────────────
 
+  /**
+   * @param {string} title
+   * @param {{ percent?: boolean }} [options]
+   * @returns {any} Chart.js's own options shape — §9.3
+   */
   function timeChartOptions(title, { percent = false } = {}) {
     return {
       responsive: true,
@@ -358,30 +489,30 @@ function setupView() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: (items) => {
+            title: (/** @type {any[]} */ items) => {
               const entry = entriesByTime.get(items[0].parsed.x);
               if (!entry) return "";
               // The UTC hour, because it is what explains the jumps in "last online".
-              return `${formatSnapshotDate(entry)} (${utcTime(entry.startedAt)} UTC)`;
+              return `${formatSnapshotDate(entry)} (${formatUtcTime(entry.startedAt)} UTC)`;
             },
-            label: (item) => `${item.dataset.label}: ${percent ? `${dec(item.parsed.y)}%` : num(item.parsed.y)}`,
-            footer: (items) => (entriesByTime.get(items[0].parsed.x)?.suspect ? "⚠ migawka może być obcięta" : ""),
+            label: (/** @type {any} */ item) => `${item.dataset.label}: ${percent ? `${dec(item.parsed.y)}%` : num(item.parsed.y)}`,
+            footer: (/** @type {any[]} */ items) => (entriesByTime.get(items[0].parsed.x)?.suspect ? "⚠ migawka może być obcięta" : ""),
           },
         },
       },
       scales: {
         y: {
           beginAtZero: percent,
-          ticks: { precision: percent ? 1 : 0, callback: (v) => (percent ? `${dec(v)}%` : num(v)) },
+          ticks: { precision: percent ? 1 : 0, callback: (/** @type {number} */ v) => (percent ? `${dec(v)}%` : num(v)) },
           grid: { color: "rgba(255, 255, 255, 0.06)" },
         },
         x: {
           type: "linear",
           ...(axisRange ?? {}),
-          afterBuildTicks: (axis) => {
+          afterBuildTicks: (/** @type {any} */ axis) => {
             axis.ticks = tickValues.map((value) => ({ value }));
           },
-          ticks: { callback: (v) => shortDate(v), maxRotation: 45, autoSkip: false },
+          ticks: { callback: (/** @type {number} */ v) => formatShortDate(v), maxRotation: 45, autoSkip: false },
           grid: { color: "rgba(255, 255, 255, 0.04)" },
         },
       },
@@ -389,20 +520,37 @@ function setupView() {
   }
 
   /** A suspect snapshot's point is drawn hollow — otherwise a truncated scrape looks like a drop. */
+  /**
+   * @param {WorldTrend} trend
+   * @param {string} color
+   */
   function pointStyle(trend, color) {
     return {
-      pointBackgroundColor: trend.suspect.map((s) => (s ? "transparent" : color)),
-      pointBorderColor: trend.suspect.map((s) => (s ? "#c98500" : color)),
-      pointBorderWidth: trend.suspect.map((s) => (s ? 2 : 1)),
-      pointRadius: trend.suspect.map((s) => (s ? 6 : 3)),
+      pointBackgroundColor: trend.suspect.map((/** @type {number} */ s) => (s ? "transparent" : color)),
+      pointBorderColor: trend.suspect.map((/** @type {number} */ s) => (s ? "#c98500" : color)),
+      pointBorderWidth: trend.suspect.map((/** @type {number} */ s) => (s ? 2 : 1)),
+      pointRadius: trend.suspect.map((/** @type {number} */ s) => (s ? 6 : 3)),
       pointHoverRadius: 6,
     };
   }
 
+  /**
+   * @param {WorldTrend} trend
+   * @param {number[]} values
+   */
   function series(trend, values) {
-    return values.map((y, i) => ({ x: new Date(trend.startedAt[i]).getTime(), y }));
+    // A point whose date cannot be read is dropped rather than placed at NaN, where
+    // Chart.js draws nothing and the series silently loses a snapshot without saying so.
+    return values
+      .map((/** @type {number} */ y, /** @type {number} */ i) => ({ x: getMillisecondsFromIsoText(trend.startedAt[i]), y }))
+      .filter((/** @type {{ x: number | null }} */ point) => point.x !== null);
   }
 
+  /**
+   * @param {string} id
+   * @param {any[]} datasets
+   * @param {any} options
+   */
   function drawChart(id, datasets, options) {
     if (!charts[id]) {
       charts[id] = new Chart(el(id), { type: "line", data: { datasets }, options });
@@ -413,8 +561,14 @@ function setupView() {
     charts[id].update();
   }
 
+  /**
+   * @param {WorldTrend} trend
+   * @param {number[]} population the **unfiltered** population — §9.6
+   * @param {Filters} filters
+   * @param {boolean} share
+   */
   function renderHistoryCharts(trend, population, filters, share) {
-    // Under the default filter, "the matches' share of the population" is 100% by
+    // Under the default filter, "the isMatch' share of the population" is 100% by
     // definition — so the population chart stays in counts instead of drawing a flat line.
     const filtered = !isDefaultFilters(filters);
     const popShare = share && filtered;
@@ -424,7 +578,7 @@ function setupView() {
       [
         {
           label: filtered ? "Pasujących" : "Populacja",
-          data: series(trend, popShare ? shareSeries(trend.total, population) : trend.total),
+          data: series(trend, popShare ? getShareSeries(trend.total, population) : trend.total),
           borderColor: "#3987e5",
           backgroundColor: "#3987e5",
           tension: 0.15,
@@ -441,15 +595,15 @@ function setupView() {
       ),
     );
 
-    const threshold = thresholdByKey(el("thresholdSelect").value, filters.maxDays);
+    const threshold = getThresholdByKey(field("thresholdSelect").value, filters.maxDays);
     if (threshold) {
-      const counts = activeCounts(trend, threshold.key, filters.maxDays);
+      const counts = getActiveCounts(trend, threshold.key, filters.maxDays);
       drawChart(
         "actChart",
         [
           {
             label: `Aktywni ${threshold.label}`,
-            data: series(trend, share ? shareSeries(counts, population) : counts),
+            data: series(trend, share ? getShareSeries(counts, population) : counts),
             borderColor: "#199e70",
             backgroundColor: "#199e70",
             tension: 0.15,
@@ -466,18 +620,23 @@ function setupView() {
     const profOptions = timeChartOptions(share ? "Udział profesji w populacji" : "Profesje w czasie", {
       percent: share,
     });
-    // The only chart with six series, so the only one that needs a legend.
-    profOptions.plugins.legend = { display: true, position: "bottom", labels: { boxWidth: 12, usePointStyle: true } };
+    // The only chart with six series, so the only one that needs a legend. The options
+    // object is Chart.js's own shape, which carries no types here (§9.3).
+    /** @type {any} */ (profOptions.plugins).legend = {
+      display: true,
+      position: "bottom",
+      labels: { boxWidth: 12, usePointStyle: true },
+    };
 
     drawChart(
       "profChart",
-      Object.entries(PROF)
-        .filter(([id]) => filters.professions.has(Number(id)))
+      getProfessionEntries()
+        .filter(([id]) => filters.professions.has(id))
         .map(([id, name]) => {
-          const values = trend.byProf[id - 1];
+          const values = assertDefined(trend.byProf[id - 1], `profession ${id} has a series`);
           return {
             label: name,
-            data: series(trend, share ? shareSeries(values, population) : values),
+            data: series(trend, share ? getShareSeries(values, population) : values),
             borderColor: PROF_COLORS[id],
             backgroundColor: PROF_COLORS[id],
             tension: 0.15,
@@ -499,12 +658,13 @@ function setupView() {
     days: ["onlineValue"],
   };
 
+  /** @param {string} key one of `FILTER_GROUPS`'s keys, or "prof" */
   function clearFilterGroup(key) {
     if (key === "prof") {
-      for (const cb of el("profCheckboxes").querySelectorAll("input")) cb.checked = true;
+      for (const cb of checkboxes("profCheckboxes")) cb.checked = true;
     } else {
-      for (const id of FILTER_GROUPS[key] ?? []) el(id).value = "";
-      if (key === "days") el("onlinePreset").value = "all";
+      for (const id of FILTER_GROUPS[/** @type {keyof typeof FILTER_GROUPS} */ (key)] ?? []) field(id).value = "";
+      if (key === "days") field("onlinePreset").value = "all";
     }
     scheduleRender();
   }
@@ -517,6 +677,9 @@ function setupView() {
    * The chips are a view of `readFilters()`, not their own state: `describeFilters`
    * computes the labels, and the close button writes back into the same form fields.
    */
+  /**
+   * @param {Filters} filters
+   */
   function renderChips(filters) {
     const chips = describeFilters(filters);
     const box = el("filterChips");
@@ -524,7 +687,10 @@ function setupView() {
     // element that held focus — focus fell back to `<body>` and two filters could not be
     // removed in a row from the keyboard. So we remember where it was.
     const active = typeof document !== "undefined" ? document.activeElement : null;
-    const hadFocus = active && box.contains?.(active) ? (active.dataset?.clear ?? "") : null;
+    const hadFocus =
+      active && box.contains?.(active)
+        ? (/** @type {HTMLElement} */ (active).dataset?.clear ?? "")
+        : null;
 
     box.innerHTML = chips
       .map(
@@ -542,6 +708,9 @@ function setupView() {
     next.focus?.();
   }
 
+  /**
+   * @param {boolean} open
+   */
   function setFieldsOpen(open) {
     // Closing hides the drawer with `display: none`. If focus were inside, the browser
     // would drop it onto `<body>` and the next Tab would start from the top of the
@@ -555,6 +724,10 @@ function setupView() {
     if (focusWasInside) el("filtersToggle").focus?.();
   }
 
+  /**
+   * @param {number} matched
+   * @param {number} population
+   */
   function renderMatchLine(matched, population) {
     const share = population > 0 ? (matched / population) * 100 : 0;
     el("matchLine").innerHTML =
@@ -563,12 +736,18 @@ function setupView() {
       `<span>(${dec(share, 1)}%)</span>`;
   }
 
+  /**
+   * @param {Map<number, number[]>} counts
+   * @param {[number, number][]} activity
+   * @param {number} maxDays
+   * @param {Set<number>} professions
+   */
   function renderStats(counts, activity, maxDays, professions) {
-    const { perProfession } = totalsFromCounts(counts);
+    const { perProfession } = getTotalsFromCounts(counts);
 
-    // Zero matches is not a distribution made of zeros: six professions and five activity
-    // buckets printed as "0" read like broken data, not like the answer "nobody matches".
-    // The same principle as `visibleActivityBuckets`.
+    // Zero isMatch is not a distribution made of zeros: six professions and five activity
+    // buckets printed as "0" read like broken data, not like the answer "nobody isMatch".
+    // The same principle as `getVisibleActivityBuckets`.
     if (perProfession.every((n) => n === 0)) {
       el("stats").innerHTML =
         `<div class="stats-line">Żaden gracz w tej migawce nie spełnia filtrów — rozkładu nie ma z czego złożyć.</div>`;
@@ -578,9 +757,13 @@ function setupView() {
     // A profession unchecked in the filter has nothing to contribute — "Mag: 0" next to
     // the result of a "Wojownik and Tropiciel only" filter looks like missing data rather
     // than exclusion. `profChart` draws only the chosen series; here it did not.
-    const badges = Object.entries(PROF)
-      .filter(([id]) => professions.has(Number(id)))
-      .map(([id, name]) => ({ name, color: PROF_COLORS[id], count: perProfession[id - 1] }))
+    const badges = getProfessionEntries()
+      .filter(([id]) => professions.has(id))
+      .map(([id, name]) => ({
+        name,
+        color: PROF_COLORS[id],
+        count: assertDefined(perProfession[id - 1], `profession ${id} has a count`),
+      }))
       .sort((a, b) => b.count - a.count)
       .map(
         ({ name, color, count }) =>
@@ -588,12 +771,12 @@ function setupView() {
       )
       .join(" · ");
 
-    const visible = new Set(visibleActivityBuckets(maxDays));
+    const visible = new Set(getVisibleActivityBuckets(maxDays));
     const activityLine = activity
-      .filter(([bucket]) => visible.has(bucket))
+      .filter((/** @type {[number, number]} */ [bucket]) => visible.has(bucket))
       .map(
-        ([bucket, count]) =>
-          `<span>${activityLabel(bucket, maxDays)}: <b style="color:var(--text)">${num(count)}</b></span>`,
+        (/** @type {[number, number]} */ [bucket, count]) =>
+          `<span>${getActivityLabel(bucket, maxDays)}: <b style="color:var(--text)">${num(count)}</b></span>`,
       )
       .join(" · ");
 
@@ -608,6 +791,9 @@ function setupView() {
    * that means the ranking returned fewer pages during an outage. Without this bar the flag
    * would be written for nobody.
    */
+  /**
+   * @param {{ reason: string } | null | undefined} suspect written by the scraper, in Polish, for a player — §9.8
+   */
   function showSuspect(suspect) {
     const node = el("suspect");
     if (!suspect) {
@@ -619,6 +805,10 @@ function setupView() {
     node.innerHTML = `<span aria-hidden="true">⚠</span><span><b>Ta migawka może być niekompletna.</b> ${suspect.reason}</span>`;
   }
 
+  /**
+   * @param {WorldTrend} trend
+   * @param {WorldTrend} base the aggregate, which owns the time axis — §9.6
+   */
   function renderSummary(trend, base) {
     const s = summarize(trend);
     if (!s) {
@@ -632,7 +822,7 @@ function setupView() {
     const from =
       trend.startedAt[0] === base.startedAt[0]
         ? "pierwszej migawki"
-        : shortDate(new Date(trend.startedAt[0]).getTime());
+        : formatShortDate(assertDefined(getMillisecondsFromIsoText(trend.startedAt[0]), "a drawn snapshot has a readable startedAt"));
 
     el("summary").innerHTML = `
       <div style="margin-bottom:6px">Ostatnia migawka: <b style="color:var(--text)">${num(s.total)}</b></div>
@@ -645,8 +835,11 @@ function setupView() {
     `;
   }
 
+  /**
+   * @param {WorldTrend} trend
+   */
   function renderTable(trend) {
-    const rows = changeRows(trend).reverse(); // the newest at the top
+    const rows = getChangeRows(trend).reverse(); // the newest at the top
     // A world with one snapshot has nothing to compare against anything. Clearing the
     // content alone left the `.card` with its border and padding — an empty box that still
     // caught the tab key (`tabindex="0"`) and was still announced as the region "Zmiany
@@ -662,7 +855,7 @@ function setupView() {
       .map(({ entry, total, delta, days, perDay }) => {
         const color = delta < 0 ? "#e66767" : delta > 0 ? "#199e70" : "var(--muted)";
         return `<tr>
-          <td>${formatSnapshotDate(entry)}${entry.suspect ? ' <span title="migawka może być obcięta" style="color:#c98500">⚠</span>' : ""}</td>
+          <td>${formatSnapshotDate(entry ?? null)}${entry?.suspect ? ' <span title="migawka może być obcięta" style="color:#c98500">⚠</span>' : ""}</td>
           <td class="num">${days === null ? "—" : dec(days)}</td>
           <td class="num">${num(total)}</td>
           <td class="num" style="color:${color}">${signed(delta)}</td>
@@ -681,28 +874,32 @@ function setupView() {
 
   /**
    * Thresholds wider than the activity filter leave the picker: under such a filter they
-   * would count exactly the same players as the matches chart, so they would collapse onto
+   * would count exactly the same players as the isMatch chart, so they would collapse onto
    * it into one line that looks like confirmation of something.
    */
+  /**
+   * @param {number} maxDays
+   * @param {string} [preferred]
+   */
   function fillThresholdSelect(maxDays, preferred) {
-    const usable = usableThresholds(maxDays);
+    const usable = getUsableThresholds(maxDays);
     const keys = usable.map((t) => t.key).join(",");
     // The choice is read BEFORE the options are replaced. `innerHTML` on a `<select>`
     // resets the value to the first option, so reading it afterwards would always give
     // "< 24h" — dropping the user onto a series that swings by 14.7% and freezing that
     // into the link.
-    const wanted = preferred ?? el("thresholdSelect").value;
+    const wanted = preferred ?? field("thresholdSelect").value;
 
     if (keys !== thresholdKeys) {
       thresholdKeys = keys;
       el("thresholdSelect").innerHTML = usable.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
     }
-    const chosen = thresholdByKey(wanted, maxDays);
-    if (chosen) el("thresholdSelect").value = chosen.key;
+    const chosen = getThresholdByKey(wanted, maxDays);
+    if (chosen) field("thresholdSelect").value = chosen.key;
 
-    el("thresholdSelect").disabled = usable.length === 0;
+    field("thresholdSelect").disabled = usable.length === 0;
     el("actChartBox").hidden = usable.length === 0;
-    el("thresholdNote").hidden = usable.length === usableThresholds(Infinity).length;
+    el("thresholdNote").hidden = usable.length === getUsableThresholds(Infinity).length;
     if (!el("thresholdNote").hidden) {
       const limit = `≤ ${maxDays === 0 ? "< 24h" : `${num(maxDays)} dni`}`;
       el("thresholdNote").innerHTML =
@@ -722,6 +919,11 @@ function setupView() {
    * drawing — the two part company once the transfer budget starts cutting. The counter
    * counts against `available`, because "10 migawek" under a world that has 12 reads as a
    * complete set of data; trimming the range without saying so is worse than not trimming it.
+   */
+  /**
+   * @param {number} loaded
+   * @param {number} expected
+   * @param {number} available
    */
   function renderHistoryStatus(loaded, expected, available) {
     const node = el("historyStatus");
@@ -754,6 +956,11 @@ function setupView() {
    * has to be said out loud — and since the missing part is one click and a named number
    * away, saying it without offering it would be worse than not trimming at all. Under the
    * default filter nothing is trimmed: that path draws the whole aggregate for free.
+   */
+  /**
+   * @param {number} expected
+   * @param {number} available
+   * @param {number} bytes
    */
   function renderBudgetNote(expected, available, bytes) {
     const missing = available - expected;
@@ -791,6 +998,9 @@ function setupView() {
     el("changeTable").innerHTML = "";
   }
 
+  /**
+   * @param {Filters} filters
+   */
   function renderCrossSection(filters) {
     const data = currentSnapshot();
     const base = baseTrend();
@@ -807,14 +1017,20 @@ function setupView() {
     }
 
     const counts = countByLevel(data, filters);
-    const matched = totalsFromCounts(counts).total;
-    const i = base ? base.id.indexOf(el("snapshotSelect").value) : -1;
+    const matched = getTotalsFromCounts(counts).total;
+    const i = base ? base.id.indexOf(field("snapshotSelect").value) : -1;
 
-    renderMatchLine(matched, i > -1 ? base.total[i] : data.count);
+    // The unfiltered population of this very snapshot where the aggregate knows it, and
+    // the snapshot's own row count otherwise — never a count from a different snapshot.
+    const population = base && i > -1 ? base.total[i] : undefined;
+    renderMatchLine(matched, population ?? data.count);
     renderLevelChart(counts);
     renderStats(counts, countByActivity(data, filters), filters.maxDays, filters.professions);
   }
 
+  /**
+   * @param {Filters} filters
+   */
   function renderHistory(filters) {
     const base = baseTrend();
     if (!base) {
@@ -828,7 +1044,7 @@ function setupView() {
     const available = datedEntries().length;
     const { trend, population, loaded, expected } = buildFilteredTrend(
       base,
-      cachedSnapshots(currentWorld()),
+      getCachedSnapshots(currentWorld()),
       filters,
       allowed,
     );
@@ -852,7 +1068,7 @@ function setupView() {
     }
 
     const usable = fillThresholdSelect(filters.maxDays);
-    const share = el("modeSelect").value === "udzial";
+    const share = field("modeSelect").value === "udzial";
 
     // One point is a valid state, not an error — luvia joined in the last round.
     el("singlePoint").hidden = trend.id.length !== 1 || expected !== 1;
@@ -868,9 +1084,22 @@ function setupView() {
     renderSummary(trend, base);
     // Ticks and tooltips for every snapshot the world has, not only the drawn ones: the gap
     // the budget leaves keeps its dates on the axis, which is what makes it visible.
-    tickValues = base.startedAt.map((t) => new Date(t).getTime());
-    axisRange = tickValues.length > 1 ? { min: tickValues[0], max: tickValues[tickValues.length - 1] } : null;
-    entriesByTime = new Map(snapshotEntries(base).map((e) => [new Date(e.startedAt).getTime(), e]));
+    // Every snapshot in the aggregate carries a `startedAt` — one without it never enters
+    // `trends.json`, because there is nowhere to put it on a time axis (§9.2). An
+    // unreadable one here is therefore a broken aggregate, not a case to draw around.
+    tickValues = base.startedAt.flatMap((t) => {
+      const at = getMillisecondsFromIsoText(t);
+      return at === null ? [] : [at];
+    });
+    const first = tickValues[0];
+    const last = tickValues[tickValues.length - 1];
+    axisRange = first !== undefined && last !== undefined && tickValues.length > 1 ? { min: first, max: last } : null;
+    entriesByTime = new Map(
+      getSnapshotEntries(base).flatMap((e) => {
+        const at = getMillisecondsFromIsoText(e.startedAt);
+        return at === null ? [] : [/** @type {[number, SnapshotEntry]} */ ([at, e])];
+      }),
+    );
     renderHistoryCharts(trend, population, filters, share);
     renderTable(trend);
   }
@@ -890,7 +1119,7 @@ function setupView() {
    * `inFlight` in history.js.
    */
   function scheduleRender() {
-    clearTimeout(renderTimer);
+    if (renderTimer !== null) clearTimeout(renderTimer);
     renderTimer = setTimeout(() => {
       render();
       void ensureHistory();
@@ -904,18 +1133,21 @@ function setupView() {
    * but latency the user can feel.
    */
   function renderNow() {
-    clearTimeout(renderTimer);
+    if (renderTimer !== null) clearTimeout(renderTimer);
     render();
     void ensureHistory();
   }
 
   // ── Fetching ──────────────────────────────────────────────────────────────
 
+  /**
+   * @param {ManifestEntry | undefined} entry
+   */
   async function loadSnapshot(entry) {
     if (!entry) return;
     const token = ++snapshotToken;
     const world = currentWorld();
-    const store = cachedSnapshots(world);
+    const store = getCachedSnapshots(world);
 
     el("sourceInfo").textContent = entry.filters;
     el("snapshotMeta").textContent = formatSnapshotDate(entry);
@@ -924,8 +1156,9 @@ function setupView() {
     // including when the data is already in memory and nothing is fetched.
     el("error").textContent = "";
 
-    if (store.has(entry.id)) {
-      showSuspect(store.get(entry.id).suspect);
+    const held = store.get(entry.id);
+    if (held) {
+      showSuspect(held.suspect ?? null);
       render();
       return;
     }
@@ -934,14 +1167,13 @@ function setupView() {
     showSuspect(null);
 
     try {
-      const res = await fetch(entry.filters);
-      if (!res.ok) throw new Error(`HTTP ${res.status} dla ${entry.filters}`);
-      const json = await res.json();
+      const json = await getJsonFromUrl(entry.filters);
       // A response to an abandoned request — the user has switched world or date.
       if (token !== snapshotToken) return;
 
-      store.set(entry.id, toTypedSnapshot(json));
-      showSuspect(json.suspect);
+      const snapshot = composeTypedSnapshot(json);
+      store.set(entry.id, snapshot);
+      showSuspect(snapshot.suspect ?? null);
       render();
     } catch (e) {
       // The same guard as on success: a rejected abandoned request must not wipe out a
@@ -973,11 +1205,11 @@ function setupView() {
 
     const world = currentWorld();
     const entries = plannedEntries();
-    const store = cachedSnapshots(world);
-    if (entries.length === 0 || loadedCount(store, entries) === entries.length) return;
+    const store = getCachedSnapshots(world);
+    if (entries.length === 0 || getLoadedCount(store, entries) === entries.length) return;
 
     const token = worldToken;
-    progress = { loaded: loadedCount(store, entries), expected: entries.length, failed: 0, running: true };
+    progress = { loaded: getLoadedCount(store, entries), expected: entries.length, failed: 0, running: true };
     render();
 
     const { failed } = await loadHistory(world, entries, {
@@ -993,7 +1225,7 @@ function setupView() {
     // Failed snapshots are described by `#partialNote` in the HISTORIA section, not by
     // `#error` above "PRZEKRÓJ": that bar is about the snapshot being cross-sectioned and
     // stands 1500 px away from the data in question.
-    progress = { loaded: loadedCount(store, entries), expected: entries.length, failed: failed.length, running: false };
+    progress = { loaded: getLoadedCount(store, entries), expected: entries.length, failed: failed.length, running: false };
     render();
 
     // The plan can grow while a pass is running: `loadHistory` hands a second caller the
@@ -1006,19 +1238,25 @@ function setupView() {
 
   // ── The selects ───────────────────────────────────────────────────────────
 
+  /**
+   * @param {string | null} [selected] the world to keep chosen, where one is to be kept
+   */
   function fillWorldSelect(selected) {
     el("worldSelect").innerHTML = getWorlds()
       .map((w) => `<option value="${w.name}">${capitalize(w.name)}</option>`)
       .join("");
-    if (selected && getWorlds().some((w) => w.name === selected)) el("worldSelect").value = selected;
+    if (selected && getWorlds().some((w) => w.name === selected)) field("worldSelect").value = selected;
   }
 
+  /**
+   * @param {string | null} [selected] the id to keep chosen, where one is to be kept
+   */
   function fillSnapshotSelect(selected) {
     const files = [...currentWorldEntries()].reverse(); // the newest at the top
     el("snapshotSelect").innerHTML = files
       .map((f) => `<option value="${f.id}">${formatSnapshotDate(f)}</option>`)
       .join("");
-    if (selected && files.some((f) => f.id === selected)) el("snapshotSelect").value = selected;
+    if (selected && files.some((f) => f.id === selected)) field("snapshotSelect").value = selected;
   }
 
   async function selectAndLoad() {
@@ -1027,21 +1265,46 @@ function setupView() {
     await ensureHistory();
   }
 
+  /**
+   * @param {unknown} json
+   * @returns {Manifest}
+   */
+  function readManifest(json) {
+    const worlds = /** @type {{ worlds?: unknown }} */ (json)?.worlds;
+    if (!Array.isArray(worlds)) throw new ResourceParseError("manifest.json");
+    return /** @type {Manifest} */ (json);
+  }
+
+  /**
+   * @param {unknown} json
+   * @returns {Trends}
+   */
+  function readTrends(json) {
+    const worlds = /** @type {{ worlds?: unknown }} */ (json)?.worlds;
+    if (typeof worlds !== "object" || worlds === null) throw new ResourceParseError("trends.json");
+    return /** @type {Trends} */ (json);
+  }
+
   async function init() {
     try {
-      const [manifestRes, trendsRes] = await Promise.all([fetch("manifest.json"), fetch("trends.json")]);
-      if (!manifestRes.ok) throw new Error(`HTTP ${manifestRes.status} dla manifest.json`);
-      if (!trendsRes.ok) throw new Error(`HTTP ${trendsRes.status} dla trends.json`);
-      manifest = await manifestRes.json();
-      trends = await trendsRes.json();
+      const [manifestJson, trendsJson] = await Promise.all([
+        getJsonFromUrl("manifest.json"),
+        getJsonFromUrl("trends.json"),
+      ]);
+      // Read, not cast. Both documents are fetched over a network and served from a cache
+      // that can be older than this script, so "it parsed" is not "it is what I expect" —
+      // and a missing `worlds` here would surface as an empty page rather than as the
+      // failure it is (§9.5).
+      manifest = readManifest(manifestJson);
+      trends = readTrends(trendsJson);
 
       const params = new URLSearchParams(location.search);
-      const view = viewFromParams(params);
+      const view = readViewFromParams(params);
       fillWorldSelect(view.world);
       fillSnapshotSelect(view.date);
-      applyFilters(filtersFromParams(params));
+      applyFilters(readFiltersFromParams(params));
       fillThresholdSelect(readFilters().maxDays, view.threshold);
-      el("modeSelect").value = view.share ? "udzial" : "liczba";
+      field("modeSelect").value = view.share ? "udzial" : "liczba";
 
 
       // A link carrying filters is to work straight away — the history starts without
@@ -1074,8 +1337,8 @@ function setupView() {
   el("snapshotSelect").addEventListener("change", selectAndLoad);
 
   el("onlinePreset").addEventListener("change", () => {
-    const value = el("onlinePreset").value;
-    el("onlineValue").value = value === "all" ? "" : value;
+    const value = field("onlinePreset").value;
+    field("onlineValue").value = value === "all" ? "" : value;
     renderNow();
   });
 
@@ -1105,7 +1368,7 @@ function setupView() {
     renderNow();
   });
 
-  // The bar's listeners are registered LAST. `test/dom_smoke.ts` calls a node's
+  // The bar's listeners are registered LAST. `test/dom-smoke.ts` calls a node's
   // first-registered listener (`handlers[0]`), so pushing anything ahead of the existing
   // bindings would change what the test actually runs.
   el("filtersToggle").addEventListener("click", (event) => {
@@ -1120,11 +1383,11 @@ function setupView() {
   });
   document.addEventListener("click", (event) => {
     if (el("filterFields").hidden) return;
-    if (!el("filterBar").contains?.(event.target)) setFieldsOpen(false);
+    if (!el("filterBar").contains?.(/** @type {Node | null} */ (event.target))) setFieldsOpen(false);
   });
 
   el("filterChips").addEventListener("click", (event) => {
-    const key = event.target?.dataset?.clear;
+    const key = /** @type {HTMLElement | null} */ (event.target)?.dataset?.clear;
     if (key) clearFilterGroup(key);
   });
 

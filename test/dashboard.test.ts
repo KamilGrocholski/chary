@@ -1,21 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { normalizeLegacyRows, splitNormalized } from "../src/snapshot.ts";
+import { normalizeLegacyRows, splitNormalized } from "@/src/snapshot.ts";
 import {
-  activityLabel,
+  getActivityLabel,
   countByActivity,
   countByLevel,
   describeFilters,
-  emptyFilters,
-  filtersFromParams,
-  filtersToParams,
+  getEmptyFilters,
+  readFiltersFromParams,
+  composeFiltersParams,
   isDefaultFilters,
-  totalsFromCounts,
-  visibleActivityBuckets,
-} from "../public/filters.js";
-import { activityBucket, daysBetween, formatSnapshotDate, isNeverOnline } from "../public/shared.js";
-import { stripComments } from "./source-text.ts";
+  getTotalsFromCounts,
+  getVisibleActivityBuckets,
+} from "@/public/filters.js";
+import { getActivityBucket, getDaysBetween, formatSnapshotDate, isNeverOnline } from "@/public/shared.js";
+import { stripComments } from "@/test/source-text.ts";
 
 // The reference is a sample of a real snapshot in the old v1 schema
 // (test/fixtures/legacy-snapshot-aether.json — every 12th row of the original, so it
@@ -43,11 +43,11 @@ function legacyDays(text: string): number | null {
 }
 
 function filters(overrides: Record<string, unknown> = {}) {
-  return { ...emptyFilters(), ...overrides };
+  return { ...getEmptyFilters(), ...overrides };
 }
 
 function total(counts: Map<number, number[]>) {
-  return totalsFromCounts(counts).total;
+  return getTotalsFromCounts(counts).total;
 }
 
 function legacyCount(predicate: (row: any[]) => boolean) {
@@ -87,7 +87,7 @@ describe("filtering — always exact", () => {
   });
 
   test("the distribution across professions", () => {
-    const perProfession = totalsFromCounts(countByLevel(data, filters())).perProfession;
+    const perProfession = getTotalsFromCounts(countByLevel(data, filters())).perProfession;
     for (let p = 1; p <= 6; p++) {
       expect(perProfession[p - 1]).toBe(legacyCount((r) => r[3] === p));
     }
@@ -151,8 +151,8 @@ describe("an account never used falls out of every threshold", () => {
     expect(isNeverOnline(undefined)).toBe(true);
     expect(isNeverOnline(-1)).toBe(true);
     expect(isNeverOnline(0)).toBe(false);
-    expect(activityBucket(-1)).toBe(4);
-    expect(activityBucket(null)).toBe(4);
+    expect(getActivityBucket(-1)).toBe(4);
+    expect(getActivityBucket(null)).toBe(4);
   });
 
   test("the −1 sentinel does not pass a threshold, even though it is below every one", () => {
@@ -180,7 +180,7 @@ describe("the activity distribution", () => {
     expect(buckets.reduce((s, [, c]) => s + c, 0)).toBe(legacy.rows.length);
 
     for (const [bucket, count] of buckets) {
-      expect(count).toBe(legacyCount((r) => activityBucket(legacyDays(r[5])) === bucket));
+      expect(count).toBe(legacyCount((r) => getActivityBucket(legacyDays(r[5])) === bucket));
     }
   });
 
@@ -197,8 +197,8 @@ describe("the activity distribution", () => {
     [8, 2],
     [30, 2],
     [31, 3],
-  ] as const)("activityBucket(%p) → %p", (days, bucket) => {
-    expect(activityBucket(days)).toBe(bucket);
+  ] as const)("getActivityBucket(%p) → %p", (days, bucket) => {
+    expect(getActivityBucket(days)).toBe(bucket);
   });
 });
 
@@ -279,13 +279,50 @@ describe("app.js agrees with index.html", () => {
   });
 
   test("fetches the aggregate and the snapshots, and nothing from outside the directory", () => {
-    // History from raw `.f.json` is new here and deliberate, but the list of URLs is to
-    // stay closed: no external dependencies, no second aggregate.
-    const literals = [...js.matchAll(/fetch\(\s*["'`]([^"'`]+)/g)].map((m) => m[1]);
+    // The list of URLs written into the code is to stay closed: no external dependency, no
+    // second aggregate. Every fetch goes through `getJsonFromUrl`, so this reads the calls
+    // to it rather than the calls to `fetch` — the reason the wrapper exists is that the
+    // four call sites were doing the same three steps four ways (§9.5).
+    const literals = [...js.matchAll(/getJsonFromUrl\(\s*["'`]([^"'`]+)/g)].map((m) => m[1]);
     expect(literals.sort()).toEqual(["manifest.json", "trends.json"]);
-    // the remaining URLs come from the manifest, not from the code
-    expect(historyJs).toContain("fetch(entry.filters)");
-    expect(js).toContain("fetch(entry.filters)");
+
+    // The remaining URLs come from the manifest, not from the code.
+    expect(historyJs).toContain("getJsonFromUrl(entry.filters)");
+    expect(js).toContain("getJsonFromUrl(entry.filters)");
+
+    // And `fetch` itself is spelled in exactly one place, which is what makes the line
+    // above a complete list rather than a sample of one.
+    const fetchJs = readFileSync(path.join(repo, "public/fetch-json.js"), "utf8");
+    expect(stripComments(fetchJs)).toContain("await fetch(url)");
+    for (const module of [js, historyJs, filtersJs, sharedJs]) {
+      expect(stripComments(module)).not.toMatch(/[^.\w]fetch\(/);
+    }
+  });
+});
+
+describe("app.js asks index.html for the right kind of node", () => {
+  // `field()` answers an HTMLInputElement | HTMLSelectElement, and app.js says in its
+  // docblock that the pairing is proved here rather than asserted at every call. That
+  // sentence is only true while this test exists — asking a `<div>` for `.value` is silent
+  // in a browser and would have been silent under checkJs too, since the cast is ours.
+  const ids = [...js.matchAll(/\bfield\(\s*"([^"]+)"\s*\)/g)].map((m) => m[1]!);
+
+  test("the view really reads form controls through it", () => {
+    expect(new Set(ids).size).toBeGreaterThan(5);
+  });
+
+  test("every id it asks for is an <input> or a <select> in the markup", () => {
+    const offenders: string[] = [];
+    for (const id of new Set(ids)) {
+      // The tag that carries this id, whatever it is.
+      const tag = new RegExp(`<(\\w+)[^>]*\\bid="${id}"`).exec(html)?.[1];
+      if (tag !== "input" && tag !== "select") offenders.push(`#${id} is <${tag ?? "nothing"}>`);
+    }
+    expect(offenders.sort()).toEqual([]);
+  });
+
+  test("el() is not used for a value — that is what the split is for", () => {
+    expect(stripComments(js)).not.toMatch(/\bel\([^)]*\)\.(value|checked|disabled)\b/);
   });
 });
 
@@ -327,7 +364,7 @@ describe("snapshot time", () => {
   });
 
   test("an interval measured from the filenames would miss the truth", () => {
-    const actual = daysBetween(old, recent)!;
+    const actual = getDaysBetween(old, recent)!;
     expect(actual).toBeCloseTo(10.48, 2);
 
     const fromFilenames =
@@ -338,13 +375,13 @@ describe("snapshot time", () => {
   test("without startedAt the date is marked as approximate", () => {
     expect(formatSnapshotDate({ id: "2026-04-17T15-24-07" })).toBe("17.04.2026 15:24 (?)");
     expect(formatSnapshotDate({ id: "nonsense" })).toBe("nonsense");
-    expect(daysBetween({ id: "a" }, recent)).toBeNull();
+    expect(getDaysBetween({ id: "a" }, recent)).toBeNull();
   });
 });
 
 describe("the filter state in the URL", () => {
   test("the default view puts nothing in the link", () => {
-    expect(filtersToParams(emptyFilters()).toString()).toBe("");
+    expect(composeFiltersParams(getEmptyFilters()).toString()).toBe("");
   });
 
   test("a full set of filters survives the round trip", () => {
@@ -356,21 +393,21 @@ describe("the filter state in the URL", () => {
       maxDays: 14,
       professions: new Set([1, 4]),
     };
-    const restored = filtersFromParams(new URLSearchParams(filtersToParams(f).toString()));
+    const restored = readFiltersFromParams(new URLSearchParams(composeFiltersParams(f).toString()));
     expect(restored).toEqual(f);
   });
 
   test("an empty URL gives the default filters", () => {
-    expect(filtersFromParams(new URLSearchParams())).toEqual(emptyFilters());
+    expect(readFiltersFromParams(new URLSearchParams())).toEqual(getEmptyFilters());
   });
 
   test("junk in the URL does not break the view", () => {
-    const f = filtersFromParams(new URLSearchParams("minLevel=abc&maxDays=-5&prof=9,x"));
-    expect(f).toEqual(emptyFilters());
+    const f = readFiltersFromParams(new URLSearchParams("minLevel=abc&maxDays=-5&prof=9,x"));
+    expect(f).toEqual(getEmptyFilters());
   });
 
   test("filters from the URL give the same result as filters set by hand", () => {
-    const f = filtersFromParams(new URLSearchParams("minLevel=200&maxLevel=250&prof=1,4"));
+    const f = readFiltersFromParams(new URLSearchParams("minLevel=200&maxLevel=250&prof=1,4"));
     const expected = legacyCount(
       (r) => r[2] >= 200 && r[2] <= 250 && (r[3] === 1 || r[3] === 4),
     );
@@ -381,9 +418,9 @@ describe("the filter state in the URL", () => {
   test("\"the default filter\" recognises exactly the filters that reject nothing", () => {
     // The whole lazy path hangs on this: under the default filter the history comes from
     // a 9 KB aggregate rather than from megabytes of raw snapshots.
-    expect(isDefaultFilters(emptyFilters())).toBe(true);
-    expect(isDefaultFilters(filtersFromParams(new URLSearchParams()))).toBe(true);
-    expect(isDefaultFilters(filtersFromParams(new URLSearchParams("prof=1,2,3,4,5,6")))).toBe(true);
+    expect(isDefaultFilters(getEmptyFilters())).toBe(true);
+    expect(isDefaultFilters(readFiltersFromParams(new URLSearchParams()))).toBe(true);
+    expect(isDefaultFilters(readFiltersFromParams(new URLSearchParams("prof=1,2,3,4,5,6")))).toBe(true);
 
     expect(isDefaultFilters(filters({ minLevel: 1 }))).toBe(false);
     expect(isDefaultFilters(filters({ maxDays: 30 }))).toBe(false);
@@ -399,7 +436,7 @@ describe("describing the active filters", () => {
   const keys = (overrides: Record<string, unknown>) => describeFilters(filters(overrides)).map((c) => c.key);
 
   test("the default filter has nothing to describe", () => {
-    expect(describeFilters(emptyFilters())).toEqual([]);
+    expect(describeFilters(getEmptyFilters())).toEqual([]);
   });
 
   test("open and closed ranges read differently", () => {
@@ -440,14 +477,14 @@ describe("describing the active filters", () => {
     const f = filters({ minLevel: 250, maxHonor: 50_000, maxDays: 14, professions: new Set([2, 3]) });
     expect(describeFilters(f)).toHaveLength(4);
     expect(isDefaultFilters(f)).toBe(false);
-    expect(describeFilters(emptyFilters()).length === 0).toBe(isDefaultFilters(emptyFilters()));
+    expect(describeFilters(getEmptyFilters()).length === 0).toBe(isDefaultFilters(getEmptyFilters()));
   });
 });
 
 describe("the activity distribution labels", () => {
   test("with no filter they describe disjoint ranges, not running totals", () => {
     // "≤ 7 dni" over the 1-7 bucket suggested it was everyone from the last week.
-    expect(visibleActivityBuckets(Infinity).map((b) => activityLabel(b))).toEqual([
+    expect(getVisibleActivityBuckets(Infinity).map((b) => getActivityLabel(b))).toEqual([
       "< 24h",
       "1-7 dni",
       "8-30 dni",
@@ -457,9 +494,9 @@ describe("the activity distribution labels", () => {
   });
 
   test("the threshold trims the label of the bucket it falls in", () => {
-    expect(visibleActivityBuckets(14).map((b) => activityLabel(b, 14))).toEqual(["< 24h", "1-7 dni", "8-14 dni"]);
-    expect(visibleActivityBuckets(3).map((b) => activityLabel(b, 3))).toEqual(["< 24h", "1-3 dni"]);
-    expect(visibleActivityBuckets(60).map((b) => activityLabel(b, 60))).toEqual([
+    expect(getVisibleActivityBuckets(14).map((b) => getActivityLabel(b, 14))).toEqual(["< 24h", "1-7 dni", "8-14 dni"]);
+    expect(getVisibleActivityBuckets(3).map((b) => getActivityLabel(b, 3))).toEqual(["< 24h", "1-3 dni"]);
+    expect(getVisibleActivityBuckets(60).map((b) => getActivityLabel(b, 60))).toEqual([
       "< 24h",
       "1-7 dni",
       "8-30 dni",
@@ -469,10 +506,10 @@ describe("the activity distribution labels", () => {
 
   test("under a threshold we hide the buckets that are empty by definition", () => {
     // "> 30 dni: 0 · nigdy: 0" looked like broken data
-    expect(visibleActivityBuckets(0)).toEqual([0]);
-    expect(visibleActivityBuckets(14)).not.toContain(3);
-    expect(visibleActivityBuckets(14)).not.toContain(4);
-    expect(visibleActivityBuckets(60)).not.toContain(4);
+    expect(getVisibleActivityBuckets(0)).toEqual([0]);
+    expect(getVisibleActivityBuckets(14)).not.toContain(3);
+    expect(getVisibleActivityBuckets(14)).not.toContain(4);
+    expect(getVisibleActivityBuckets(60)).not.toContain(4);
   });
 
   test("the numbers under the labels match the range those labels describe", () => {
@@ -480,14 +517,17 @@ describe("the activity distribution labels", () => {
     const buckets = new Map<number, number>(
       countByActivity(data, f).map(([bucket, count]: number[]) => [bucket as number, count as number]),
     );
-    const visible = visibleActivityBuckets(14);
+    const visible = getVisibleActivityBuckets(14);
+    // Read once with an assertion rather than three times with a `!`: the length is checked
+    // at the end of this test, so a short list is a failure of the subject, not of indexing.
+    const [first, second, third] = visible as [number, number, number];
 
-    expect(buckets.get(visible[0])).toBe(legacyCount((r) => legacyDays(r[5]) === 0));
-    expect(buckets.get(visible[1])).toBe(legacyCount((r) => {
+    expect(buckets.get(first)).toBe(legacyCount((r) => legacyDays(r[5]) === 0));
+    expect(buckets.get(second)).toBe(legacyCount((r) => {
       const d = legacyDays(r[5]);
       return d !== null && d >= 1 && d <= 7;
     }));
-    expect(buckets.get(visible[2])).toBe(legacyCount((r) => {
+    expect(buckets.get(third)).toBe(legacyCount((r) => {
       const d = legacyDays(r[5]);
       return d !== null && d >= 8 && d <= 14;
     }));
@@ -495,20 +535,20 @@ describe("the activity distribution labels", () => {
   });
 
   test("\"1 dzień\" inflects correctly", () => {
-    expect(activityLabel(1, 1)).toBe("1 dzień");
+    expect(getActivityLabel(1, 1)).toBe("1 dzień");
   });
 });
 
 // ── The view as a whole ─────────────────────────────────────────────────────
 //
-// The DOM layer put through a stub in a separate process (test/dom_smoke.ts).
+// The DOM layer put through a stub in a separate process (test/dom-smoke.ts).
 // Two scenarios, because the view has two data paths and only together do they cover
 // both: the default filter (history from trends.json) and a filter set (history from
 // `.f.json`).
 
 const repo = path.resolve(import.meta.dir, "..");
 const smoke = (scenario: string) => {
-  const proc = Bun.spawnSync(["bun", path.join(repo, "test/dom_smoke.ts"), scenario], { cwd: repo });
+  const proc = Bun.spawnSync(["bun", path.join(repo, "test/dom-smoke.ts"), scenario], { cwd: repo });
   return {
     proc,
     out: proc.exitCode === 0 && proc.stdout.length > 0 ? JSON.parse(proc.stdout.toString()) : null,
@@ -693,7 +733,7 @@ describe("the view comes together — a filter set", () => {
   test("an incomplete history says so, and stops once it stops being incomplete", () => {
     // The snapshot count of world "brutal" grows with every scrape — taken from trends.json
     // rather than hard-coded, otherwise the next `bun run scrape` gives red CI.
-    // dom_smoke.ts breaks the fetch of exactly one snapshot of that world.
+    // dom-smoke.ts breaks the fetch of exactly one snapshot of that world.
     const total = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.brutal
       .total.length;
 
@@ -771,7 +811,7 @@ describe("the view comes together — a filter set", () => {
 
   test("the activity filter removes the thresholds that say nothing under it", () => {
     // At "≤ 3 dni" the "≤ 7 dni" threshold would count exactly the same players as the
-    // matches chart — three lines on top of each other look like confirmation of
+    // isMatch chart — three lines on top of each other look like confirmation of
     // something.
     expect(out.afterActivityFilter.thresholdOptions).toBe(1);
     expect(out.afterActivityFilter.noteHidden).toBe(false);
@@ -784,7 +824,7 @@ describe("the suspect-snapshot warning", () => {
   test("the view reads the flag from the snapshot and has somewhere to show it", () => {
     // Without this the scraper would write `suspect` for nobody — exactly the pattern the
     // audit deleted the aggregate module for.
-    expect(js).toContain("showSuspect(json.suspect)");
+    expect(js).toMatch(/showSuspect\(\w+\.suspect/);
     expect(js).toContain("Ta migawka może być niekompletna");
     expect(html).toContain('id="suspect"');
   });
@@ -792,8 +832,11 @@ describe("the suspect-snapshot warning", () => {
   test("the warning disappears when switching to another snapshot", () => {
     const load = js.slice(js.indexOf("async function loadSnapshot"));
     const reset = load.indexOf("showSuspect(null)");
-    const set = load.indexOf("showSuspect(json.suspect)");
+    // The freshly fetched snapshot, not the one already in memory — that branch returns
+    // before this point, so a match on it would prove nothing about the order here.
+    const set = load.search(/showSuspect\(snapshot\.suspect/);
     expect(reset).toBeGreaterThan(-1);
+    expect(set).toBeGreaterThan(-1);
     expect(reset).toBeLessThan(set); // cleared before the new data arrives
   });
 });

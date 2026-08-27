@@ -4,7 +4,7 @@ import path from "node:path";
 const ROOT = path.resolve("public");
 
 function resolveInsideRoot(pathname: string): string | null {
-  // Without normalising, `/../src/world_scraper.ts` escaped public/.
+  // Without normalising, `/../src/world-scraper.ts` escaped public/.
   const resolved = path.resolve(ROOT, `.${path.posix.normalize(pathname)}`);
   return resolved === ROOT || resolved.startsWith(ROOT + path.sep) ? resolved : null;
 }

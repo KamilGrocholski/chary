@@ -1,4 +1,6 @@
 import * as cheerio from "cheerio";
+import { getIntegerFromText } from "@/public/lib/number.js";
+import { MargoStatToolError } from "@/src/margostat-tool-error.ts";
 
 // ── The row schema (v2) ───────────────────────────────────────────────────────
 //
@@ -52,10 +54,16 @@ const PROFESSION_BY_NAME: Record<string, number> = {
   lowca: 6,
 };
 
-export class ParseError extends Error {
-  readonly type = "ParseError";
+/**
+ * The ranking page did not have the shape we can read.
+ *
+ * Thrown, not collected: a single unreadable row is data the caller decides about
+ * (`ParsedTable.errors`), but a missing table or a page nothing parsed on means the markup
+ * changed, and every world would fail the same way. Loud is correct here — §9.5.
+ */
+export class LadderMarkupError extends MargoStatToolError {
   constructor(message: string, readonly world: string, readonly page: number) {
-    super(`${message} (world=${world}, page=${page})`);
+    super("LadderMarkup", `${message} (world=${world}, page=${page})`);
   }
 }
 
@@ -76,15 +84,26 @@ function normalize(text: string): string {
     .replace(/\p{Diacritic}/gu, "");
 }
 
-/** Returns null when the text holds no valid integer. */
-export function parseIntStrict(text: string): number | null {
-  const cleaned = text.replace(/[^\d-]/g, "");
-  if (cleaned === "" || cleaned === "-") return null;
-  const n = Number(cleaned);
-  return Number.isInteger(n) ? n : null;
+/**
+ * An integer as the ranking spells one: digits, optionally grouped by a space, and
+ * optionally followed by the profession letter the "Poziom" column appends ("378t").
+ *
+ * Its own reader rather than `getIntegerFromText` alone, because those two shapes are the
+ * ranking's and not JavaScript's — and its own reader rather than the blanket
+ * `replace(/[^\d-]/g, "")` it replaces, which read "1-2" as 12 and "--5" as −5 by deleting
+ * whatever it did not understand. What it strips now is named, and everything else is
+ * `null`.
+ *
+ * Honor reaches six figures and can be negative (−35 observed), so neither a width limit
+ * nor a floor at zero belongs here.
+ */
+export function getIntegerFromLadderText(text: string): number | null {
+  const grouped = text.trim().replace(/[\u0020\u00A0\u2009\u202F]/g, "");
+  const withoutProfessionLetter = grouped.replace(/[a-z]$/i, "");
+  return getIntegerFromText(withoutProfessionLetter);
 }
 
-export function professionToId(title: string, levelText: string): number | null {
+export function getProfessionId(title: string, levelText: string): number | null {
   const byName = PROFESSION_BY_NAME[normalize(title)];
   if (byName) return byName;
 
@@ -104,27 +123,30 @@ export function parseLastOnlineDays(text: string): number | null | undefined {
   const m = t.match(/(\d+)\s+(?:dni?|dzien)\s+temu/);
   if (!m) return undefined;
 
-  const days = Number(m[1]);
+  // The capture proves the shape; it says nothing about the magnitude, and the reader is
+  // what turns a run of digits past 2^53 into `null` rather than into a neighbour of itself.
+  const days = getIntegerFromText(m[1] ?? "");
+  if (days === null) return undefined;
   return days >= NEVER_ONLINE_DAYS ? null : days;
 }
 
 /** `/profile/view,6805038#char_729,aether` → 729 */
 export function parseCharId(href: string): number | null {
-  const m = href.match(/#char_(\d+)/);
-  return m ? Number(m[1]) : null;
+  const digits = href.match(/#char_(\d+)/)?.[1];
+  return digits === undefined ? null : getIntegerFromText(digits);
 }
 
 export function parseTotalPages($: cheerio.CheerioAPI): number {
-  const fromTotal = parseIntStrict($(".pagination .total-pages").first().text());
+  const fromTotal = getIntegerFromLadderText($(".pagination .total-pages").first().text());
   if (fromTotal && fromTotal > 0) return fromTotal;
 
-  const fromInput = parseIntStrict($("input[name='page'][max]").attr("max") ?? "");
+  const fromInput = getIntegerFromLadderText($("input[name='page'][max]").attr("max") ?? "");
   if (fromInput && fromInput > 0) return fromInput;
 
   // The highest page number among the pagination links. Note: the numbers MUST be
   // parsed one at a time — joining them into one string produced figures like 234390.
   const fromLinks = $(".pagination a[href*='page=']")
-    .map((_, el) => parseIntStrict($(el).attr("href")?.match(/page=(\d+)/)?.[1] ?? ""))
+    .map((_, el) => getIntegerFromLadderText($(el).attr("href")?.match(/page=(\d+)/)?.[1] ?? ""))
     .get()
     .filter((n): n is number => typeof n === "number" && n > 0);
 
@@ -150,7 +172,7 @@ function findLadderTable($: cheerio.CheerioAPI) {
 export function parseTable($: cheerio.CheerioAPI, world: string, page: number): ParsedTable {
   const table = findLadderTable($);
   if (table.length === 0) {
-    throw new ParseError("ladder table not found (did the markup change?)", world, page);
+    throw new LadderMarkupError("ladder table not found (did the markup change?)", world, page);
   }
 
   const rows: PlayerRow[] = [];
@@ -190,20 +212,20 @@ export function parseTable($: cheerio.CheerioAPI, world: string, page: number): 
     }
 
     const levelText = levelCell.text().trim();
-    const level = parseIntStrict(levelText);
+    const level = getIntegerFromLadderText(levelText);
     if (level === null || level < 1) {
       errors.push(`row ${index} ("${name}"): invalid level ${JSON.stringify(levelText)}`);
       return;
     }
 
-    const profession = professionToId(levelCell.find("[title]").first().attr("title") ?? "", levelText);
+    const profession = getProfessionId(levelCell.find("[title]").first().attr("title") ?? "", levelText);
     if (profession === null) {
       errors.push(`row ${index} ("${name}"): unknown profession in ${JSON.stringify(levelText)}`);
       return;
     }
 
     const honorText = honorCell.text().trim();
-    const honor = parseIntStrict(honorText);
+    const honor = getIntegerFromLadderText(honorText);
     if (honor === null) {
       errors.push(`row ${index} ("${name}"): invalid honor ${JSON.stringify(honorText)}`);
       return;
@@ -216,7 +238,7 @@ export function parseTable($: cheerio.CheerioAPI, world: string, page: number): 
       return;
     }
 
-    const rank = parseIntStrict($(tds[0]).text());
+    const rank = getIntegerFromLadderText($(tds[0]).text());
     parsed.push({
       index,
       rank: rank !== null && rank > 0 ? rank : null,
@@ -225,7 +247,7 @@ export function parseTable($: cheerio.CheerioAPI, world: string, page: number): 
   });
 
   if (parsed.length === 0) {
-    throw new ParseError(
+    throw new LadderMarkupError(
       `not a single row parsed${errors.length ? `; first error: ${errors[0]}` : ""}`,
       world,
       page,

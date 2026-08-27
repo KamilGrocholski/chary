@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import * as cheerio from "cheerio";
 import {
-  ParseError,
+  LadderMarkupError,
   parseCharId,
-  parseIntStrict,
+  getIntegerFromLadderText,
   parseLastOnlineDays,
   parseTable,
   parseTotalPages,
-  professionToId,
-} from "../src/parser.ts";
+  getProfessionId,
+} from "@/src/parser.ts";
 
 const fixture = await Bun.file(
   new URL("./fixtures/ladder-aether-p1.html", import.meta.url).pathname,
@@ -60,7 +60,7 @@ describe("parseLastOnlineDays", () => {
   });
 });
 
-describe("professionToId", () => {
+describe("getProfessionId", () => {
   test.each([
     ["Wojownik", "306w", 1],
     ["Mag", "331m", 2],
@@ -69,19 +69,19 @@ describe("professionToId", () => {
     ["Tancerz ostrzy", "335b", 5],
     ["Łowca", "316h", 6],
   ] as const)("%s → %p", (title, level, expected) => {
-    expect(professionToId(title, level)).toBe(expected);
+    expect(getProfessionId(title, level)).toBe(expected);
   });
 
   test("copes with a mangled encoding of the name (owca ← Łowca)", () => {
-    expect(professionToId("owca", "316h")).toBe(6);
+    expect(getProfessionId("owca", "316h")).toBe(6);
   });
 
   test("falls back to the letter next to the level when title is missing", () => {
-    expect(professionToId("", "378t")).toBe(4);
+    expect(getProfessionId("", "378t")).toBe(4);
   });
 
   test("an unknown profession → null", () => {
-    expect(professionToId("Nekromanta", "300")).toBeNull();
+    expect(getProfessionId("Nekromanta", "300")).toBeNull();
   });
 });
 
@@ -95,16 +95,36 @@ describe("parseCharId", () => {
   });
 });
 
-describe("parseIntStrict", () => {
+describe("getIntegerFromLadderText", () => {
   test.each([
     ["378t", 378],
     [" 9550 ", 9550],
     ["-20", -20],
+    ["0", 0],
+    ["-35", -35],
+    ["600630", 600630],
+    // The ranking groups long numbers with a space on some worlds; every space it is known
+    // to use folds away, and nothing else does.
+    ["600 630", 600630],
+    ["600\u00A0630", 600630],
     ["", null],
     ["-", null],
     ["brak", null],
   ] as const)("%p → %p", (text, expected) => {
-    expect(parseIntStrict(text)).toBe(expected);
+    expect(getIntegerFromLadderText(text)).toBe(expected);
+  });
+
+  // What the blanket `replace(/[^\d-]/g, "")` this reader replaced used to answer. It
+  // deleted whatever it did not understand, so a cell holding two numbers read as one.
+  test.each([
+    ["1-2", null],
+    ["--5", null],
+    ["12abc", null],
+    ["3.5", null],
+    ["1e3", null],
+    ["0x10", null],
+  ] as const)("%p is refused rather than repaired → %p", (text, expected) => {
+    expect(getIntegerFromLadderText(text)).toBe(expected);
   });
 });
 
@@ -177,14 +197,14 @@ describe("parseTable resilience", () => {
     expect(errors[0]).toContain("unknown profession");
   });
 
-  test("no ladder table → ParseError", () => {
+  test("no ladder table → LadderMarkupError", () => {
     expect(() => parseTable(cheerio.load("<table><thead><tr><th>Coś</th></tr></thead></table>"), "aether", 1))
-      .toThrow(ParseError);
+      .toThrow(LadderMarkupError);
   });
 
-  test("a table with no parsed rows → ParseError", () => {
+  test("a table with no parsed rows → LadderMarkupError", () => {
     const brokenRow = `<tr><td class="dark-cell id">1</td><td class="long-clan"></td><td class="long-level"></td><td class="long-ph"></td><td class="long-last-online"></td></tr>`;
     expect(() => parseTable(cheerio.load(`${header}<tbody>${brokenRow}</tbody></table>`), "aether", 1))
-      .toThrow(ParseError);
+      .toThrow(LadderMarkupError);
   });
 });

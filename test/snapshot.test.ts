@@ -4,16 +4,16 @@ import path from "node:path";
 import {
   checkPopulationDrop,
   isLegacySnapshot,
-  latestSnapshotCount,
+  getLatestSnapshotCount,
   normalizeLegacyRows,
   splitNormalized,
   splitSnapshot,
-  timestampFromFileName,
+  getTimestampFromFileName,
   SNAPSHOT_SCHEMA,
-} from "../src/snapshot.ts";
-import type { PlayerRow } from "../src/parser.ts";
-import { writeAtomic } from "../src/atomic.ts";
-import { BACKOFF_BASE_MS, MAX_BACKOFF_MS, backoffFor, parseRetryAfter } from "../src/retry.ts";
+} from "@/src/snapshot.ts";
+import type { PlayerRow } from "@/src/parser.ts";
+import { writeAtomic } from "@/src/atomic.ts";
+import { BACKOFF_BASE_MS, MAX_BACKOFF_MS, getBackoffMs, parseRetryAfter } from "@/src/retry.ts";
 
 const META = { world: "aether", timestamp: "2026-08-01T10-00-00" };
 
@@ -103,8 +103,8 @@ describe("recognising files", () => {
     ["2026-07-21T22-04-12.json", "2026-07-21T22-04-12"],
     ["2026-07-21T22-04-12.f.json", "2026-07-21T22-04-12"],
     ["2026-07-21T22-04-12.n.json", "2026-07-21T22-04-12"],
-  ] as const)("timestampFromFileName(%p) → %p", (name, expected) => {
-    expect(timestampFromFileName(name)).toBe(expected);
+  ] as const)("getTimestampFromFileName(%p) → %p", (name, expected) => {
+    expect(getTimestampFromFileName(name)).toBe(expected);
   });
 });
 
@@ -181,7 +181,7 @@ describe("reading the previous snapshot", () => {
       "2026-08-01T00-00-00.f.json": { count: 300 },
       "2026-07-01T00-00-00.f.json": { count: 200 },
     });
-    expect(await latestSnapshotCount(dir)).toBe(300);
+    expect(await getLatestSnapshotCount(dir)).toBe(300);
   });
 
   test("skips the names files", async () => {
@@ -189,22 +189,22 @@ describe("reading the previous snapshot", () => {
       "2026-08-01T00-00-00.f.json": { count: 42 },
       "2026-09-01T00-00-00.n.json": { count: 999 },
     });
-    expect(await latestSnapshotCount(dir)).toBe(42);
+    expect(await getLatestSnapshotCount(dir)).toBe(42);
   });
 
   test("a new world, a corrupted file and a missing directory give null, not an exception", async () => {
-    expect(await latestSnapshotCount(path.join(tmp, "no-such-world"))).toBeNull();
-    expect(await latestSnapshotCount(await world("empty", {}))).toBeNull();
+    expect(await getLatestSnapshotCount(path.join(tmp, "no-such-world"))).toBeNull();
+    expect(await getLatestSnapshotCount(await world("empty", {}))).toBeNull();
 
     const corrupted = path.join(tmp, "corrupted");
     await mkdir(corrupted, { recursive: true });
     await Bun.write(path.join(corrupted, "2026-08-01T00-00-00.f.json"), "{ this is not json");
-    expect(await latestSnapshotCount(corrupted)).toBeNull();
+    expect(await getLatestSnapshotCount(corrupted)).toBeNull();
   });
 
   test("together with the guard: a truncated snapshot gets flagged", async () => {
     const dir = await world("truncated", { "2026-07-01T00-00-00.f.json": { count: 7754 } });
-    const suspect = checkPopulationDrop(3900, await latestSnapshotCount(dir));
+    const suspect = checkPopulationDrop(3900, await getLatestSnapshotCount(dir));
 
     expect(suspect).not.toBeNull();
     expect(suspect!.drop).toBeCloseTo(0.497, 3);
@@ -243,21 +243,21 @@ describe("the retry policy", () => {
     // `0 ?? x` is `0`, not `x` — that one operator sent four requests back to back with
     // no pause at all, straight against "respect the service".
     expect(parseRetryAfter("0")).toBe(0);
-    expect(backoffFor(1, parseRetryAfter("0"))).toBe(BACKOFF_BASE_MS);
-    expect(backoffFor(1, 0)).toBeGreaterThanOrEqual(BACKOFF_BASE_MS);
+    expect(getBackoffMs(1, parseRetryAfter("0"))).toBe(BACKOFF_BASE_MS);
+    expect(getBackoffMs(1, 0)).toBeGreaterThanOrEqual(BACKOFF_BASE_MS);
   });
 
   test("with no hint the backoff grows exponentially and has a ceiling", () => {
-    expect(backoffFor(1)).toBe(BACKOFF_BASE_MS);
-    expect(backoffFor(2)).toBe(BACKOFF_BASE_MS * 2);
-    expect(backoffFor(3)).toBe(BACKOFF_BASE_MS * 4);
-    expect(backoffFor(99)).toBe(MAX_BACKOFF_MS);
+    expect(getBackoffMs(1)).toBe(BACKOFF_BASE_MS);
+    expect(getBackoffMs(2)).toBe(BACKOFF_BASE_MS * 2);
+    expect(getBackoffMs(3)).toBe(BACKOFF_BASE_MS * 4);
+    expect(getBackoffMs(99)).toBe(MAX_BACKOFF_MS);
   });
 
   test("the server's hint may lengthen the pause but not shorten it", () => {
-    expect(backoffFor(1, 60_000)).toBe(60_000); // longer than ours — honoured
-    expect(backoffFor(3, 1_000)).toBe(BACKOFF_BASE_MS * 4); // shorter — ignored
-    expect(backoffFor(1, 999_999)).toBe(MAX_BACKOFF_MS); // absurd — the ceiling
+    expect(getBackoffMs(1, 60_000)).toBe(60_000); // longer than ours — honoured
+    expect(getBackoffMs(3, 1_000)).toBe(BACKOFF_BASE_MS * 4); // shorter — ignored
+    expect(getBackoffMs(1, 999_999)).toBe(MAX_BACKOFF_MS); // absurd — the ceiling
   });
 
   test("the header is sometimes a date, and junk must not take down the scraper", () => {
