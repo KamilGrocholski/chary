@@ -88,6 +88,9 @@ export const PROFESSION_NAMES = {
   6: "Łowca",
 };
 
+/** How many professions there are. Six is a fact of the game, not a number we chose. */
+export const PROFESSION_COUNT = Object.keys(PROFESSION_NAMES).length;
+
 // MargoMeter's series palette (validated for contrast/CVD on a dark background).
 /** @type {Record<number, string>} */
 export const PROFESSION_COLORS = {
@@ -169,6 +172,33 @@ export function getActivityBucket(days) {
   // mean the table stopped covering the number line, not that this reading is unusual.
   assert(bucket !== -1, "the activity bands cover every non-negative number of days");
   return bucket;
+}
+
+/**
+ * A counter per activity bucket, and one per profession: zero-filled, the right length, and
+ * the length stated in one place. They were nine array literals — `[0, 0, 0, 0, 0]` next to
+ * `[0, 0, 0, 0, 0, 0]` — across `filters.js`, `history.js` and `src/trends.ts`, and nothing
+ * connected their length to the tables above.
+ *
+ * @returns {number[]}
+ */
+export function composeActivityCounts() {
+  return new Array(ACTIVITY_BUCKET_COUNT).fill(0);
+}
+
+/** @returns {number[]} */
+export function composeProfessionCounts() {
+  return new Array(PROFESSION_COUNT).fill(0);
+}
+
+/** One series per profession, for a history folded column by column. @returns {number[][]} */
+export function composeProfessionSeries() {
+  return Array.from({ length: PROFESSION_COUNT }, () => []);
+}
+
+/** One series per activity bucket, same shape and same reason. @returns {number[][]} */
+export function composeActivitySeries() {
+  return Array.from({ length: ACTIVITY_BUCKET_COUNT }, () => []);
 }
 
 /**

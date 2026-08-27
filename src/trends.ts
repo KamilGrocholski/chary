@@ -6,7 +6,13 @@ import { writeAtomic } from "@/src/atomic.ts";
 import { assertDefined } from "@/public/lib/assert.js";
 import { getValueFromJsonText } from "@/public/lib/json.js";
 import { getTextOrder } from "@/public/lib/text-order.js";
-import { getActivityBucket } from "@/public/shared.js";
+import {
+  composeActivityCounts,
+  composeActivitySeries,
+  composeProfessionCounts,
+  composeProfessionSeries,
+  getActivityBucket,
+} from "@/public/shared.js";
 
 // The folded history of one world: a single number per snapshot instead of hundreds of
 // thousands of rows. The whole history (202 snapshots, 21 worlds) fits in ~24 KB, i.e.
@@ -30,8 +36,8 @@ export type SnapshotSummary = {
 };
 
 export function summarizeSnapshot(filters: FilterFile): SnapshotSummary {
-  const act = [0, 0, 0, 0, 0];
-  const byProf = [0, 0, 0, 0, 0, 0];
+  const act = composeActivityCounts();
+  const byProf = composeProfessionCounts();
   let total = 0;
 
   for (let i = 0; i < filters.count; i++) {
@@ -95,8 +101,8 @@ export function buildWorldTrend(snapshots: { id: string; filters: FilterFile }[]
     id: [],
     startedAt: [],
     total: [],
-    act: [[], [], [], [], []],
-    byProf: [[], [], [], [], [], []],
+    act: composeActivitySeries(),
+    byProf: composeProfessionSeries(),
     suspect: [],
     // 0 means "not measured". The client reads it as unknown and falls back to a count,
     // rather than treating a world as free and pulling its whole history.

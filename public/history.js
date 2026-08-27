@@ -11,7 +11,7 @@
 //
 // The labels below are Polish because a player reads them — see "Language" in AGENTS.md.
 
-import { getActivityBucketBound, getDaysBetween } from "./shared.js";
+import { composeActivitySeries, composeProfessionSeries, getActivityBucketBound, getDaysBetween } from "./shared.js";
 import { isDefaultFilters, summarizeFiltered } from "./filters.js";
 import { getJsonFromUrl } from "./fetch-json.js";
 import { assertDefined } from "./lib/assert.js";
@@ -465,8 +465,8 @@ export function buildFilteredTrend(base, store, filters, allowed = null) {
     id: [],
     startedAt: [],
     total: [],
-    act: [[], [], [], [], []],
-    byProf: [[], [], [], [], [], []],
+    act: composeActivitySeries(),
+    byProf: composeProfessionSeries(),
     suspect: [],
     // Not spent on this path: the snapshots are already fetched by the time a filtered
     // trend is built, so there is nothing left to price.

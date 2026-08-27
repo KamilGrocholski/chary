@@ -11,7 +11,10 @@
 import {
   ACTIVITY_BUCKET_BOUNDS,
   NEVER_ONLINE_BUCKET,
+  PROFESSION_COUNT,
   PROFESSION_NAMES,
+  composeActivityCounts,
+  composeProfessionCounts,
   getActivityBucket,
   isNeverOnline,
 } from "./shared.js";
@@ -193,7 +196,7 @@ export function countByLevel(data, f) {
     const profession = assertDefined(data.profession[i], "a matched row has a profession");
     let bucket = counts.get(level);
     if (!bucket) {
-      bucket = [0, 0, 0, 0, 0, 0];
+      bucket = composeProfessionCounts();
       counts.set(level, bucket);
     }
     bucket[profession - 1] = assertDefined(bucket[profession - 1], "professions are 1-6") + 1;
@@ -207,7 +210,7 @@ export function countByLevel(data, f) {
  * @returns {[number, number][]}
  */
 export function countByActivity(data, f) {
-  const buckets = [0, 0, 0, 0, 0];
+  const buckets = composeActivityCounts();
   for (let i = 0; i < data.count; i++) {
     if (!isMatch(data, i, f)) continue;
     const bucket = getActivityBucket(data.days[i]);
@@ -221,10 +224,10 @@ export function countByActivity(data, f) {
  * @returns {{ total: number, perProfession: number[] }}
  */
 export function getTotalsFromCounts(counts) {
-  const perProfession = [0, 0, 0, 0, 0, 0];
+  const perProfession = composeProfessionCounts();
   let total = 0;
   for (const row of counts.values()) {
-    for (let p = 0; p < 6; p++) {
+    for (let p = 0; p < PROFESSION_COUNT; p++) {
       const count = assertDefined(row[p], "a level bucket holds six counts");
       perProfession[p] = assertDefined(perProfession[p], "six professions") + count;
       total += count;
@@ -250,8 +253,8 @@ export function getTotalsFromCounts(counts) {
  * @returns {SnapshotSummary}
  */
 export function summarizeFiltered(data, f) {
-  const act = [0, 0, 0, 0, 0];
-  const byProf = [0, 0, 0, 0, 0, 0];
+  const act = composeActivityCounts();
+  const byProf = composeProfessionCounts();
   let total = 0;
 
   for (let i = 0; i < data.count; i++) {
