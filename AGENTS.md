@@ -399,8 +399,10 @@ test/              A test sits beside the thing it tests.
                      no cast off JSON.parse, the value-reader register, imports, file names.
     structure-block.test.ts
                      The block above against the tree it claims to describe.
-    naming.test.ts   §9.4 over every exported function: the action it opens with, the
-                     synonyms it may not use, the contractions it may not carry.
+    naming.test.ts   §9.4 over names. The action a name opens with, over the exported
+                     surface; the synonyms and contractions it may not carry, over every
+                     function; and over every declaration, that it is not named exactly
+                     an action. Why the first one stops at the exports is measured there.
     cited-paths.test.ts
                      Every path this file and README.md name is a path that exists.
     commit-messages.test.ts
@@ -568,6 +570,12 @@ its inverse is `delete`. `parse` and `read` are not synonyms: `parse` knows a gr
 throws, `read` takes what somebody else produced and may answer `null` (§9.5). Other verbs
 are allowed where they are more precise, but `[NEVER]` a **synonym** for one in the table:
 no `fetch` where `get` fits, no `update` where `set` fits.
+
+**`[ALWAYS] [any]` A variable is never named exactly an action.** Those words are spent on
+what a function does, so `const read` for a list of lines and `const pages` for a sentence
+read as calls that never happen. `count` is the one exception and it is not ours: it is a
+field of the snapshot format. The exported half of §9.4 was guarded from the start and the
+local half was not, which is how one dry run grew all three in a single function.
 
 **`[ALWAYS] [any]` Names follow A/HC/LC** — `prefix? + action + high context + low
 context?`. `getSnapshotCountByWorld` = get + SnapshotCount + ByWorld.
