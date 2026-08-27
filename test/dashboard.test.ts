@@ -650,7 +650,20 @@ describe("the view comes together — the default filter", () => {
 
     expect(out.summary).toContain(`${signText}${formatted}%`);
     expect(percent).toBeLessThan(0); // fobos empties fastest of them all
-    expect(out.tableRows).toBe(out.charts.popChart.points); // the header + n-1 change rows
+    // One row per snapshot, plus the header. This assertion used to read
+    // `tableRows === points` and passed on a coincidence: the header plus n−1 change rows
+    // also comes to n, so a table silently missing its OLDEST snapshot counted as correct.
+    // The reader who found it was counting rows against the chart beside them.
+    expect(out.tableRows).toBe(out.charts.popChart.points + 1);
+
+    // The oldest snapshot is the row that used to be missing. Its population is checked
+    // against trends.json rather than against the view's own output, and its three change
+    // columns are em dashes: there is no earlier snapshot to measure a change from, and
+    // unknown is not zero (§9.6).
+    const [date, days, population, delta, perDay] = out.oldestTableRow;
+    expect(date).not.toBe("");
+    expect(population).toBe(fobos.total[0].toLocaleString("pl-PL"));
+    expect([days, delta, perDay]).toEqual(["—", "—", "—"]);
     expect(out.tableHidden).toBe(false); // it is hidden only when there are no rows
     expect(out.singlePointHidden).toBe(true);
     expect(out.suspectNoteHidden).toBe(true);

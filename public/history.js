@@ -140,12 +140,18 @@ export function getSnapshotEntries(trend) {
 }
 
 /**
- * The changes between consecutive snapshots. `perDay` matters more here than `delta`: the
- * intervals run 3-17 days, so "−120 players" on two rows of the table means two different
- * things until it is divided by time.
+ * One row per snapshot, carrying the change from the one before it. `perDay` matters more
+ * here than `delta`: the intervals run 3-17 days, so "−120 players" on two rows of the
+ * table means two different things until it is divided by time.
  *
  * That same division rescues a partially loaded history: a missing snapshot makes a longer
  * interval rather than a false jump, because `perDay` divides by real elapsed time.
+ *
+ * The oldest snapshot gets a row too, with `days`, `delta` and `perDay` all `null`. It used
+ * to be skipped — the loop started at 1, because a change needs a predecessor — and the
+ * table it feeds is headed "Migawka", so the row that was never there read as a snapshot
+ * missing from the data. A reader counting rows against the chart beside them found one
+ * short in every world.
  */
 /**
  * @param {WorldTrend} trend
@@ -154,16 +160,22 @@ export function getChangeRows(trend) {
   const entries = getSnapshotEntries(trend);
   const rows = [];
 
-  for (let index = 1; index < entries.length; index++) {
-    const days = getDaysBetween(entries[index - 1], entries[index]);
+  for (let index = 0; index < entries.length; index++) {
     const total = assertDefined(trend.total[index], "every snapshot has a population");
-    const delta = total - assertDefined(trend.total[index - 1], "every snapshot has a population");
+    // The oldest snapshot is a row like any other, and its change is UNKNOWN rather than
+    // zero. It used to be left out entirely, which read as a snapshot missing from the
+    // data rather than as a transition that does not exist: the table is headed "Migawka",
+    // so a reader counts rows against the chart beside it and finds one short (§9.6 — keep
+    // unknown and zero apart, and a hole is named where it falls).
+    const previous = index > 0 ? trend.total[index - 1] : undefined;
+    const days = index > 0 ? getDaysBetween(entries[index - 1], entries[index]) : null;
+    const delta = previous === undefined ? null : total - previous;
     rows.push({
       entry: entries[index],
       total,
       delta,
       days,
-      perDay: days && days > 0 ? delta / days : null,
+      perDay: delta !== null && days && days > 0 ? delta / days : null,
     });
   }
   return rows;

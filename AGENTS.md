@@ -257,6 +257,12 @@ Rules that arrived this way, each paid for at least once:
   a legitimate reading of every number here — a level cannot be zero but honor can, and
   `days: 0` means "today". A test at `0` needs one at `1` beside it, and one below where the
   type allows: honor reaches −35 and `days` carries −1 for an account never used.
+- `[ALWAYS] [any]` **Two sides of an assertion that can agree by arithmetic are not being
+  compared.** `expect(tableRows).toBe(chartPoints)` passed for months over a table that was
+  missing its oldest snapshot in every world: the header plus n−1 change rows also comes to
+  n. The reader who found it was counting rows against the chart beside them, which is what
+  the test claimed to be doing. Where a count is asserted, say what each side is made of —
+  and assert the **contents** of the boundary row, not only how many there are.
 - `[ALWAYS] [any]` **A test compares against the truth, not against itself.** The parser is
   checked against a capture of a real ranking page and the filters against a real snapshot
   in the old schema. A test that checks a reimplementation of itself holds nothing.

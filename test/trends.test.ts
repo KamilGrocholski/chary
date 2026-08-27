@@ -427,10 +427,14 @@ describe("history under a filter", () => {
     const { trend } = buildFilteredTrend(base, store, { ...getEmptyFilters(), minLevel: 200 });
     const rows = getChangeRows(trend);
 
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.delta).toBe(2);
-    expect(rows[0]!.days).toBeCloseTo(20, 6); // a→c, not a→b
-    expect(rows[0]!.perDay).toBeCloseTo(0.1, 6);
+    // Two rows for two snapshots: the oldest carries the population and no change.
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.delta).toBeNull();
+    expect(rows[0]!.days).toBeNull();
+    expect(rows[0]!.perDay).toBeNull();
+    expect(rows[1]!.delta).toBe(2);
+    expect(rows[1]!.days).toBeCloseTo(20, 6); // a→c, not a→b
+    expect(rows[1]!.perDay).toBeCloseTo(0.1, 6);
   });
 
   test("the snapshot window narrows the history and says how much is left", () => {
@@ -450,7 +454,7 @@ describe("history under a filter", () => {
     expect(trend.id).toEqual([]);
     expect(loaded).toBe(0);
     expect(summarize(trend)).toBeNull();
-    expect(getChangeRows(trend)).toEqual([]);
+    expect(getChangeRows(trend)).toEqual([]);  // no snapshot, so not even a first row
   });
 });
 
@@ -573,23 +577,33 @@ describe("changes between snapshots", () => {
     // The intervals run 3-17 days, so "−120 players" on two rows of the table means two
     // different things until it is divided by time.
     const rows = getChangeRows(aether);
-    expect(rows).toHaveLength(aether.id.length - 1);
+    // One row per snapshot, the oldest included — the table is a list of snapshots, and a
+    // reader counts its rows against the chart beside it.
+    expect(rows).toHaveLength(aether.id.length);
 
-    for (const [index, row] of rows.entries()) {
+    // The first has no predecessor, so its change is unknown and says so. Never 0: zero is
+    // a measurement, and a green "0" against the oldest snapshot is one nobody took (§9.5).
+    expect(rows[0]!.entry!.id).toBe(aether.id[0]);
+    expect(rows[0]!.total).toBe(aether.total[0]);
+    expect(rows[0]!.delta).toBeNull();
+    expect(rows[0]!.days).toBeNull();
+    expect(rows[0]!.perDay).toBeNull();
+
+    for (const [index, row] of rows.slice(1).entries()) {
       expect(row.delta).toBe(aether.total[index + 1] - aether.total[index]);
       const expectedDays =
         (new Date(aether.startedAt[index + 1]).getTime() - new Date(aether.startedAt[index]).getTime()) / 86_400_000;
       expect(row.days).toBeCloseTo(expectedDays, 6);
-      expect(row.perDay).toBeCloseTo(row.delta / expectedDays, 6);
+      expect(row.perDay).toBeCloseTo(row.delta! / expectedDays, 6);
     }
   });
 
   test("the intervals in this data really are uneven", () => {
-    const days = getChangeRows(aether).map((row) => row.days!);
+    const days = getChangeRows(aether).slice(1).map((row) => row.days!);
     expect(Math.max(...days) - Math.min(...days)).toBeGreaterThan(3);
   });
 
-  test("a world with a single snapshot gives an empty table, not an error", () => {
+  test("a world with a single snapshot gives one row and no change to show", () => {
     const single = {
       id: ["a"],
       startedAt: ["2026-08-04T10:45:20.548Z"],
@@ -599,7 +613,11 @@ describe("changes between snapshots", () => {
       suspect: [0],
       bytes: 0,
     };
-    expect(getChangeRows(single)).toEqual([]);
+    // One row, every change unknown. The view hides the table below two rows — there is no
+    // trend yet, and `#singlePoint` says so beside it; `test/dashboard.test.ts` holds that.
+    const rows = getChangeRows(single);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!).toMatchObject({ total: 39087, delta: null, days: null, perDay: null });
     expect(summarize(single)).toMatchObject({ snapshots: 1, delta: 0, days: 0 });
   });
 });

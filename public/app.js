@@ -878,20 +878,24 @@ function startView() {
     // caught the tab key (`tabindex="0"`) and was still announced as the region "Zmiany
     // populacji między migawkami", only with no content. The `#singlePoint` note above
     // already says why there is no table, so the card is to disappear entirely.
-    getElement("changeTable").hidden = rows.length === 0;
-    if (rows.length === 0) {
+    // Fewer than two snapshots is not a trend, and a table of changes whose every change
+    // is an em dash says less than `#singlePoint` already says beside it.
+    getElement("changeTable").hidden = rows.length < 2;
+    if (rows.length < 2) {
       getElement("changeTable").innerHTML = "";
       return;
     }
 
     const body = rows
       .map(({ entry, total, delta, days, perDay }) => {
-        const color = delta < 0 ? "var(--danger)" : delta > 0 ? "var(--ok)" : "var(--muted)";
+        // A change nobody can compute is grey and an em dash, never a green zero: the
+        // oldest snapshot has no predecessor, and "0" there would be a measurement.
+        const color = delta === null || delta === 0 ? "var(--muted)" : delta < 0 ? "var(--danger)" : "var(--ok)";
         return `<tr>
           <td>${formatSnapshotDate(entry ?? null)}${entry?.suspect ? ' <span title="migawka może być obcięta" style="color:var(--warn)">⚠</span>' : ""}</td>
           <td class="number">${days === null ? "—" : formatDecimal(days)}</td>
           <td class="number">${formatNumber(total)}</td>
-          <td class="number" style="color:${color}">${formatSigned(delta)}</td>
+          <td class="number" style="color:${color}">${delta === null ? "—" : formatSigned(delta)}</td>
           <td class="number" style="color:${color}">${perDay === null ? "—" : formatSigned(perDay, formatDecimal)}</td>
         </tr>`;
       })

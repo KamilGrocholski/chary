@@ -286,6 +286,14 @@ const result: Record<string, unknown> = {
     profChart: getChartShape("profChart"),
   },
   tableRows: (nodes.changeTable!.innerHTML.match(/<tr>/g) ?? []).length,
+  // The table runs newest first, so the OLDEST snapshot is its last row — the one that
+  // used to be absent altogether. Cells as text, so the test can compare the population
+  // against trends.json rather than against the view's own output.
+  oldestTableRow: [...(nodes.changeTable!.innerHTML.match(/<tr>[\s\S]*?<\/tr>/g) ?? [])]
+    .at(-1)!
+    .split(/<\/?td[^>]*>/)
+    .map((cell: string) => cell.replace(/<[^>]*>/g, "").trim())
+    .filter((cell: string) => cell !== ""),
   table: getText("changeTable"),
   tableHidden: nodes.changeTable!.hidden,
 };
