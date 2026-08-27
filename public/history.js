@@ -383,7 +383,7 @@ export function loadHistory(world, entries, options = {}) {
   const running = inFlight.get(world);
   if (running) return running;
 
-  const run = fetchMissing(world, entries, options).finally(() => inFlight.delete(world));
+  const run = loadMissingSnapshots(world, entries, options).finally(() => inFlight.delete(world));
   inFlight.set(world, run);
   return run;
 }
@@ -393,7 +393,7 @@ export function loadHistory(world, entries, options = {}) {
  * @param {ManifestEntry[]} entries
  * @param {FetchOptions} options
  */
-async function fetchMissing(world, entries, options) {
+async function loadMissingSnapshots(world, entries, options) {
   const { concurrency = 4, onProgress = () => {}, isStale = () => false } = options;
   const store = getCachedSnapshots(world);
   const missing = entries.filter((e) => !store.has(e.id));

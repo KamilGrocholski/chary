@@ -13,14 +13,14 @@ import { rename, unlink } from "node:fs/promises";
  * contents or the new ones, never half of each.
  */
 export async function writeAtomic(filePath: string, contents: string): Promise<void> {
-  const tmp = `${filePath}.tmp`;
+  const temporaryPath = `${filePath}.tmp`;
   try {
-    await Bun.write(tmp, contents);
-    await rename(tmp, filePath);
+    await Bun.write(temporaryPath, contents);
+    await rename(temporaryPath, filePath);
   } catch (e) {
     // The temp file must not survive: a `.tmp` in `public/worlds/` would ship to Pages,
     // and on the next write it would pretend everything was fine.
-    await unlink(tmp).catch(() => {});
+    await unlink(temporaryPath).catch(() => {});
     throw e;
   }
 }

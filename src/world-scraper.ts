@@ -115,7 +115,7 @@ function sleep(ms: number) {
 
 // ── Fetching a page ───────────────────────────────────────────────────────────
 
-async function fetchPage(world: string, page: number): Promise<string> {
+async function getPage(world: string, page: number): Promise<string> {
   const url = buildUrl(world, page);
 
   let res: Response;
@@ -144,7 +144,7 @@ async function fetchPage(world: string, page: number): Promise<string> {
 type PageResult = { rows: PlayerRow[]; totalPages: number; badRows: string[] };
 
 async function scrapePage(world: string, page: number): Promise<PageResult> {
-  const html = await fetchPage(world, page);
+  const html = await getPage(world, page);
   const $ = cheerio.load(html);
   const { rows, errors } = parseTable($, world, page);
 

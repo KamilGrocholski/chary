@@ -10,7 +10,7 @@
 //
 // The strings a reader sees are Polish — see "Language" in AGENTS.md.
 
-import { PROF_COLORS, getProfessionEntries, capitalize, formatSnapshotDate, formatShortDate, formatUtcTime } from "./shared.js";
+import { PROFESSION_COLORS, getProfessionEntries, capitalize, formatSnapshotDate, formatShortDate, formatUtcTime } from "./shared.js";
 import {
   getActivityLabel,
   countByActivity,
@@ -86,7 +86,7 @@ function setupView() {
    * @param {string} id
    * @returns {HTMLElement}
    */
-  const el = (id) => {
+  const getElement = (id) => {
     const node = document.getElementById(id);
     if (!node) throw new MissingElementError(id);
     return node;
@@ -104,7 +104,7 @@ function setupView() {
    * @param {string} id
    * @returns {HTMLInputElement | HTMLSelectElement}
    */
-  const field = (id) => /** @type {HTMLInputElement | HTMLSelectElement} */ (el(id));
+  const field = (id) => /** @type {HTMLInputElement | HTMLSelectElement} */ (getElement(id));
 
   /**
    * The checkable inputs inside a container — the profession checkboxes.
@@ -114,7 +114,7 @@ function setupView() {
    * @returns {HTMLInputElement[]}
    */
   const checkboxes = (id, selector = "input") =>
-    /** @type {HTMLInputElement[]} */ ([...el(id).querySelectorAll(selector)]);
+    /** @type {HTMLInputElement[]} */ ([...getElement(id).querySelectorAll(selector)]);
 
   /** @type {Manifest | null} */
   let manifest = null;
@@ -161,10 +161,10 @@ function setupView() {
     Chart.defaults.font.family = 'ui-sans-serif, system-ui, "Segoe UI", sans-serif';
   }
 
-  (function buildProfCheckboxes() {
-    const container = el("profCheckboxes");
+  (function buildProfessionCheckboxes() {
+    const container = getElement("profCheckboxes");
     getProfessionEntries().forEach(([id, name]) => {
-      const color = assertDefined(PROF_COLORS[id], `profession ${id} has a colour`);
+      const color = assertDefined(PROFESSION_COLORS[id], `profession ${id} has a colour`);
       const lbl = document.createElement("label");
       lbl.style.color = color;
       const cb = document.createElement("input");
@@ -194,7 +194,7 @@ function setupView() {
   }
 
   /**
-   * A profession id out of our own markup or out of `PROF`.
+   * A profession id out of our own markup or out of `PROFESSION_NAMES`.
    *
    * An assertion rather than a fallback: these come from `index.html` and from a constant
    * in `shared.js`, both ours, so a value that is not 1-6 means the two went out of step
@@ -315,16 +315,16 @@ function setupView() {
 
   // ── Formatting numbers ────────────────────────────────────────────────────
 
-  const num = (/** @type {number} */ n) => n.toLocaleString("pl-PL");
+  const formatNumber = (/** @type {number} */ n) => n.toLocaleString("pl-PL");
   // Fractions in Polish too — "−5,3%" next to "23 719" rather than "−5.3%", two
   // conventions at once.
-  const dec = (/** @type {number} */ n, digits = 1) =>
+  const formatDecimal = (/** @type {number} */ n, digits = 1) =>
     n.toLocaleString("pl-PL", { minimumFractionDigits: digits, maximumFractionDigits: digits });
-  const signed = (/** @type {number} */ n, format = num) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${format(Math.abs(n))}`;
+  const signed = (/** @type {number} */ n, format = formatNumber) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${format(Math.abs(n))}`;
   // A transfer, as the person paying for it reads it. Under a megabyte in whole kilobytes:
   // "0,4 MB" says less than "360 KB" to somebody deciding whether to press the button.
   const MB = 1024 * 1024;
-  const formatBytes = (/** @type {number} */ n) => (n >= MB ? `${dec(n / MB)} MB` : `${num(Math.round(n / 1024))} KB`);
+  const formatBytes = (/** @type {number} */ n) => (n >= MB ? `${formatDecimal(n / MB)} MB` : `${formatNumber(Math.round(n / 1024))} KB`);
 
   /**
    * An exception turned into a message for a person. The error bar used to carry the raw
@@ -402,17 +402,17 @@ function setupView() {
     const total = chart.data.datasets.reduce((/** @type {number} */ sum, /** @type {any} */ ds) => sum + (ds.data[dataIndex] || 0), 0);
     const level = chart.data.labels[dataIndex];
     const rows = chart.data.datasets
-      .map((/** @type {any} */ ds) => ({ label: ds.label, color: ds.backgroundColor, val: ds.data[dataIndex] || 0 }))
-      .filter((/** @type {{ val: number }} */ e) => e.val > 0)
-      .sort((/** @type {{ val: number }} */ a, /** @type {{ val: number }} */ b) => b.val - a.val)
-      .map((/** @type {{ label: string, color: string, val: number }} */ e) => {
+      .map((/** @type {any} */ ds) => ({ label: ds.label, color: ds.backgroundColor, value: ds.data[dataIndex] || 0 }))
+      .filter((/** @type {{ value: number }} */ e) => e.value > 0)
+      .sort((/** @type {{ value: number }} */ a, /** @type {{ value: number }} */ b) => b.value - a.value)
+      .map((/** @type {{ label: string, color: string, value: number }} */ e) => {
         // The same notation as in the bar and the table: "12,3%" and "1 234", not "12.3%".
-        const pct = total ? dec((e.val / total) * 100, 1) : dec(0, 1);
+        const percentText = total ? formatDecimal((e.value / total) * 100, 1) : formatDecimal(0, 1);
         return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
           <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${e.color};flex-shrink:0"></span>
           <span style="flex:1">${e.label}</span>
-          <span style="color:#a0a09a;margin-left:8px">${num(e.val)}</span>
-          <span style="color:#3987e5;min-width:48px;text-align:right">${pct}%</span>
+          <span style="color:#a0a09a;margin-left:8px">${formatNumber(e.value)}</span>
+          <span style="color:#3987e5;min-width:48px;text-align:right">${percentText}%</span>
         </div>`;
       })
       .join("");
@@ -420,7 +420,7 @@ function setupView() {
     node.innerHTML = `
       <div style="font-weight:700;margin-bottom:6px;color:#3987e5">Level ${level}</div>
       ${rows}
-      <div style="border-top:1px solid #35353b;margin-top:6px;padding-top:6px;color:#a0a09a">Razem: <b style="color:#f2f2ef">${num(total)}</b></div>
+      <div style="border-top:1px solid #35353b;margin-top:6px;padding-top:6px;color:#a0a09a">Razem: <b style="color:#f2f2ef">${formatNumber(total)}</b></div>
     `;
 
     const pos = chart.canvas.getBoundingClientRect();
@@ -432,7 +432,7 @@ function setupView() {
     if (y + node.offsetHeight > window.innerHeight - 8) y = window.innerHeight - node.offsetHeight - 8;
     // The filter bar is sticky and has a higher z-index than the tooltip, so the upper
     // clamp has to end below it rather than 8 px from the window's edge.
-    const barBottom = el("filterBar").getBoundingClientRect().bottom || 0;
+    const barBottom = getElement("filterBar").getBoundingClientRect().bottom || 0;
     if (y < barBottom + 8) y = barBottom + 8;
 
     node.style.left = `${x}px`;
@@ -447,16 +447,16 @@ function setupView() {
     const datasets = getProfessionEntries().map(([id, name]) => ({
       label: name,
       data: labels.map((level) => counts.get(level)?.[id - 1] || 0),
-      backgroundColor: PROF_COLORS[id],
+      backgroundColor: PROFESSION_COLORS[id],
       barPercentage: 1.0,
       categoryPercentage: 1.0,
     }));
 
-    el("chartEmpty").hidden = labels.length > 0;
-    el("professionChart").hidden = labels.length === 0;
+    getElement("chartEmpty").hidden = labels.length > 0;
+    getElement("professionChart").hidden = labels.length === 0;
 
     if (!charts.professionChart) {
-      charts.professionChart = new Chart(el("professionChart"), {
+      charts.professionChart = new Chart(getElement("professionChart"), {
         type: "bar",
         data: { labels, datasets },
         options: levelChartOptions(),
@@ -495,7 +495,7 @@ function setupView() {
               // The UTC hour, because it is what explains the jumps in "last online".
               return `${formatSnapshotDate(entry)} (${formatUtcTime(entry.startedAt)} UTC)`;
             },
-            label: (/** @type {any} */ item) => `${item.dataset.label}: ${percent ? `${dec(item.parsed.y)}%` : num(item.parsed.y)}`,
+            label: (/** @type {any} */ item) => `${item.dataset.label}: ${percent ? `${formatDecimal(item.parsed.y)}%` : formatNumber(item.parsed.y)}`,
             footer: (/** @type {any[]} */ items) => (entriesByTime.get(items[0].parsed.x)?.suspect ? "⚠ migawka może być obcięta" : ""),
           },
         },
@@ -503,7 +503,7 @@ function setupView() {
       scales: {
         y: {
           beginAtZero: percent,
-          ticks: { precision: percent ? 1 : 0, callback: (/** @type {number} */ v) => (percent ? `${dec(v)}%` : num(v)) },
+          ticks: { precision: percent ? 1 : 0, callback: (/** @type {number} */ v) => (percent ? `${formatDecimal(v)}%` : formatNumber(v)) },
           grid: { color: "rgba(255, 255, 255, 0.06)" },
         },
         x: {
@@ -553,7 +553,7 @@ function setupView() {
    */
   function drawChart(id, datasets, options) {
     if (!charts[id]) {
-      charts[id] = new Chart(el(id), { type: "line", data: { datasets }, options });
+      charts[id] = new Chart(getElement(id), { type: "line", data: { datasets }, options });
       return;
     }
     charts[id].data.datasets = datasets;
@@ -637,8 +637,8 @@ function setupView() {
           return {
             label: name,
             data: series(trend, share ? getShareSeries(values, population) : values),
-            borderColor: PROF_COLORS[id],
-            backgroundColor: PROF_COLORS[id],
+            borderColor: PROFESSION_COLORS[id],
+            backgroundColor: PROFESSION_COLORS[id],
             tension: 0.15,
             pointRadius: 3,
             pointHoverRadius: 6,
@@ -682,7 +682,7 @@ function setupView() {
    */
   function renderChips(filters) {
     const chips = describeFilters(filters);
-    const box = el("filterChips");
+    const box = getElement("filterChips");
     // The chips are rebuilt on every render, so pressing a close button destroyed the
     // element that held focus — focus fell back to `<body>` and two filters could not be
     // removed in a row from the keyboard. So we remember where it was.
@@ -698,13 +698,13 @@ function setupView() {
           `<span class="chip" title="${label}">${label}<button type="button" data-clear="${key}" aria-label="Usuń filtr: ${label}">×</button></span>`,
       )
       .join("");
-    el("filtersToggle").textContent = chips.length > 0 ? `Filtry (${chips.length})` : "Filtry";
+    getElement("filtersToggle").textContent = chips.length > 0 ? `Filtry (${chips.length})` : "Filtry";
 
     if (hadFocus === null) return;
     const buttons = [...box.querySelectorAll("button")];
     // The same chip if it survived; otherwise the first one left; and when the last one is
     // gone — the button the chips grow out from.
-    const next = buttons.find((b) => b.dataset?.clear === hadFocus) ?? buttons[0] ?? el("filtersToggle");
+    const next = buttons.find((b) => b.dataset?.clear === hadFocus) ?? buttons[0] ?? getElement("filtersToggle");
     next.focus?.();
   }
 
@@ -715,13 +715,13 @@ function setupView() {
     // Closing hides the drawer with `display: none`. If focus were inside, the browser
     // would drop it onto `<body>` and the next Tab would start from the top of the
     // document — so we hand it to the button that opens the drawer.
-    const fields = el("filterFields");
+    const fields = getElement("filterFields");
     const active = typeof document !== "undefined" ? document.activeElement : null;
     const focusWasInside = !open && active && fields.contains?.(active);
 
     fields.hidden = !open;
-    el("filtersToggle").setAttribute("aria-expanded", String(open));
-    if (focusWasInside) el("filtersToggle").focus?.();
+    getElement("filtersToggle").setAttribute("aria-expanded", String(open));
+    if (focusWasInside) getElement("filtersToggle").focus?.();
   }
 
   /**
@@ -730,10 +730,10 @@ function setupView() {
    */
   function renderMatchLine(matched, population) {
     const share = population > 0 ? (matched / population) * 100 : 0;
-    el("matchLine").innerHTML =
-      `<span>Pasuje: <b>${num(matched)}</b></span>` +
-      `<span>z ${num(population)}<span class="wide-only"> w tej migawce</span></span>` +
-      `<span>(${dec(share, 1)}%)</span>`;
+    getElement("matchLine").innerHTML =
+      `<span>Pasuje: <b>${formatNumber(matched)}</b></span>` +
+      `<span>z ${formatNumber(population)}<span class="wide-only"> w tej migawce</span></span>` +
+      `<span>(${formatDecimal(share, 1)}%)</span>`;
   }
 
   /**
@@ -749,7 +749,7 @@ function setupView() {
     // buckets printed as "0" read like broken data, not like the answer "nobody isMatch".
     // The same principle as `getVisibleActivityBuckets`.
     if (perProfession.every((n) => n === 0)) {
-      el("stats").innerHTML =
+      getElement("stats").innerHTML =
         `<div class="stats-line">Żaden gracz w tej migawce nie spełnia filtrów — rozkładu nie ma z czego złożyć.</div>`;
       return;
     }
@@ -761,13 +761,13 @@ function setupView() {
       .filter(([id]) => professions.has(id))
       .map(([id, name]) => ({
         name,
-        color: PROF_COLORS[id],
+        color: PROFESSION_COLORS[id],
         count: assertDefined(perProfession[id - 1], `profession ${id} has a count`),
       }))
       .sort((a, b) => b.count - a.count)
       .map(
         ({ name, color, count }) =>
-          `<span style="color:${color};white-space:nowrap">${name}: <b>${num(count)}</b></span>`,
+          `<span style="color:${color};white-space:nowrap">${name}: <b>${formatNumber(count)}</b></span>`,
       )
       .join(" · ");
 
@@ -776,11 +776,11 @@ function setupView() {
       .filter((/** @type {[number, number]} */ [bucket]) => visible.has(bucket))
       .map(
         (/** @type {[number, number]} */ [bucket, count]) =>
-          `<span>${getActivityLabel(bucket, maxDays)}: <b style="color:var(--text)">${num(count)}</b></span>`,
+          `<span>${getActivityLabel(bucket, maxDays)}: <b style="color:var(--text)">${formatNumber(count)}</b></span>`,
       )
       .join(" · ");
 
-    el("stats").innerHTML = `
+    getElement("stats").innerHTML = `
       <div class="stats-line">${badges}</div>
       <div class="stats-line" style="margin-top:8px">${activityLine}</div>
     `;
@@ -795,7 +795,7 @@ function setupView() {
    * @param {{ reason: string } | null | undefined} suspect written by the scraper, in Polish, for a player — §9.8
    */
   function showSuspect(suspect) {
-    const node = el("suspect");
+    const node = getElement("suspect");
     if (!suspect) {
       node.hidden = true;
       node.textContent = "";
@@ -812,7 +812,7 @@ function setupView() {
   function renderSummary(trend, base) {
     const s = summarize(trend);
     if (!s) {
-      el("summary").textContent = "—";
+      getElement("summary").textContent = "—";
       return;
     }
     const color = s.delta < 0 ? "#e66767" : s.delta > 0 ? "#199e70" : "var(--muted)";
@@ -824,11 +824,11 @@ function setupView() {
         ? "pierwszej migawki"
         : formatShortDate(assertDefined(getMillisecondsFromIsoText(trend.startedAt[0]), "a drawn snapshot has a readable startedAt"));
 
-    el("summary").innerHTML = `
-      <div style="margin-bottom:6px">Ostatnia migawka: <b style="color:var(--text)">${num(s.total)}</b></div>
+    getElement("summary").innerHTML = `
+      <div style="margin-bottom:6px">Ostatnia migawka: <b style="color:var(--text)">${formatNumber(s.total)}</b></div>
       <div class="stats-line">
         <span>Zmiana od ${from}: <b style="color:${color}">${signed(s.delta)}</b>
-          <span style="color:${color}">(${signed(s.percent, dec)}%)</span></span>
+          <span style="color:${color}">(${signed(s.percent, formatDecimal)}%)</span></span>
         <span>Migawek: <b style="color:var(--text)">${s.snapshots}</b></span>
         <span>Okres: <b style="color:var(--text)">${span}</b></span>
       </div>
@@ -845,9 +845,9 @@ function setupView() {
     // caught the tab key (`tabindex="0"`) and was still announced as the region "Zmiany
     // populacji między migawkami", only with no content. The `#singlePoint` note above
     // already says why there is no table, so the card is to disappear entirely.
-    el("changeTable").hidden = rows.length === 0;
+    getElement("changeTable").hidden = rows.length === 0;
     if (rows.length === 0) {
-      el("changeTable").innerHTML = "";
+      getElement("changeTable").innerHTML = "";
       return;
     }
 
@@ -856,17 +856,17 @@ function setupView() {
         const color = delta < 0 ? "#e66767" : delta > 0 ? "#199e70" : "var(--muted)";
         return `<tr>
           <td>${formatSnapshotDate(entry ?? null)}${entry?.suspect ? ' <span title="migawka może być obcięta" style="color:#c98500">⚠</span>' : ""}</td>
-          <td class="num">${days === null ? "—" : dec(days)}</td>
-          <td class="num">${num(total)}</td>
-          <td class="num" style="color:${color}">${signed(delta)}</td>
-          <td class="num" style="color:${color}">${perDay === null ? "—" : signed(perDay, dec)}</td>
+          <td class="number">${days === null ? "—" : formatDecimal(days)}</td>
+          <td class="number">${formatNumber(total)}</td>
+          <td class="number" style="color:${color}">${signed(delta)}</td>
+          <td class="number" style="color:${color}">${perDay === null ? "—" : signed(perDay, formatDecimal)}</td>
         </tr>`;
       })
       .join("");
 
-    el("changeTable").innerHTML = `
+    getElement("changeTable").innerHTML = `
       <table>
-        <thead><tr><th>Migawka</th><th class="num">Odstęp (dni)</th><th class="num">Populacja</th><th class="num">Zmiana</th><th class="num">Na dobę</th></tr></thead>
+        <thead><tr><th>Migawka</th><th class="number">Odstęp (dni)</th><th class="number">Populacja</th><th class="number">Zmiana</th><th class="number">Na dobę</th></tr></thead>
         <tbody>${body}</tbody>
       </table>
     `;
@@ -892,17 +892,17 @@ function setupView() {
 
     if (keys !== thresholdKeys) {
       thresholdKeys = keys;
-      el("thresholdSelect").innerHTML = usable.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
+      getElement("thresholdSelect").innerHTML = usable.map((t) => `<option value="${t.key}">${t.label}</option>`).join("");
     }
     const chosen = getThresholdByKey(wanted, maxDays);
     if (chosen) field("thresholdSelect").value = chosen.key;
 
     field("thresholdSelect").disabled = usable.length === 0;
-    el("actChartBox").hidden = usable.length === 0;
-    el("thresholdNote").hidden = usable.length === getUsableThresholds(Infinity).length;
-    if (!el("thresholdNote").hidden) {
-      const limit = `≤ ${maxDays === 0 ? "< 24h" : `${num(maxDays)} dni`}`;
-      el("thresholdNote").innerHTML =
+    getElement("actChartBox").hidden = usable.length === 0;
+    getElement("thresholdNote").hidden = usable.length === getUsableThresholds(Infinity).length;
+    if (!getElement("thresholdNote").hidden) {
+      const limit = `≤ ${maxDays === 0 ? "< 24h" : `${formatNumber(maxDays)} dni`}`;
+      getElement("thresholdNote").innerHTML =
         `<span aria-hidden="true">ℹ</span><span><b>Filtr aktywności zawęził progi.</b> ` +
         (usable.length === 0
           ? `Każdy próg jest szerszy niż filtr (${limit}), więc wykres aktywnych rysowałby tę samą linię co wykres pasujących — ukryty.`
@@ -926,7 +926,7 @@ function setupView() {
    * @param {number} available
    */
   function renderHistoryStatus(loaded, expected, available) {
-    const node = el("historyStatus");
+    const node = getElement("historyStatus");
     if (available === 0) {
       node.textContent = "brak datowanych migawek";
       return;
@@ -964,15 +964,15 @@ function setupView() {
    */
   function renderBudgetNote(expected, available, bytes) {
     const missing = available - expected;
-    el("budgetNote").hidden = missing <= 0;
+    getElement("budgetNote").hidden = missing <= 0;
     if (missing <= 0) return;
 
     const rest = bytes > 0 ? ` (+${formatBytes(missing * bytes)})` : "";
-    el("budgetNoteText").innerHTML =
-      `<b>Historia pod filtrem sięga ${num(expected)} najnowszych migawek z ${num(available)}.</b> ` +
+    getElement("budgetNoteText").innerHTML =
+      `<b>Historia pod filtrem sięga ${formatNumber(expected)} najnowszych migawek z ${formatNumber(available)}.</b> ` +
       `Dokładne liczenie wymaga pobrania każdej migawki osobno, więc bierzemy tyle, ile mieści się ` +
       `w ${formatBytes(HISTORY_BUDGET_BYTES)} — reszta czeka na kliknięcie. Wykresy bez filtra pokazują całość.`;
-    el("loadRestBtn").textContent = `Dociągnij resztę historii${rest}`;
+    getElement("loadRestBtn").textContent = `Dociągnij resztę historii${rest}`;
   }
 
   // ── Rendering ─────────────────────────────────────────────────────────────
@@ -994,8 +994,8 @@ function setupView() {
     // Hidden for the same reason as with a single snapshot: an empty card with a border is
     // a visible empty box and a dead tab stop. `renderTable` will bring it back once it has
     // something to show.
-    el("changeTable").hidden = true;
-    el("changeTable").innerHTML = "";
+    getElement("changeTable").hidden = true;
+    getElement("changeTable").innerHTML = "";
   }
 
   /**
@@ -1005,8 +1005,8 @@ function setupView() {
     const data = currentSnapshot();
     const base = baseTrend();
     if (!data) {
-      el("stats").textContent = "Ładowanie…";
-      el("matchLine").textContent = "Ładowanie…";
+      getElement("stats").textContent = "Ładowanie…";
+      getElement("matchLine").textContent = "Ładowanie…";
       // The histogram is from the previous snapshot too, until the new one arrives.
       if (charts.professionChart) {
         charts.professionChart.data.labels = [];
@@ -1034,8 +1034,8 @@ function setupView() {
   function renderHistory(filters) {
     const base = baseTrend();
     if (!base) {
-      el("historyStatus").textContent = "brak historii dla tego świata";
-      el("summary").textContent = "—";
+      getElement("historyStatus").textContent = "brak historii dla tego świata";
+      getElement("summary").textContent = "—";
       clearHistoryCharts();
       return;
     }
@@ -1054,10 +1054,10 @@ function setupView() {
     // The note hangs on how much is genuinely missing — not on whether anything is still in
     // flight. Otherwise a failed fetch made it disappear, leaving an incomplete chart with
     // nothing said about it.
-    el("partialNote").hidden = loaded >= expected;
-    if (!el("partialNote").hidden) {
+    getElement("partialNote").hidden = loaded >= expected;
+    if (!getElement("partialNote").hidden) {
       const stalled = !progress.running;
-      el("partialNote").innerHTML =
+      getElement("partialNote").innerHTML =
         `<span aria-hidden="true">${stalled ? "⚠" : "⏳"}</span><span><b>` +
         (stalled ? "Historia jest niepełna." : "Historia dopełnia się w tle.") +
         `</b> Narysowane są tylko migawki już wczytane ` +
@@ -1071,12 +1071,12 @@ function setupView() {
     const share = field("modeSelect").value === "udzial";
 
     // One point is a valid state, not an error — luvia joined in the last round.
-    el("singlePoint").hidden = trend.id.length !== 1 || expected !== 1;
-    el("suspectNote").hidden = !trend.suspect.some((s) => s === 1);
-    el("onlineNote").hidden = usable.length === 0;
+    getElement("singlePoint").hidden = trend.id.length !== 1 || expected !== 1;
+    getElement("suspectNote").hidden = !trend.suspect.some((s) => s === 1);
+    getElement("onlineNote").hidden = usable.length === 0;
 
     if (trend.id.length === 0) {
-      el("summary").textContent = "—";
+      getElement("summary").textContent = "—";
       clearHistoryCharts();
       return;
     }
@@ -1149,12 +1149,12 @@ function setupView() {
     const world = currentWorld();
     const store = getCachedSnapshots(world);
 
-    el("sourceInfo").textContent = entry.filters;
-    el("snapshotMeta").textContent = formatSnapshotDate(entry);
+    getElement("sourceInfo").textContent = entry.filters;
+    getElement("snapshotMeta").textContent = formatSnapshotDate(entry);
 
     // The previous snapshot's error does not describe this one — cleared on both paths,
     // including when the data is already in memory and nothing is fetched.
-    el("error").textContent = "";
+    getElement("error").textContent = "";
 
     const held = store.get(entry.id);
     if (held) {
@@ -1163,7 +1163,7 @@ function setupView() {
       return;
     }
 
-    el("stats").textContent = "Ładowanie…";
+    getElement("stats").textContent = "Ładowanie…";
     showSuspect(null);
 
     try {
@@ -1179,11 +1179,11 @@ function setupView() {
       // The same guard as on success: a rejected abandoned request must not wipe out a
       // correctly rendered cross-section of another snapshot.
       if (token !== snapshotToken) return;
-      el("error").textContent = describeFailure(e, "migawki przekroju");
-      el("stats").textContent = "—";
+      getElement("error").textContent = describeFailure(e, "migawki przekroju");
+      getElement("stats").textContent = "—";
       // Without this the bar stayed on the previous snapshot's numbers or on "Ładowanie…",
       // i.e. a result with nothing behind it stood next to a red error.
-      el("matchLine").textContent = "—";
+      getElement("matchLine").textContent = "—";
     }
   }
 
@@ -1242,7 +1242,7 @@ function setupView() {
    * @param {string | null} [selected] the world to keep chosen, where one is to be kept
    */
   function fillWorldSelect(selected) {
-    el("worldSelect").innerHTML = getWorlds()
+    getElement("worldSelect").innerHTML = getWorlds()
       .map((w) => `<option value="${w.name}">${capitalize(w.name)}</option>`)
       .join("");
     if (selected && getWorlds().some((w) => w.name === selected)) field("worldSelect").value = selected;
@@ -1253,7 +1253,7 @@ function setupView() {
    */
   function fillSnapshotSelect(selected) {
     const files = [...currentWorldEntries()].reverse(); // the newest at the top
-    el("snapshotSelect").innerHTML = files
+    getElement("snapshotSelect").innerHTML = files
       .map((f) => `<option value="${f.id}">${formatSnapshotDate(f)}</option>`)
       .join("");
     if (selected && files.some((f) => f.id === selected)) field("snapshotSelect").value = selected;
@@ -1311,18 +1311,18 @@ function setupView() {
       // waiting for a mouse move.
       await selectAndLoad();
     } catch (e) {
-      el("error").textContent = describeFailure(e, "indeksu migawek");
-      el("stats").textContent = "—";
-      el("matchLine").textContent = "—";
+      getElement("error").textContent = describeFailure(e, "indeksu migawek");
+      getElement("stats").textContent = "—";
+      getElement("matchLine").textContent = "—";
       // `#summary` stayed on "Ładowanie…" forever — so a line promising data that will
       // never arrive stood next to the error message.
-      el("summary").textContent = "—";
+      getElement("summary").textContent = "—";
     }
   }
 
   // ── Events ────────────────────────────────────────────────────────────────
 
-  el("worldSelect").addEventListener("change", async () => {
+  getElement("worldSelect").addEventListener("change", async () => {
     worldToken += 1; // abandons the previous world's history
     progress = { loaded: 0, expected: 0, failed: 0, running: false };
     // The charts are cleared at once, synchronously. The first render of a new world comes
@@ -1330,25 +1330,25 @@ function setupView() {
     // under the new heading for a few hundred milliseconds — with tooltips showing those
     // dates.
     clearHistoryCharts();
-    el("historyStatus").textContent = "—";
+    getElement("historyStatus").textContent = "—";
     fillSnapshotSelect();
     await selectAndLoad();
   });
-  el("snapshotSelect").addEventListener("change", selectAndLoad);
+  getElement("snapshotSelect").addEventListener("change", selectAndLoad);
 
-  el("onlinePreset").addEventListener("change", () => {
+  getElement("onlinePreset").addEventListener("change", () => {
     const value = field("onlinePreset").value;
     field("onlineValue").value = value === "all" ? "" : value;
     renderNow();
   });
 
   for (const id of ["minLevel", "maxLevel", "minHonor", "maxHonor", "onlineValue"]) {
-    el(id).addEventListener("input", scheduleRender);
+    getElement(id).addEventListener("input", scheduleRender);
   }
-  el("profCheckboxes").addEventListener("change", scheduleRender);
+  getElement("profCheckboxes").addEventListener("change", scheduleRender);
 
   for (const id of ["thresholdSelect", "modeSelect"]) {
-    el(id).addEventListener("change", renderNow);
+    getElement(id).addEventListener("change", renderNow);
   }
 
   // Literals, not a loop over an array: the test "every element fetched has its node in the
@@ -1358,12 +1358,12 @@ function setupView() {
     resetFilters();
     renderNow();
   };
-  el("resetBtn").addEventListener("click", resetAndRender);
-  el("emptyResetBtn").addEventListener("click", resetAndRender);
+  getElement("resetBtn").addEventListener("click", resetAndRender);
+  getElement("emptyResetBtn").addEventListener("click", resetAndRender);
 
   // Lifting the budget is the one place where megabytes are bought on purpose, so it is a
   // press of a button and nothing else — no filter change, no reload.
-  el("loadRestBtn").addEventListener("click", () => {
+  getElement("loadRestBtn").addEventListener("click", () => {
     lifted.add(currentWorld());
     renderNow();
   });
@@ -1371,22 +1371,22 @@ function setupView() {
   // The bar's listeners are registered LAST. `test/dom-smoke.ts` calls a node's
   // first-registered listener (`handlers[0]`), so pushing anything ahead of the existing
   // bindings would change what the test actually runs.
-  el("filtersToggle").addEventListener("click", (event) => {
+  getElement("filtersToggle").addEventListener("click", (event) => {
     event.stopPropagation?.();
-    setFieldsOpen(el("filterFields").hidden);
+    setFieldsOpen(getElement("filterFields").hidden);
   });
 
   // The drawer closes like any other: Escape, or a click outside it. Without that it covers
   // the charts and the only way out is hitting the same button again.
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !el("filterFields").hidden) setFieldsOpen(false);
+    if (event.key === "Escape" && !getElement("filterFields").hidden) setFieldsOpen(false);
   });
   document.addEventListener("click", (event) => {
-    if (el("filterFields").hidden) return;
-    if (!el("filterBar").contains?.(/** @type {Node | null} */ (event.target))) setFieldsOpen(false);
+    if (getElement("filterFields").hidden) return;
+    if (!getElement("filterBar").contains?.(/** @type {Node | null} */ (event.target))) setFieldsOpen(false);
   });
 
-  el("filterChips").addEventListener("click", (event) => {
+  getElement("filterChips").addEventListener("click", (event) => {
     const key = /** @type {HTMLElement | null} */ (event.target)?.dataset?.clear;
     if (key) clearFilterGroup(key);
   });

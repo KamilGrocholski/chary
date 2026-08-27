@@ -8,7 +8,7 @@
 //
 // The strings below are Polish because a player reads them — see "Language" in AGENTS.md.
 
-import { PROF, getActivityBucket, isNeverOnline } from "./shared.js";
+import { PROFESSION_NAMES, getActivityBucket, isNeverOnline } from "./shared.js";
 import { getFiniteNumberFromText, getIntegerFromText } from "./lib/number.js";
 import { assertDefined } from "./lib/assert.js";
 
@@ -134,7 +134,7 @@ export function describeFilters(f) {
   if (f.professions.size !== 6) {
     const names = [...f.professions]
       .sort((a, b) => a - b)
-      .map((p) => assertDefined(PROF[/** @type {1|2|3|4|5|6} */ (p)], `profession ${p} has a name`));
+      .map((p) => assertDefined(PROFESSION_NAMES[/** @type {1|2|3|4|5|6} */ (p)], `profession ${p} has a name`));
     chips.push({
       key: "prof",
       // Past two names the label pushes the bar beyond one line, and nobody reads it whole
@@ -299,7 +299,7 @@ export function readFiltersFromParams(params) {
   // A query string is text a stranger can write, so every reading may fail and every
   // failure falls back to the default rather than to a number nobody typed: `Number("")`
   // is 0, which would read as a deliberate "minimum level 0".
-  const num = (/** @type {string} */ key, /** @type {number} */ fallback) => {
+  const getNumberFromParam = (/** @type {string} */ key, /** @type {number} */ fallback) => {
     const raw = params.get(key);
     if (raw === null || raw === "") return fallback;
     return getFiniteNumberFromText(raw.trim()) ?? fallback;
@@ -313,12 +313,12 @@ export function readFiltersFromParams(params) {
     return profession !== null && profession >= 1 && profession <= 6 ? [profession] : [];
   });
 
-  const maxDays = num("maxDays", Infinity);
+  const maxDays = getNumberFromParam("maxDays", Infinity);
   return {
-    minLevel: num("minLevel", -Infinity),
-    maxLevel: num("maxLevel", Infinity),
-    minHonor: num("minHonor", -Infinity),
-    maxHonor: num("maxHonor", Infinity),
+    minLevel: getNumberFromParam("minLevel", -Infinity),
+    maxLevel: getNumberFromParam("maxLevel", Infinity),
+    minHonor: getNumberFromParam("minHonor", -Infinity),
+    maxHonor: getNumberFromParam("maxHonor", Infinity),
     // A negative day threshold means nothing — we treat it as no filter rather than
     // silently showing an empty page.
     maxDays: maxDays < 0 ? Infinity : maxDays,

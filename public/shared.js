@@ -73,7 +73,7 @@ import { assertDefined } from "./lib/assert.js";
  */
 
 /** @type {Record<number, string>} */
-export const PROF = {
+export const PROFESSION_NAMES = {
   1: "Wojownik",
   2: "Mag",
   3: "Paladyn",
@@ -84,7 +84,7 @@ export const PROF = {
 
 // margometer's series palette (validated for contrast/CVD on a dark background).
 /** @type {Record<number, string>} */
-export const PROF_COLORS = {
+export const PROFESSION_COLORS = {
   1: "#3987e5", // Wojownik — blue
   2: "#d55181", // Mag — magenta
   3: "#199e70", // Paladyn — aquamarine
@@ -147,14 +147,14 @@ export function getActivityBucket(days) {
 /**
  * The professions as `[id, name]` pairs, with the id a **number**.
  *
- * `Object.entries` stringifies every key, so `PROF` read that way hands back "1" where
+ * `Object.entries` stringifies every key, so `PROFESSION_NAMES` read that way hands back "1" where
  * the rest of the code has a `Set<number>` and does `id - 1`. Converting at each of the
  * six call sites is six chances to forget; converting here is one.
  *
  * @returns {[number, string][]}
  */
 export function getProfessionEntries() {
-  return Object.entries(PROF).map(([id, name]) => [
+  return Object.entries(PROFESSION_NAMES).map(([id, name]) => [
     assertDefined(getIntegerFromText(id), `a profession key is a whole number, got "${id}"`),
     name,
   ]);

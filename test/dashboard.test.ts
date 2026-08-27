@@ -249,8 +249,8 @@ const historyJs = await Bun.file(path.join(PUBLIC_DIR, "history.js")).text();
 const trendsHtml = await Bun.file(path.join(PUBLIC_DIR, "trends.html")).text();
 
 describe("app.js agrees with index.html", () => {
-  test("every element fetched through el() exists in the markup", () => {
-    const ids = [...js.matchAll(/\bel\("([^"]+)"\)/g)].map((m) => m[1]);
+  test("every element fetched through getElement() exists in the markup", () => {
+    const ids = [...js.matchAll(/\bgetElement\("([^"]+)"\)/g)].map((m) => m[1]);
     expect(ids.length).toBeGreaterThan(10);
     for (const id of new Set(ids)) {
       expect(html).toContain(`id="${id}"`);
@@ -321,8 +321,8 @@ describe("app.js asks index.html for the right kind of node", () => {
     expect(offenders.sort()).toEqual([]);
   });
 
-  test("el() is not used for a value — that is what the split is for", () => {
-    expect(stripComments(js)).not.toMatch(/\bel\([^)]*\)\.(value|checked|disabled)\b/);
+  test("getElement() is not used for a value — that is what the split is for", () => {
+    expect(stripComments(js)).not.toMatch(/\bgetElement\([^)]*\)\.(value|checked|disabled)\b/);
   });
 });
 

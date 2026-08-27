@@ -60,7 +60,7 @@ function readLegacySnapshot(value: unknown): LegacySnapshot | null {
 const args = process.argv.slice(2);
 const keepLegacy = args.includes("--keep-legacy");
 
-function mb(bytes: number) {
+function formatMegabytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
@@ -122,7 +122,7 @@ const manifest = await rebuildManifest();
 const { trends, skipped } = await rebuildTrends();
 
 if (migrated > 0) {
-  process.stdout.write(`\nMigrated ${migrated} snapshots: ${mb(before)} → ${mb(after)}\n`);
+  process.stdout.write(`\nMigrated ${migrated} snapshots: ${formatMegabytes(before)} → ${formatMegabytes(after)}\n`);
 } else {
   process.stdout.write(`\nNothing to migrate — every snapshot is already split.\n`);
 }
