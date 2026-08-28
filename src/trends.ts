@@ -129,7 +129,7 @@ export function buildWorldTrend(snapshots: { id: string; filters: FilterFile }[]
  * an aggregate silently missing a world. Checking the columns is cheap next to the pass
  * over their contents that follows.
  *
- * Exported at its second consumer and not before (§7.1): `tools/data-status.ts` reports
+ * Exported at its second consumer and not before (§7.1): `src/data-status.ts` reports
  * `overlapRows` off the same files, and a status tool that read them its own way would be
  * a second answer to "is this a snapshot" for the guards to hold together.
  */

@@ -51,7 +51,7 @@ const SPEAKS_POLISH: Array<{ file: string; phrase?: string }> = [
 
 // Every directory holding a source of ours. A new one that is not here is a whole layer
 // the boundary stops being checked over, which is why the first test below counts.
-const SCANNED = ["src/**/*.ts", "web/*.ts", "test/*.ts", "tools/*.ts"];
+const SCANNED = ["src/**/*.ts", "web/*.ts", "test/*.ts"];
 
 const sources = new Map<string, string>();
 for (const pattern of SCANNED) {

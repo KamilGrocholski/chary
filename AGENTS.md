@@ -8,8 +8,7 @@ usually a measurement or a trap somebody already fell into. Longer reasoning liv
 docblock of the file it concerns, or in `docs/`. What never belongs here is a number
 describing the tree or the data as it stands today — §5.
 
-**The section numbers are addresses.** Comments across `src/`, `web/`, `tools/` and
-`test/` cite them, so a number is never reused and a removed section leaves its number
+**The section numbers are addresses.** Comments across `src/`, `web/` and `test/` cite them, so a number is never reused and a removed section leaves its number
 unused rather than shifting its neighbours.
 
 ---
@@ -37,7 +36,7 @@ bottom layer both sides read and `src/shared.ts` the vocabulary of the data. `we
 dashboard, built into `public/`: `app.ts` the wiring, `controls.ts` the form, `charts.ts` and
 `panels.ts` the drawing, `dom.ts` the document, `filters.ts`/`history.ts` the counting.
 `public/` is what Pages serves: the markup, `vendor/`, `worlds/` — and `app.js`, which is
-output. `tools/` ships nowhere. `test/` sits beside what it tests. `docs/` holds dated specs
+output. `test/` sits beside what it tests. `docs/` holds dated specs
 and audits, indexed by `docs/README.md`. Why a file is the way it is lives in its own docblock;
 what is in `public/` right now is `bun run data:status`, never prose (§5).
 
@@ -142,7 +141,7 @@ bun run serve                        # builds, then http://localhost:3000
 bun run data:status                  # what is in public/ right now — §5
 ```
 
-A tool arrives with the question it answers (§7.1). `tools/data-status.ts` answers *what is
+A command arrives with the question it answers (§7.1). `src/data-status.ts` answers *what is
 in `public/` right now?* — snapshots, rounds, the artefact against the Pages limit, what one
 snapshot costs a visitor. The figures §5 keeps out of prose.
 
@@ -301,8 +300,6 @@ guard that kept it true cost more than the block was worth — `docs/2026-08-28-
   take what they need as arguments and decide nothing: `controls.ts` answers *what is in the form
   right now*, `panels.ts` prints one node each, `charts.ts` owns the Chart.js instances and the
   time axis, because those outlive a single render.
-- `[ALWAYS]` **A tool may read anything.** It ships nowhere — and a report about what the
-  dashboard costs is only true if it reads the same material the dashboard reads.
 - `[ALWAYS]` **`public/app.js` is output, never a source.** It is gitignored and rebuilt; a rule
   or a test read over it would be read over a transformation of what it means to hold.
 - `[ALWAYS]` **A file holds one subject, however long that subject runs.** What forces a split
@@ -451,8 +448,8 @@ callers never match on message text.
   of ours and answered `null`, which reads as "a world with no history".
 - `[ALWAYS]` **Pass the original in `cause` when wrapping.**
 - `[ALWAYS]` **An expected failure in the dashboard is DATA**, not an exception that propagates:
-  it becomes something the view can draw — §9.6. In `src/` and `tools/` throwing loudly is
-  correct, because the caller is a person at a terminal. **A rejected row is data too**: the
+  it becomes something the view can draw — §9.6. In `src/` throwing loudly is correct,
+  because the caller is a person at a terminal. **A rejected row is data too**: the
   parser collects rejections with reasons and the caller decides on the threshold, which is why
   one strange row cannot take down a world and why a changed table layout still can.
 
@@ -462,7 +459,7 @@ handled; a broken invariant cannot be, so it gets neither a code nor a hierarchy
 
 - `[ALWAYS]` `assert` / `assertDefined` for what must never happen, never for a failure you know
   can occur — that is an error class. The message names the **invariant**, not the condition.
-- `[NEVER]` **`!` in `src/`, `web/` or `tools/`.** Use `assertDefined` — but first ask whether
+- `[NEVER]` **`!` in `src/` or `web/`.** Use `assertDefined` — but first ask whether
   the type can be made precise; an assert over a type that could have been exact is covering for
   a loose type. Tests keep `!`.
 
@@ -471,7 +468,7 @@ handled; a broken invariant cannot be, so it gets neither a code nor a hierarchy
 | Where the value came from | Mechanism | Why |
 |---|---|---|
 | **Inside** — our own regex or invariant guarantees it | `assert` / `assertDefined` | Nobody can handle it; a break means the program is wrong. |
-| **Outside, in `src/` or `tools/`** — a snapshot file, a ranking page | a branded subclass with a `code`, thrown | A terminal command refuses bad material loudly. |
+| **Outside, in `src/`** — a snapshot file, a ranking page | a branded subclass with a `code`, thrown | A terminal command refuses bad material loudly. |
 | **Outside, in the dashboard** — a fetched file, a URL parameter | **data**: `null` → an explicit unknown → something drawn | An exception here blanks the page. |
 | A default that makes the number look right | **never** | `0` is a measurement. |
 

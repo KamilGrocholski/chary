@@ -15,7 +15,7 @@
     "scrape:check": "bun src/world-scraper.ts --dry-run",
     "rebuild": "bun src/rebuild-data.ts",
     "serve": "bun run build && bun src/server.ts",
-    "data:status": "bun tools/data-status.ts",
+    "data:status": "bun src/data-status.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

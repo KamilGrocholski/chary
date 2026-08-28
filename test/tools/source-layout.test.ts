@@ -10,7 +10,7 @@ import { stripComments } from "@/test/source-text.ts";
 // spell it, and so does the assertion in this file.
 
 /** The sources of this repository. Data, fixtures and the vendored library are not ours. */
-const SOURCE_GLOBS = ["src/**/*.ts", "web/**/*.ts", "tools/**/*.ts", "test/**/*.ts"];
+const SOURCE_GLOBS = ["src/**/*.ts", "web/**/*.ts", "test/**/*.ts"];
 
 const sources = new Map<string, string>();
 for (const pattern of SOURCE_GLOBS) {
@@ -116,7 +116,7 @@ const shipped = [...sources].filter(([file]) => !isTest(file));
 
 describe("the scan", () => {
   test("reaches every directory the rules below claim to cover", () => {
-    for (const prefix of ["src/", "src/lib/", "web/", "tools/", "test/"]) {
+    for (const prefix of ["src/", "src/lib/", "web/", "test/"]) {
       expect([...sources.keys()].some((file) => file.startsWith(prefix))).toBe(true);
     }
     expect([...sources.keys()]).toContain("web/app.ts");

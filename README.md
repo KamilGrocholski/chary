@@ -199,6 +199,7 @@ src/
   rebuild-data.ts    # maintenance: migration + manifest + trends
   worlds.ts          # the list of tracked worlds
   server.ts          # a local static server for previewing
+  data-status.ts     # what is in public/ right now — `bun run data:status`
   scraper-cli.ts     # reading the scraper's arguments (pure, so it can be tested)
   margostat-tool-error.ts  # the base every terminal-side error extends
   shared.ts          # the vocabulary of the data, read by the scraper AND the dashboard
@@ -214,8 +215,6 @@ web/                 # the dashboard, bundled into public/app.js — never shipp
   history.ts         # a world's history: thresholds, series, fetching snapshots (no DOM)
   fetch-json.ts      # the one place `fetch` is spelled; refuses with a code
   margostat-error.ts # the base every browser-side error extends
-tools/
-  data-status.ts     # what is in public/ right now — `bun run data:status`
 test/
   parser.test.ts     # parser tests against a capture of a real page
   snapshot.test.ts   # the snapshot format and migration from the old schemas
