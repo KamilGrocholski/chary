@@ -74,6 +74,12 @@
           "startedAt": "2026-08-26T11:06:25.547Z",
           "filters": "worlds/aether/2026-08-26T11-06-25.f.json",
           "names": "worlds/aether/2026-08-26T11-06-25.n.json"
+        },
+        {
+          "id": "2026-09-01T15-11-46",
+          "startedAt": "2026-09-01T15:11:46.982Z",
+          "filters": "worlds/aether/2026-09-01T15-11-46.f.json",
+          "names": "worlds/aether/2026-09-01T15-11-46.n.json"
         }
       ]
     },
@@ -151,6 +157,12 @@
           "startedAt": "2026-08-26T11:14:46.351Z",
           "filters": "worlds/aldous/2026-08-26T11-14-46.f.json",
           "names": "worlds/aldous/2026-08-26T11-14-46.n.json"
+        },
+        {
+          "id": "2026-09-01T15-20-05",
+          "startedAt": "2026-09-01T15:20:05.874Z",
+          "filters": "worlds/aldous/2026-09-01T15-20-05.f.json",
+          "names": "worlds/aldous/2026-09-01T15-20-05.n.json"
         }
       ]
     },
@@ -228,6 +240,12 @@
           "startedAt": "2026-08-26T11:19:27.956Z",
           "filters": "worlds/berufs/2026-08-26T11-19-27.f.json",
           "names": "worlds/berufs/2026-08-26T11-19-27.n.json"
+        },
+        {
+          "id": "2026-09-01T15-24-26",
+          "startedAt": "2026-09-01T15:24:26.284Z",
+          "filters": "worlds/berufs/2026-09-01T15-24-26.f.json",
+          "names": "worlds/berufs/2026-09-01T15-24-26.n.json"
         }
       ]
     },
@@ -311,6 +329,12 @@
           "startedAt": "2026-08-26T11:22:23.194Z",
           "filters": "worlds/brutal/2026-08-26T11-22-23.f.json",
           "names": "worlds/brutal/2026-08-26T11-22-23.n.json"
+        },
+        {
+          "id": "2026-09-01T15-27-20",
+          "startedAt": "2026-09-01T15:27:20.379Z",
+          "filters": "worlds/brutal/2026-09-01T15-27-20.f.json",
+          "names": "worlds/brutal/2026-09-01T15-27-20.n.json"
         }
       ]
     },
@@ -388,6 +412,12 @@
           "startedAt": "2026-08-26T11:23:53.998Z",
           "filters": "worlds/classic/2026-08-26T11-23-53.f.json",
           "names": "worlds/classic/2026-08-26T11-23-53.n.json"
+        },
+        {
+          "id": "2026-09-01T15-28-51",
+          "startedAt": "2026-09-01T15:28:51.243Z",
+          "filters": "worlds/classic/2026-09-01T15-28-51.f.json",
+          "names": "worlds/classic/2026-09-01T15-28-51.n.json"
         }
       ]
     },
@@ -465,6 +495,12 @@
           "startedAt": "2026-08-26T11:30:42.129Z",
           "filters": "worlds/fobos/2026-08-26T11-30-42.f.json",
           "names": "worlds/fobos/2026-08-26T11-30-42.n.json"
+        },
+        {
+          "id": "2026-09-01T15-35-40",
+          "startedAt": "2026-09-01T15:35:40.564Z",
+          "filters": "worlds/fobos/2026-09-01T15-35-40.f.json",
+          "names": "worlds/fobos/2026-09-01T15-35-40.n.json"
         }
       ]
     },
@@ -542,6 +578,12 @@
           "startedAt": "2026-08-26T11:35:35.279Z",
           "filters": "worlds/gefion/2026-08-26T11-35-35.f.json",
           "names": "worlds/gefion/2026-08-26T11-35-35.n.json"
+        },
+        {
+          "id": "2026-09-01T15-40-33",
+          "startedAt": "2026-09-01T15:40:33.346Z",
+          "filters": "worlds/gefion/2026-09-01T15-40-33.f.json",
+          "names": "worlds/gefion/2026-09-01T15-40-33.n.json"
         }
       ]
     },
@@ -619,6 +661,12 @@
           "startedAt": "2026-08-26T11:40:37.389Z",
           "filters": "worlds/gordion/2026-08-26T11-40-37.f.json",
           "names": "worlds/gordion/2026-08-26T11-40-37.n.json"
+        },
+        {
+          "id": "2026-09-01T15-45-36",
+          "startedAt": "2026-09-01T15:45:36.662Z",
+          "filters": "worlds/gordion/2026-09-01T15-45-36.f.json",
+          "names": "worlds/gordion/2026-09-01T15-45-36.n.json"
         }
       ]
     },
@@ -696,6 +744,12 @@
           "startedAt": "2026-08-26T11:58:56.928Z",
           "filters": "worlds/hutena/2026-08-26T11-58-56.f.json",
           "names": "worlds/hutena/2026-08-26T11-58-56.n.json"
+        },
+        {
+          "id": "2026-09-01T16-03-52",
+          "startedAt": "2026-09-01T16:03:52.359Z",
+          "filters": "worlds/hutena/2026-09-01T16-03-52.f.json",
+          "names": "worlds/hutena/2026-09-01T16-03-52.n.json"
         }
       ]
     },
@@ -773,6 +827,12 @@
           "startedAt": "2026-08-26T12:04:34.014Z",
           "filters": "worlds/jaruna/2026-08-26T12-04-34.f.json",
           "names": "worlds/jaruna/2026-08-26T12-04-34.n.json"
+        },
+        {
+          "id": "2026-09-01T16-09-30",
+          "startedAt": "2026-09-01T16:09:30.945Z",
+          "filters": "worlds/jaruna/2026-09-01T16-09-30.f.json",
+          "names": "worlds/jaruna/2026-09-01T16-09-30.n.json"
         }
       ]
     },
@@ -850,6 +910,12 @@
           "startedAt": "2026-08-26T12:10:49.012Z",
           "filters": "worlds/katahha/2026-08-26T12-10-49.f.json",
           "names": "worlds/katahha/2026-08-26T12-10-49.n.json"
+        },
+        {
+          "id": "2026-09-01T16-15-44",
+          "startedAt": "2026-09-01T16:15:44.350Z",
+          "filters": "worlds/katahha/2026-09-01T16-15-44.f.json",
+          "names": "worlds/katahha/2026-09-01T16-15-44.n.json"
         }
       ]
     },
@@ -927,6 +993,12 @@
           "startedAt": "2026-08-26T12:17:22.372Z",
           "filters": "worlds/lelwani/2026-08-26T12-17-22.f.json",
           "names": "worlds/lelwani/2026-08-26T12-17-22.n.json"
+        },
+        {
+          "id": "2026-09-01T16-22-19",
+          "startedAt": "2026-09-01T16:22:19.035Z",
+          "filters": "worlds/lelwani/2026-09-01T16-22-19.f.json",
+          "names": "worlds/lelwani/2026-09-01T16-22-19.n.json"
         }
       ]
     },
@@ -950,6 +1022,12 @@
           "startedAt": "2026-08-26T12:22:35.193Z",
           "filters": "worlds/luvia/2026-08-26T12-22-35.f.json",
           "names": "worlds/luvia/2026-08-26T12-22-35.n.json"
+        },
+        {
+          "id": "2026-09-01T16-27-32",
+          "startedAt": "2026-09-01T16:27:32.702Z",
+          "filters": "worlds/luvia/2026-09-01T16-27-32.f.json",
+          "names": "worlds/luvia/2026-09-01T16-27-32.n.json"
         }
       ]
     },
@@ -1027,6 +1105,12 @@
           "startedAt": "2026-08-26T12:32:43.156Z",
           "filters": "worlds/majuna/2026-08-26T12-32-43.f.json",
           "names": "worlds/majuna/2026-08-26T12-32-43.n.json"
+        },
+        {
+          "id": "2026-09-01T16-38-06",
+          "startedAt": "2026-09-01T16:38:06.292Z",
+          "filters": "worlds/majuna/2026-09-01T16-38-06.f.json",
+          "names": "worlds/majuna/2026-09-01T16-38-06.n.json"
         }
       ]
     },
@@ -1104,6 +1188,12 @@
           "startedAt": "2026-08-26T12:39:31.875Z",
           "filters": "worlds/nomada/2026-08-26T12-39-31.f.json",
           "names": "worlds/nomada/2026-08-26T12-39-31.n.json"
+        },
+        {
+          "id": "2026-09-01T16-44-56",
+          "startedAt": "2026-09-01T16:44:56.367Z",
+          "filters": "worlds/nomada/2026-09-01T16-44-56.f.json",
+          "names": "worlds/nomada/2026-09-01T16-44-56.n.json"
         }
       ]
     },
@@ -1181,6 +1271,12 @@
           "startedAt": "2026-08-26T12:43:17.726Z",
           "filters": "worlds/perkun/2026-08-26T12-43-17.f.json",
           "names": "worlds/perkun/2026-08-26T12-43-17.n.json"
+        },
+        {
+          "id": "2026-09-01T16-48-43",
+          "startedAt": "2026-09-01T16:48:43.535Z",
+          "filters": "worlds/perkun/2026-09-01T16-48-43.f.json",
+          "names": "worlds/perkun/2026-09-01T16-48-43.n.json"
         }
       ]
     },
@@ -1258,6 +1354,12 @@
           "startedAt": "2026-08-26T12:46:01.000Z",
           "filters": "worlds/tarhuna/2026-08-26T12-46-01.f.json",
           "names": "worlds/tarhuna/2026-08-26T12-46-01.n.json"
+        },
+        {
+          "id": "2026-09-01T16-51-28",
+          "startedAt": "2026-09-01T16:51:28.428Z",
+          "filters": "worlds/tarhuna/2026-09-01T16-51-28.f.json",
+          "names": "worlds/tarhuna/2026-09-01T16-51-28.n.json"
         }
       ]
     },
@@ -1335,6 +1437,12 @@
           "startedAt": "2026-08-26T12:51:50.599Z",
           "filters": "worlds/telawel/2026-08-26T12-51-50.f.json",
           "names": "worlds/telawel/2026-08-26T12-51-50.n.json"
+        },
+        {
+          "id": "2026-09-01T16-57-19",
+          "startedAt": "2026-09-01T16:57:19.975Z",
+          "filters": "worlds/telawel/2026-09-01T16-57-19.f.json",
+          "names": "worlds/telawel/2026-09-01T16-57-19.n.json"
         }
       ]
     },
@@ -1412,6 +1520,12 @@
           "startedAt": "2026-08-26T12:57:35.923Z",
           "filters": "worlds/tempest/2026-08-26T12-57-35.f.json",
           "names": "worlds/tempest/2026-08-26T12-57-35.n.json"
+        },
+        {
+          "id": "2026-09-01T17-03-05",
+          "startedAt": "2026-09-01T17:03:05.744Z",
+          "filters": "worlds/tempest/2026-09-01T17-03-05.f.json",
+          "names": "worlds/tempest/2026-09-01T17-03-05.n.json"
         }
       ]
     },
@@ -1489,6 +1603,12 @@
           "startedAt": "2026-08-26T13:01:30.397Z",
           "filters": "worlds/zemyna/2026-08-26T13-01-30.f.json",
           "names": "worlds/zemyna/2026-08-26T13-01-30.n.json"
+        },
+        {
+          "id": "2026-09-01T17-07-00",
+          "startedAt": "2026-09-01T17:07:00.997Z",
+          "filters": "worlds/zemyna/2026-09-01T17-07-00.f.json",
+          "names": "worlds/zemyna/2026-09-01T17-07-00.n.json"
         }
       ]
     },
@@ -1566,6 +1686,12 @@
           "startedAt": "2026-08-26T13:06:16.939Z",
           "filters": "worlds/zorza/2026-08-26T13-06-16.f.json",
           "names": "worlds/zorza/2026-08-26T13-06-16.n.json"
+        },
+        {
+          "id": "2026-09-01T17-11-49",
+          "startedAt": "2026-09-01T17:11:49.018Z",
+          "filters": "worlds/zorza/2026-09-01T17-11-49.f.json",
+          "names": "worlds/zorza/2026-09-01T17-11-49.n.json"
         }
       ]
     }
