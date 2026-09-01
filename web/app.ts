@@ -74,6 +74,7 @@ function startView() {
   let manifest: Manifest | null = null;
   let trends: Trends | null = null;
   let renderTimer: ReturnType<typeof setTimeout> | null = null;
+  let redrawTimer: ReturnType<typeof setTimeout> | null = null;
 
   // The history is bought knowingly: as long as nobody has moved the filter, `trends.json`
   // is enough and there is no reason to pull megabytes.
@@ -207,6 +208,13 @@ function startView() {
    * The render and any history fetch go **together, behind the same debounce**. A fetch
    * called straight from the `input` handler started one pass per keystroke — see
    * `inFlight` in history.js.
+   *
+   * ⚠️ Only something the user did may come through here. A pass reporting its own progress
+   * through this function starts the next one itself: a snapshot that failed is deliberately
+   * not in the store, so `ensureHistory` plans it again, it fails again, and the world is
+   * asked for it about four times a second for as long as the filter stands — with the
+   * status line flickering between "wczytywanie…" and its settled reading rather than ever
+   * coming to rest. That is what `scheduleRedraw` is for.
    */
   function scheduleRender() {
     if (renderTimer !== null) clearTimeout(renderTimer);
@@ -214,6 +222,18 @@ function startView() {
       render();
       void ensureHistory();
     }, RENDER_DEBOUNCE_MS);
+  }
+
+  /**
+   * A redraw with nothing behind it — for a pass reporting its own progress, which moves the
+   * counter and decides nothing about what else to fetch.
+   *
+   * Its own timer, because sharing `renderTimer` would let a progress update cancel a filter
+   * change made mid-pass, and that one does have a fetch to start.
+   */
+  function scheduleRedraw() {
+    if (redrawTimer !== null) clearTimeout(redrawTimer);
+    redrawTimer = setTimeout(render, RENDER_DEBOUNCE_MS);
   }
 
   /**
@@ -304,7 +324,7 @@ function startView() {
       onProgress: (loaded, expected, failedCount) => {
         if (token !== worldToken) return;
         progress = { loaded, expected, failed: failedCount, running: true };
-        scheduleRender();
+        scheduleRedraw();
       },
     });
 

@@ -860,6 +860,14 @@ describe("the view comes together — a filter set", () => {
       max: new Date(brutal.startedAt.at(-1)).getTime(),
     });
 
+    // A settled reading stays settled. The status is sampled again after 600 ms of nothing
+    // happening, and the snapshot that answered 503 is not asked for again in between: while
+    // a progress update was allowed to start the next pass, the failed snapshot was refetched
+    // about four times a second for as long as a filter stood, and the counter above read
+    // whichever half of that cycle the sample landed in.
+    expect(out.afterQuiet.status).toBe(out.partialHistory.status);
+    expect(out.afterQuiet.attemptsAfter).toBe(out.afterQuiet.attemptsBefore);
+
     // Back at the default filter, the history comes from the complete aggregate — every
     // snapshot, including the one whose file could not be fetched. The failure counter from
     // the previous filter has no business still describing it.

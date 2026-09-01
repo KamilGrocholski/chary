@@ -341,7 +341,8 @@ if (scenario === "default") {
   const brutalFiles = JSON.parse(await Bun.file("public/manifest.json").text()).worlds.find(
     (world: { name: string }) => world.name === "brutal",
   ).files as { filters: string }[];
-  failUrls.add(brutalFiles.at(-2)!.filters);
+  const failedUrl = brutalFiles.at(-2)!.filters;
+  failUrls.add(failedUrl);
 
   field("worldSelect").value = "brutal";
   send("worldSelect", "change");
@@ -379,6 +380,18 @@ if (scenario === "default") {
     points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
     axis: getAxis("popChart"),
     error: node("error").textContent,
+  };
+
+  // Nothing has happened since the pass stopped, so nothing may still be moving. A progress
+  // update allowed to start the next pass turned the one snapshot that cannot be fetched into
+  // a retry loop — about four requests a second at a file that will not come back, and a
+  // status line that never settled.
+  const attemptsBefore = fetchCounts.get(failedUrl) ?? 0;
+  await settle(600);
+  result.afterQuiet = {
+    status: node("historyStatus").textContent,
+    attemptsBefore,
+    attemptsAfter: fetchCounts.get(failedUrl) ?? 0,
   };
 
   // Back to the default filter: the history comes from the complete aggregate again, so the
