@@ -18,7 +18,7 @@ import {
   type Filters,
   type ManifestEntry,
 } from "@/src/shared.ts";
-import { composeFiltersParams, describeFilters } from "@/web/filters.ts";
+import { DEFAULT_MAX_DAYS, composeFiltersParams, describeFilters } from "@/web/filters.ts";
 import { composeViewParams, getThresholdByKey, getUsableThresholds } from "@/web/history.ts";
 import { assert, assertDefined } from "@/src/lib/assert.ts";
 import { getFiniteNumberFromText, getIntegerFromText } from "@/src/lib/number.ts";
@@ -96,10 +96,13 @@ export function applyFilters(filters: Filters) {
 }
 
 export function resetFilters() {
-  for (const id of ["minLevel", "maxLevel", "minHonor", "maxHonor", "onlineValue"]) {
+  for (const id of ["minLevel", "maxLevel", "minHonor", "maxHonor"]) {
     getField(id).value = "";
   }
-  getField("onlinePreset").value = "all";
+  // Back to how the view opens, which is no longer "everybody" — otherwise "Resetuj" and a
+  // fresh visit would leave the page in two different states.
+  getField("onlineValue").value = String(DEFAULT_MAX_DAYS);
+  getField("onlinePreset").value = String(DEFAULT_MAX_DAYS);
   for (const checkbox of getCheckboxes("profCheckboxes")) checkbox.checked = true;
 }
 

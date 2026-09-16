@@ -23,5 +23,7 @@ Starting work on the project? Read [`../AGENTS.md`](../AGENTS.md) first, not thi
 | [`2026-08-28-simplification.md`](2026-08-28-simplification.md) | Four cuts in one round: the rulebook trimmed to what each rule paid for (`AGENTS.md` **974 → 651**, four prose-policing guards deleted, **635 lines**); a `bun build` step that took `lib/` and `shared` out of `public/` and **115 JSDoc type tags** out of the dashboard; `happy-dom` in place of a hand-written DOM stub; and `app.js` — **1290 lines in one closure** — split into a seven-file view layer. Includes where the estimates were wrong. |
 | [`2026-09-16-redesign-rail.md`](2026-09-16-redesign-rail.md) | The world view redrawn from three directions: the filter moves into a permanent rail, so the **961 px** between it and the first chart stops being a distance at all. What it overturns in the filter-bar spec, the palettes solved for 3:1 rather than picked, the page **1050 px** shorter at 1440, and a date-label collision older than the redesign. |
 
+| [`2026-09-16-activity-default.md`](2026-09-16-activity-default.md) | "Ostatnio online" opens at **30 days**. Why `maxDays=all` had to be invented, why every link shared before today now means something else, and what a first visit costs once the aggregate can no longer answer: **2.59 MB** for gordion, **1.01 MB** for the median world. |
+
 Filenames: `YYYY-MM-DD-<topic>.md`. Add a new note to the table above — this index is what
 [`../AGENTS.md`](../AGENTS.md) points at, so a note missing here is a note nobody will find.

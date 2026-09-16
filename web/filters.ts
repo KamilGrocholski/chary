@@ -63,6 +63,26 @@ export function getVisibleActivityBuckets(maxDays = Infinity): number[] {
 
 // ── Filters ─────────────────────────────────────────────────────────────────
 
+/**
+ * What "Ostatnio online" starts on when the address says nothing about it.
+ *
+ * ⚠️ This is NOT `getEmptyFilters()`, and the difference is load-bearing. That one is the
+ * filter that rejects nothing, and it is what decides whether the history may be read off
+ * the aggregate; a default that DOES reject cannot make that decision. So the view now
+ * opens on a filter, and opening the view fetches that world's snapshots.
+ */
+export const DEFAULT_MAX_DAYS = 30;
+
+/**
+ * "No limit", spelled for a query string.
+ *
+ * It needs a spelling at all only because the default stopped being "no limit": an absent
+ * `maxDays` now means 30, so without this the unfiltered view could not be linked to.
+ * ⚠️ A link shared before this carries no `maxDays` and therefore now opens on 30 days
+ * rather than on everybody.
+ */
+const NO_LIMIT_PARAM = "all";
+
 export function getEmptyFilters(): Filters {
   return {
     minLevel: -Infinity,
@@ -246,7 +266,9 @@ export function composeFiltersParams(filters: Filters): URLSearchParams {
   setParam("maxLevel", filters.maxLevel);
   setParam("minHonor", filters.minHonor);
   setParam("maxHonor", filters.maxHonor);
-  setParam("maxDays", filters.maxDays);
+  // Always written, `all` included — see NO_LIMIT_PARAM. Every other field may be absent
+  // because absent still means "no bound" for them.
+  params.set("maxDays", Number.isFinite(filters.maxDays) ? String(filters.maxDays) : NO_LIMIT_PARAM);
 
   const profs = [...filters.professions].sort((left, right) => left - right);
   if (profs.length !== 6) params.set("prof", profs.join(","));
@@ -272,7 +294,8 @@ export function readFiltersFromParams(params: URLSearchParams): Filters {
     return profession !== null && profession >= 1 && profession <= 6 ? [profession] : [];
   });
 
-  const maxDays = getNumberFromParam("maxDays", Infinity);
+  const maxDays =
+    params.get("maxDays") === NO_LIMIT_PARAM ? Infinity : getNumberFromParam("maxDays", DEFAULT_MAX_DAYS);
   return {
     minLevel: getNumberFromParam("minLevel", -Infinity),
     maxLevel: getNumberFromParam("maxLevel", Infinity),

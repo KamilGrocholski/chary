@@ -7,6 +7,7 @@ import {
   countByActivity,
   countByLevel,
   describeFilters,
+  DEFAULT_MAX_DAYS,
   getEmptyFilters,
   readFiltersFromParams,
   composeFiltersParams,
@@ -491,8 +492,13 @@ describe("snapshot time", () => {
 });
 
 describe("the filter state in the URL", () => {
-  test("the default view puts nothing in the link", () => {
-    expect(composeFiltersParams(getEmptyFilters()).toString()).toBe("");
+  test("the unfiltered view has to say so in the link", () => {
+    // An absent `maxDays` used to mean "no limit". It now means the default, 30 days — so
+    // the unfiltered state needs a spelling of its own, or it could not be linked to at all.
+    // ⚠️ The other side of that: a link shared before this carries no `maxDays` and now
+    // opens on 30 days rather than on everybody.
+    expect(composeFiltersParams(getEmptyFilters()).toString()).toBe("maxDays=all");
+    expect(readFiltersFromParams(composeFiltersParams(getEmptyFilters()))).toEqual(getEmptyFilters());
   });
 
   test("a full set of filters survives the round trip", () => {
@@ -508,8 +514,20 @@ describe("the filter state in the URL", () => {
     expect(restored).toEqual(filterFile);
   });
 
-  test("an empty URL gives the default filters", () => {
-    expect(readFiltersFromParams(new URLSearchParams())).toEqual(getEmptyFilters());
+  test("an empty URL opens on the activity default, not on everybody", () => {
+    expect(readFiltersFromParams(new URLSearchParams())).toEqual({
+      ...getEmptyFilters(),
+      maxDays: DEFAULT_MAX_DAYS,
+    });
+    expect(readFiltersFromParams(new URLSearchParams("maxDays=all"))).toEqual(getEmptyFilters());
+  });
+
+  test("the markup opens on the same day count the code calls the default", () => {
+    // Two addresses for one number: the field's `value` in index.html and DEFAULT_MAX_DAYS.
+    // The form is overwritten from the URL on load, so a drift here would only show as a
+    // flash of the wrong value on a slow paint — invisible, and wrong.
+    expect(/<input id="onlineValue"[^>]*\bvalue="(\d*)"/.exec(html)?.[1]).toBe(String(DEFAULT_MAX_DAYS));
+    expect(new RegExp(`<option value="${DEFAULT_MAX_DAYS}" selected>`).test(html)).toBe(true);
   });
 
   test("junk in the URL does not break the view", () => {
@@ -518,7 +536,7 @@ describe("the filter state in the URL", () => {
   });
 
   test("filters from the URL give the same result as filters set by hand", () => {
-    const filterFile = readFiltersFromParams(new URLSearchParams("minLevel=200&maxLevel=250&prof=1,4"));
+    const filterFile = readFiltersFromParams(new URLSearchParams("minLevel=200&maxLevel=250&prof=1,4&maxDays=all"));
     const expected = countLegacyRows(
       (row) => row[2] >= 200 && row[2] <= 250 && (row[3] === 1 || row[3] === 4),
     );
@@ -530,8 +548,12 @@ describe("the filter state in the URL", () => {
     // The whole lazy path hangs on this: under the default filter the history comes from
     // a 9 KB aggregate rather than from megabytes of raw snapshots.
     expect(isDefaultFilters(getEmptyFilters())).toBe(true);
-    expect(isDefaultFilters(readFiltersFromParams(new URLSearchParams()))).toBe(true);
-    expect(isDefaultFilters(readFiltersFromParams(new URLSearchParams("prof=1,2,3,4,5,6")))).toBe(true);
+    expect(isDefaultFilters(readFiltersFromParams(new URLSearchParams("maxDays=all")))).toBe(true);
+    expect(isDefaultFilters(readFiltersFromParams(new URLSearchParams("maxDays=all&prof=1,2,3,4,5,6")))).toBe(true);
+    // ⚠️ The view no longer OPENS on it. "Rejects nothing" is what decides that the
+    // aggregate is an exact answer, and a 30-day default rejects — so a fresh visit now
+    // takes the fetching path. That is the price of the default, and it is paid here.
+    expect(isDefaultFilters(readFiltersFromParams(new URLSearchParams()))).toBe(false);
 
     expect(isDefaultFilters(composeFilters({ minLevel: 1 }))).toBe(false);
     expect(isDefaultFilters(composeFilters({ maxDays: 30 }))).toBe(false);
@@ -955,10 +977,24 @@ describe("the view comes together — a filter set", () => {
     expect(out.afterQuiet.status).toBe(out.partialHistory.status);
     expect(out.afterQuiet.attemptsAfter).toBe(out.afterQuiet.attemptsBefore);
 
-    // Back at the default filter, the history comes from the complete aggregate — every
-    // snapshot, including the one whose file could not be fetched. The failure counter from
-    // the previous filter has no business still describing it.
+    // "Resetuj" gives what a fresh visit gives, and that is a filter now: 30 days in both
+    // the field and the preset. So it does not go back to the aggregate — it only has to
+    // leave the axis alone.
     expect(out.afterReset).toEqual({
+      // Still the fetched history, still one file short — resetting is not an escape from
+      // that any more. Written out rather than compared against itself: two sides that can
+      // agree by construction are not being compared (§7.5).
+      status: `${getTotal - 1} z ${getTotal} migawek · 1 nie wczytano`,
+      online: "30",
+      preset: "30",
+      axis: out.partialHistory.axis,
+    });
+
+    // Clearing the activity field is the way back to the filter that rejects nothing, and
+    // with it to the complete aggregate — every snapshot, including the one whose file could
+    // not be fetched. The failure counter from the previous filter has no business still
+    // describing it.
+    expect(out.afterClearingActivity).toEqual({
       status: `${getTotal} migawek`,
       noteHidden: true,
       points: getTotal,

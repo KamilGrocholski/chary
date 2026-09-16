@@ -23,8 +23,14 @@ const scenario = process.argv[2] === "filtered" ? "filtered" : "default";
 // The "filtered" scenario gets its filters in the URL, so the numbers can be compared
 // against `.f.json` and so the history starts without waiting for a mouse move — exactly
 // like a shared link.
+// `maxDays=all` in both: the view now OPENS on a 30-day activity filter, and neither
+// scenario is about that. The default one is about the path taken when the filter rejects
+// nothing — which is now something a link has to ask for — and the filtered one is about a
+// level and profession filter, which a third chip would only blur.
 const search =
-  scenario === "filtered" ? "?world=aether&minLevel=200&maxLevel=250&prof=1,4" : "?world=fobos";
+  scenario === "filtered"
+    ? "?world=aether&minLevel=200&maxLevel=250&prof=1,4&maxDays=all"
+    : "?world=fobos&maxDays=all";
 
 await GlobalRegistrator.register({ url: `http://localhost/index.html${search}` });
 
@@ -398,11 +404,25 @@ if (scenario === "default") {
     attemptsAfter: fetchCounts.get(failedUrl) ?? 0,
   };
 
-  // Back to the default filter: the history comes from the complete aggregate again, so the
-  // failure counter has no business still describing it.
+  // "Resetuj" gives the state a fresh visit gives — and that state is now a 30-day activity
+  // filter, so it does NOT return to the aggregate. What it must do is hold the axis and stop
+  // describing the previous filter's numbers.
   node("resetBtn").click();
-  await settle(600);
+  await settle(900);
   result.afterReset = {
+    status: node("historyStatus").textContent,
+    online: field("onlineValue").value,
+    preset: field("onlinePreset").value,
+    axis: getAxis("popChart"),
+  };
+
+  // Clearing the activity field is what returns the view to the filter that rejects nothing,
+  // and with it to the complete aggregate — every snapshot, including the one whose file
+  // cannot be fetched. This is the way out of a history left incomplete by a failed fetch.
+  field("onlineValue").value = "";
+  send("onlineValue", "input");
+  await settle(900);
+  result.afterClearingActivity = {
     status: node("historyStatus").textContent,
     noteHidden: node("partialNote").hidden,
     points: charts.popChart?.data.datasets[0]?.data.length ?? 0,
