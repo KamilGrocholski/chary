@@ -193,6 +193,7 @@ const result: Record<string, unknown> = {
   stats: getText("stats"),
   summary: getText("summary"),
   historyStatus: node("historyStatus").textContent,
+  transferInfo: getText("transferInfo"),
   professionCheckboxes: node("profCheckboxes").querySelectorAll("input").length,
   source: node("sourceInfo").textContent,
   snapshotMeta: node("snapshotMeta").textContent,
@@ -261,24 +262,28 @@ if (scenario === "default") {
   const getChipLabels = () =>
     [...node("filterChips").querySelectorAll(".chip")].map((chip) => chip.firstChild?.textContent ?? "");
 
-  // The drawer starts closed and nobody toggles it once the data arrives — otherwise the
-  // page would jump by the panel's height mid-load.
+  // The rail starts closed and nobody toggles it once the data arrives — otherwise the page
+  // would jump by the rail's width mid-load.
+  //
+  // `data-open`, not `.hidden`: above 1100 px the rail stands beside the charts whatever the
+  // button last said, so the open state cannot be one boolean on the element itself. CSS
+  // reads this attribute only below that width.
   result.bar = {
     chips: getChipLabels(),
     toggle: node("filtersToggle").textContent,
-    fieldsHidden: node("filterFields").hidden,
+    fieldsOpen: node("filterFields").dataset.open,
   };
 
   node("filtersToggle").click();
   result.afterOpen = {
-    fieldsHidden: node("filterFields").hidden,
+    fieldsOpen: node("filterFields").dataset.open,
     expanded: node("filtersToggle").getAttribute("aria-expanded"),
     chips: getChipLabels(),
   };
 
   node("filtersToggle").click();
   result.afterClose = {
-    fieldsHidden: node("filterFields").hidden,
+    fieldsOpen: node("filterFields").dataset.open,
     expanded: node("filtersToggle").getAttribute("aria-expanded"),
   };
 

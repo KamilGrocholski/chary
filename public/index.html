@@ -5,26 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MargoStat</title>
   <meta name="description" content="Statystyki graczy Margonem — rozkład poziomów i profesji w rankingach światów oraz historia populacji, aktywności i profesji w czasie." />
-  <meta name="theme-color" content="#101013" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2316161a'/><rect x='6' y='17' width='4' height='9' fill='%233987e5'/><rect x='12' y='12' width='4' height='14' fill='%23199e70'/><rect x='18' y='7' width='4' height='19' fill='%23c98500'/><rect x='24' y='14' width='4' height='12' fill='%23d55181'/></svg>" />
+  <!-- Two entries, the dark one first: a browser picks the first whose media matches, and one
+       without `media` would match always and shadow the other. The first is also the one
+       `dashboard.test.ts` holds equal to `--bg`, so the first `:root` block below is the dark
+       theme and the light one is the override. -->
+  <meta name="theme-color" content="#0d0f12" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f4f6f8" media="(prefers-color-scheme: light)" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2314171c'/><rect x='6' y='17' width='4' height='9' fill='%233987e5'/><rect x='12' y='12' width='4' height='14' fill='%23199e70'/><rect x='18' y='7' width='4' height='19' fill='%23c98500'/><rect x='24' y='14' width='4' height='12' fill='%23d55181'/></svg>" />
   <!-- Chart.js 4.4.7, local instead of from a CDN. To update:
        curl -sL https://cdn.jsdelivr.net/npm/chart.js@<version>/dist/chart.umd.min.js -o public/vendor/chart.umd.min.js -->
   <script defer src="vendor/chart.umd.min.js"></script>
   <style>
     :root {
-      /* MargoMeter's theme: warm, dark */
-      --bg: #101013;
-      --panel: #16161a;
-      --surface-2: #1e1e22;
-      --text: #f2f2ef;
-      --muted: #a0a09a;
-      --accent: #3987e5;
+      /* The console theme: cool and near-achromatic on purpose. The only chroma the page
+         carries is the series palette in src/shared.ts — six professions — so a colour on
+         screen means data and never decoration. */
+      --bg: #0d0f12;
+      --panel: #14171c;
+      --surface-2: #1b1f26;
+      --text: #e6e9ee;
+      --muted: #8b94a3;
+      --accent: #4c9aff;
       /* Dividers inside a card — decoration, so no contrast threshold applies. */
-      --border: #35353b;
-      /* The borders of controls and cards. WCAG 2.2 SC 1.4.11 requires 3:1: #35353b gave
-         1.48:1 against the card and 1.09:1 against a field's fill, i.e. a form field was
-         distinguishable from the background by nothing. #6a6a73 gives 3.37:1 and 3.10:1. */
-      --border-strong: #6a6a73;
+      --border: #262b33;
+      /* The borders of controls and cards. WCAG 2.2 SC 1.4.11 requires 3:1, and the split
+         from `--border` is what the 2026-08-05 audit paid for: one shared value measured
+         1.48:1 and a form field was distinguishable from the card by nothing. Solved by
+         search rather than by eye — the first hand-picked value here measured 2.43:1.
+         This one: 3.33:1 against --panel, 3.07:1 against --surface-2, 3.56:1 against --bg. */
+      --border-strong: #616b7b;
       --warn: #c98500;
       --danger: #e66767;
       --ok: #199e70;
@@ -32,10 +41,53 @@
          they are the theme, and the theme has one address. */
       --grid: rgba(255, 255, 255, 0.06);
       --grid-soft: rgba(255, 255, 255, 0.04);
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 24px;
+      --radius-1: 6px;
+      --radius-2: 10px;
+      --radius-3: 14px;
+      --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.40);
+      --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.45);
+      /* Three rules have to agree on each of these: the rail's width against the view's
+         offset, and the topbar's height against `scroll-margin-top` and the rail's own
+         height. They used to be three literals that drifted. */
+      --rail-width: 272px;
+      --topbar-height: 52px;
       /* Without this, native dropdowns, number-field arrows and scrollbars are drawn in
          the system's light skin on top of a dark interface. */
       color-scheme: dark;
     }
+
+    /* The light theme. `:root:not([data-theme="dark"])` rather than `:root`, so a future
+       explicit switch can win over the system preference without a second copy of the
+       palette — and so the block cannot be mistaken for the token list `dashboard.test.ts`
+       parses, which is the first `:root {` above and must stay the one the `<meta>` matches.
+       Measured the same way: --border-strong is 3.46:1 against --panel, 3.05:1 against
+       --surface-2, 3.19:1 against --bg. */
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) {
+        --bg: #f4f6f8;
+        --panel: #ffffff;
+        --surface-2: #eef1f5;
+        --text: #11161d;
+        --muted: #5a6472;
+        --accent: #1c64d8;
+        --border: #dde3ea;
+        --border-strong: #808b99;
+        --warn: #8a5a00;
+        --danger: #c0392f;
+        --ok: #0f6b4a;
+        --grid: rgba(17, 22, 29, 0.10);
+        --grid-soft: rgba(17, 22, 29, 0.06);
+        --shadow-1: 0 1px 2px rgba(17, 22, 29, 0.06);
+        --shadow-2: 0 8px 24px rgba(17, 22, 29, 0.10);
+        color-scheme: light;
+      }
+    }
+
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -43,18 +95,61 @@
       background: var(--bg);
       color: var(--text);
     }
-    .wrap { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+    /* ── The frame: a rail that does not scroll away, and everything else beside it ──
+       The filter and the chart it acts on used to be 961 px apart — more than a screen —
+       and the bar existed to bridge that. Here the filter simply stays on screen, so the
+       distance is zero at any scroll position. The rail is its own scroll container, so a
+       long filter list never pushes the charts down. */
+    .shell { display: flex; align-items: flex-start; min-height: 100dvh; }
+    .rail {
+      width: var(--rail-width);
+      flex: 0 0 auto;
+      position: sticky;
+      top: 0;
+      height: 100dvh;
+      overflow-y: auto;
+      background: var(--panel);
+      border-right: 1px solid var(--border-strong);
+      padding: var(--space-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+    .view { flex: 1 1 auto; min-width: 0; }
+
+    .brand { display: flex; flex-direction: column; gap: 2px; }
+    .brand h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.05em; }
+    .brand span { color: var(--muted); font-size: 11px; }
+
+    .rail-section { display: flex; flex-direction: column; gap: var(--space-3); }
+    .rail-head { display: flex; align-items: baseline; justify-content: space-between; }
+    .rail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+    .rail-row { display: flex; gap: var(--space-2); }
+    /* Pinned to the bottom of the rail whatever the filter list's height, so the price does
+       not move when a chip appears. */
+    .rail-foot {
+      margin-top: auto;
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+    .transfer { font-size: 12px; color: var(--muted); }
+    .transfer b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
     .card {
       background: var(--panel);
       border: 1px solid var(--border-strong);
-      border-radius: 14px;
-      padding: 16px;
+      border-radius: var(--radius-3);
+      padding: var(--space-4);
     }
     label, .field-title {
       display: block;
       font-size: 12px;
       color: var(--muted);
-      margin-bottom: 6px;
+      margin-bottom: var(--space-1);
     }
     /* Controls do not inherit the font from `body` by themselves: without this the browser
        drew every field and list in the system typeface at 13.33 px — a different face from
@@ -65,8 +160,8 @@
     }
     input, select {
       width: 100%;
-      padding: 10px 12px;
-      border-radius: 10px;
+      padding: 8px 10px;
+      border-radius: var(--radius-1);
       border: 1px solid var(--border-strong);
       background: var(--surface-2);
       color: var(--text);
@@ -77,15 +172,15 @@
        variant that fails contrast. */
     button {
       width: 100%;
-      padding: 10px 12px;
-      border-radius: 10px;
+      padding: 8px 10px;
+      border-radius: var(--radius-1);
       cursor: pointer;
       background: var(--surface-2);
       border: 1px solid var(--border-strong);
       color: var(--accent);
       font-weight: 700;
     }
-    button:hover { filter: brightness(1.1); }
+    button:hover { filter: brightness(1.12); }
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 0.92em;
@@ -94,20 +189,20 @@
       background: var(--surface-2);
       border: 1px solid var(--border);
     }
-    /* The skip link: all the content sits behind the filter bar, so without it a screen
-       reader and the keyboard walk through every control before reaching the data. */
+    /* The skip link: the rail holds every control, so without it a screen reader and the
+       keyboard walk through all of them before reaching the data. */
     .skip {
       position: fixed;
       left: -9999px;
-      top: 8px;
+      top: var(--space-2);
       z-index: 1002;
       padding: 10px 14px;
-      border-radius: 10px;
+      border-radius: var(--radius-2);
       background: var(--surface-2);
       border: 1px solid var(--border-strong);
       color: var(--accent);
     }
-    .skip:focus { left: 8px; }
+    .skip:focus { left: var(--space-2); }
     :focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
@@ -117,13 +212,21 @@
       background: none;
       color: var(--accent);
     }
+    /* "Resetuj" sits on the "Filtry" caption line, so it may not take the full width a
+       button takes by default. It keeps the 24 px minimum target of WCAG 2.2 SC 2.5.8. */
+    .reset-inline {
+      width: auto;
+      min-height: 24px;
+      padding: 2px 8px;
+      font-size: 12px;
+      border: 1px solid var(--border-strong);
+    }
 
-    /* The filter bar — the only copy of the world picker and the match counter, pinned to
-       the top. The filter drives two sections, and it is 961 px from it to the first history
-       chart, i.e. more than a screen: without this bar there is no way to see what is being
-       set and what it acts on at the same time.
-       Height budget: ≤ 64 px, i.e. ≤ 7% of a 900 px screen (NN/g's threshold is 10%). */
-    .filterbar {
+    /* ── The top bar ──
+       What is left in it after the filters moved into the rail: the world, the match
+       counter and the chips. Still a fixed height and still one row — a bar that grows
+       once the data arrives moves the whole page under the cursor. */
+    .topbar {
       position: sticky;
       top: 0;
       /* above #profTooltip, which is fixed with z-index 999 (public/app.js) */
@@ -131,46 +234,22 @@
       display: flex;
       flex-wrap: nowrap;
       align-items: center;
-      gap: 8px 14px;
-      /* A fixed height, always one row. A bar that grows once the data arrives moves the
-         whole page under the cursor — and on a reload the restored scroll position lands
-         somewhere else. That is why nothing here wraps to a second line. */
-      height: 56px;
-      padding: 0 16px;
-      margin-bottom: 16px;
-      border-top: none;
-      border-radius: 0 0 14px 14px;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+      gap: var(--space-2) var(--space-4);
+      height: var(--topbar-height);
+      padding: 0 var(--space-4);
+      border-width: 0 0 1px;
+      border-radius: 0;
+      box-shadow: var(--shadow-1);
     }
-    .filterbar > select {
+    .topbar > select {
       width: auto;
       flex: 0 0 auto;
       min-width: 140px;
-      padding: 6px 10px;
-    }
-
-    /* The filter drawer falls out FROM UNDER the bar, not from the top of the document.
-       That is what makes "Filtry" open the fields where you actually are — the panel used to
-       sit at the top of the page, so after scrolling the button showed nothing visible.
-       Absolute positioning also means opening and closing does NOT move the page layout by
-       a single pixel. */
-    #filterFields {
-      position: absolute;
-      top: calc(100% + 6px);
-      left: 0;
-      right: 0;
-      z-index: 1001;
-      /* `dvh`, not `vh`: on a phone the address bar eats part of the window and `100vh`
-         ignores it, so the drawer extended below the real screen.
-         We subtract the bar's height (56 px) plus room for the shadow. */
-      max-height: calc(100dvh - 90px);
-      overflow-y: auto;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
-      margin: 0;
+      padding: 5px 9px;
     }
     .filterbar-nav {
       display: flex;
-      gap: 10px;
+      gap: var(--space-3);
       margin-left: auto;
     }
     .filterbar-nav a {
@@ -183,10 +262,13 @@
     .filterbar-actions {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: var(--space-3);
       flex: 0 0 auto;
     }
-    .filterbar .match { flex: 0 0 auto; }
+    /* The rail holds the filters at this width, so the button that opens it has nothing to
+       open. It comes back below 1100 px with the rail itself. */
+    .filterbar-actions { display: none; }
+    .topbar .match { flex: 0 0 auto; }
     .ghost-btn {
       width: auto;
       padding: 6px 11px;
@@ -205,7 +287,7 @@
     .chips {
       display: flex;
       flex-wrap: nowrap;
-      gap: 6px;
+      gap: var(--space-1);
       flex: 1 1 auto;
       min-width: 0;
       overflow-x: auto;
@@ -215,7 +297,7 @@
     .chip {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: var(--space-1);
       padding: 0 0 0 10px;
       border: 1px solid var(--border-strong);
       border-radius: 999px;
@@ -241,35 +323,19 @@
     }
     .chip button:hover { color: var(--danger); filter: none; }
 
-    .toolbar { margin-bottom: 20px; }
-    .toolbar-row1 {
-      display: grid;
-      grid-template-columns: 200px 1fr;
-      gap: 12px;
-      align-items: end;
-      margin-bottom: 12px;
-    }
-    .toolbar-row2 {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 12px;
-      align-items: end;
-    }
-    .col-2 { grid-column: span 2; }
-    .col-full { grid-column: 1 / -1; }
     .prof-checkboxes {
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px 12px;
-      padding: 6px 0;
+      flex-direction: column;
+      gap: var(--space-1);
     }
     .prof-checkboxes label {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       font-size: 13px;
       color: var(--text);
       margin: 0;
+      min-height: 24px;
       cursor: pointer;
       white-space: nowrap;
     }
@@ -279,9 +345,7 @@
       accent-color: var(--accent);
     }
 
-    /* The match counter — the only number that answers "how many are there in total".
-       It lives in the bar, so it is visible across all 2806 px of the page rather than the
-       first 390. */
+    /* The match counter — the only number that answers "how many are there in total". */
     .match {
       margin: 0;
       font-size: 13px;
@@ -289,210 +353,233 @@
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
-      gap: 4px 8px;
+      gap: var(--space-1) var(--space-2);
       white-space: nowrap;
     }
     .match b { color: var(--text); font-size: 16px; }
 
+    main { padding: var(--space-4) var(--space-5) var(--space-5); }
     .section-head {
       /* anchors from the bar must not slide underneath the bar */
-      scroll-margin-top: 76px;
+      scroll-margin-top: calc(var(--topbar-height) + var(--space-3));
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
-      gap: 8px 14px;
-      margin: 28px 0 14px;
-      padding-top: 20px;
-      border-top: 1px solid var(--border);
+      gap: var(--space-2) var(--space-4);
+      margin: var(--space-5) 0 var(--space-3);
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid var(--border);
     }
+    .section-head:first-of-type { margin-top: var(--space-2); }
     .section-head h2 {
       margin: 0;
-      font-size: 15px;
+      font-size: 13px;
       font-weight: 700;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.10em;
       text-transform: uppercase;
       color: var(--text);
     }
-    .section-head .meta { font-size: 13px; color: var(--muted); }
+    .section-head .meta { font-size: 12px; color: var(--muted); }
     .history-controls {
       display: grid;
-      grid-template-columns: 180px 200px;
-      gap: 12px;
+      grid-template-columns: 170px 190px;
+      gap: var(--space-3);
       align-items: end;
       margin-left: auto;
     }
 
+    /* Two charts per row instead of four stacked ones: the whole history fits one screen,
+       so comparing population against activity no longer means scrolling between them. */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-4);
+      align-items: start;
+    }
+
     .stats {
-      margin: 0 0 20px;
+      margin: 0 0 var(--space-4);
       color: var(--muted);
+      font-size: 13px;
     }
     .stats-line {
       display: flex;
       flex-wrap: wrap;
-      gap: 6px 16px;
+      gap: var(--space-1) var(--space-4);
     }
-    .chartBox { height: 420px; margin-bottom: 20px; }
-    .chartBox.short { height: 320px; }
+    .chartBox { height: 380px; margin-bottom: var(--space-4); }
+    .grid-2 .chartBox { margin-bottom: 0; }
+    .chartBox.short { height: 300px; }
     canvas { width: 100% !important; height: 100% !important; }
     .error {
       color: var(--danger);
       white-space: pre-wrap;
-      margin-bottom: 12px;
+      margin-bottom: var(--space-3);
     }
     .error:empty { margin: 0; }
     .note {
-      margin-bottom: 20px;
+      margin-bottom: var(--space-4);
       font-size: 13px;
       line-height: 1.5;
       color: var(--muted);
       display: flex;
-      gap: 10px;
+      gap: var(--space-3);
       align-items: flex-start;
     }
     .note b { color: var(--text); }
     .note.warn { border-color: var(--warn); }
     .note.warn b { color: var(--warn); }
     .suspect {
-      margin-bottom: 20px;
+      margin-bottom: var(--space-4);
       border-color: var(--warn);
       color: var(--text);
       display: flex;
-      gap: 10px;
+      gap: var(--space-3);
       align-items: flex-start;
       font-size: 13px;
       line-height: 1.5;
     }
     .suspect b { color: var(--warn); }
     .source {
-      padding: 10px 0;
       color: var(--muted);
-      font-size: 13px;
+      font-size: 11px;
+      word-break: break-all;
     }
     .empty {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 14px;
+      gap: var(--space-3);
       height: 100%;
       color: var(--muted);
     }
     .empty button { width: auto; }
 
-    .tableBox { overflow-x: auto; }
+    /* `auto`, never `hidden`: at 375 px there were 193 px of table past the edge, and a
+       clipped column cannot be reached by wheel, touch or tab. In the grid the table also
+       gets a ceiling, so a long history does not stretch the row its chart sits in. */
+    .tableBox { overflow: auto; max-height: 300px; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
-    th { color: var(--muted); font-weight: 600; }
+    th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      /* The table scrolls inside its own box now, so without this the heading row scrolls
+         out of it and the columns lose their names. */
+      position: sticky;
+      top: 0;
+      background: var(--panel);
+    }
     td.number, th.number { text-align: right; font-variant-numeric: tabular-nums; }
     tbody tr:last-child td { border-bottom: none; }
     [hidden] { display: none !important; }
 
-    /* Below ~1100 px the bar cannot hold the world, the counter, the chips, the anchors and
-       two buttons at once — and shrinking took space from the chips alone, down to zero. The
-       anchors and the "w tej migawce" qualifier give way first: both are conveniences, while
-       the chips carry the filter state and the only way to remove one of them. */
+    /* Below 1100 px the rail no longer fits beside the charts: 272 px of it left a chart
+       column under 400 px, which is narrower than the phone layout gives it. So the rail
+       becomes an overlay and `#filtersToggle` — hidden above this width, where it has
+       nothing to open — comes back to open it. */
     @media (max-width: 1100px) {
+      .rail {
+        position: fixed;
+        top: var(--topbar-height);
+        left: 0;
+        bottom: 0;
+        width: min(320px, 88vw);
+        z-index: 1001;
+        border-right: 1px solid var(--border-strong);
+        box-shadow: var(--shadow-2);
+      }
+      /* `display: none` rather than a transform: a rail merely moved off-screen keeps every
+         field in the tab order, so the keyboard walks through a panel nobody can see. */
+      .rail[data-open="false"] { display: none; }
+      .filterbar-actions { display: flex; }
       .filterbar-nav { display: none; }
       .wide-only { display: none; }
+      .grid-2 { grid-template-columns: minmax(0, 1fr); }
+      .tableBox { max-height: none; }
     }
 
     @media (max-width: 720px) {
-      .wrap { padding: 14px; }
-      .toolbar-row1 { grid-template-columns: 1fr; }
-      .history-controls { grid-template-columns: 1fr; margin-left: 0; width: 100%; }
-      .chartBox { height: 320px; }
+      main { padding: var(--space-3) var(--space-3) var(--space-5); }
+      .chartBox { height: 300px; }
       .chartBox.short { height: 260px; }
-
-      /* Without this the grid drops to one column while `.col-2` forces a second — the
-         panel extended past the card below ~352 px of width. */
-      .toolbar-row2 { grid-template-columns: repeat(2, 1fr); }
-      .col-2 { grid-column: 1 / -1; }
-      /* On a phone one row is left, the same height as on desktop: the world, the counter
-         and the filters button. The anchors and the chips do not fit on the line, and
-         pushing the bar to two rows cost 22% of a 667 px screen. */
-      /* At 375 px there is no room for one row: the world, the counter and two buttons do
-         not fit together, and clipping ended in "Pasuje: 79" instead of 79 528 — a truncated
-         number reads as a different number. Hence two rows, but of a **fixed** height, so the
-         bar still does not move the page. 88 px is 13% of a 667 px screen. */
-      .filterbar {
+      .history-controls { grid-template-columns: 1fr; margin-left: 0; width: 100%; }
+      /* At 375 px the world, the counter and the button do not fit on one line, and
+         clipping ended in "Pasuje: 79" instead of 79 528 — a truncated number reads as a
+         different number. Hence two rows, but of a **fixed** height, so the bar still does
+         not move the page. 88 px is 13% of a 667 px screen. */
+      .topbar {
         height: 88px;
-        gap: 4px 8px;
-        padding: 0 12px;
+        gap: var(--space-1) var(--space-2);
+        padding: 0 var(--space-3);
         flex-wrap: wrap;
         align-content: center;
       }
-      /* Row 1: the world and the buttons. Row 2: the counter at full width. */
-      .filterbar > select { order: 1; flex: 1 1 auto; min-width: 0; }
+      /* Row 1: the world and the button. Row 2: the counter at full width. */
+      .topbar > select { order: 1; flex: 1 1 auto; min-width: 0; }
       .filterbar-actions { order: 2; flex: 0 0 auto; }
-      .filterbar .match { order: 3; font-size: 12px; flex: 1 1 100%; flex-wrap: nowrap; }
-      .filterbar-nav, .chips { display: none; }
-      /* The bar is 88 px here, not 56 — both figures derived from its height have to allow
-         for that, otherwise an anchor lands under the bar and the drawer below the screen. */
-      .section-head { scroll-margin-top: 108px; }
-      #filterFields { max-height: calc(100dvh - 122px); }
-      /* "w tej migawce" is a qualifier the number still stands without */
-      .wide-only { display: none; }
+      .topbar .match { order: 3; font-size: 12px; flex: 1 1 100%; flex-wrap: nowrap; }
+      .chips { display: none; }
+      /* The bar is 88 px here, not 52 — everything derived from its height has to allow for
+         that, otherwise an anchor lands under the bar and the rail starts below the screen. */
+      :root { --topbar-height: 88px; }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="shell">
     <a class="skip" href="#content">Przejdź do treści</a>
-    <noscript>
-      <p class="error">Ten widok liczy wszystko w przeglądarce, więc bez JavaScriptu nie pokaże
-      żadnych danych. Dane źródłowe leżą jako pliki JSON w katalogu <code>worlds/</code>.</p>
-    </noscript>
-    <header style="display:flex;align-items:baseline;gap:10px;margin-bottom:20px;flex-wrap:wrap">
-      <h1 style="margin:0;font-size:22px;letter-spacing:0.02em;font-weight:700">MargoStat</h1>
-      <span style="color:var(--muted);font-size:13px">statystyki graczy Margonem</span>
-    </header>
 
-    <div class="filterbar card" id="filterBar">
-      <select id="worldSelect" aria-label="Świat"></select>
-      <div id="matchLine" class="match" role="status">Ładowanie…</div>
-      <div id="filterChips" class="chips"></div>
-      <nav class="filterbar-nav" aria-label="Sekcje">
-        <a href="#snapshot">Przekrój</a>
-        <a href="#history">Historia</a>
-      </nav>
-      <div class="filterbar-actions">
-        <button id="filtersToggle" class="ghost-btn" aria-expanded="false" aria-controls="filterFields">Filtry</button>
-      </div>
+    <!-- The filters, and the world they act on, stay on screen at every scroll position.
+         `data-open` is the rail's state below 1100 px, where it becomes an overlay; the
+         initial value lives here in the markup and nothing sets it after load, so the page
+         cannot move by the rail's width once the data arrives. Above 1100 px the rail is
+         always shown and `#filtersToggle` is not rendered at all. -->
+    <aside class="rail" id="filterFields" data-open="false" aria-label="Filtry">
+      <header class="brand">
+        <h1>MargoStat</h1>
+        <span>statystyki graczy Margonem</span>
+      </header>
 
-      <div class="card toolbar" id="filterFields" hidden>
-      <div class="toolbar-row1">
+      <noscript>
+        <p class="error">Ten widok liczy wszystko w przeglądarce, więc bez JavaScriptu nie pokaże
+        żadnych danych. Dane źródłowe leżą jako pliki JSON w katalogu <code>worlds/</code>.</p>
+      </noscript>
+
+      <div class="rail-section">
+        <div class="rail-head">
+          <span class="field-title">Filtry</span>
+          <button id="resetBtn" class="reset-btn reset-inline" type="button">Resetuj</button>
+        </div>
+
         <div>
           <label for="snapshotSelect">Migawka przekroju</label>
           <select id="snapshotSelect"></select>
         </div>
-        <div>
-          <!-- This is not a control's label but a caption over text — a `<label>` with no
-               `for` labels nothing and confuses a screen reader. -->
-          <span class="field-title">Plik</span>
-          <div id="sourceInfo" class="source">—</div>
-        </div>
-      </div>
 
-      <div class="toolbar-row2">
-        <div>
-          <label for="minLevel">Min level</label>
-          <input id="minLevel" type="number" placeholder="np. 1" min="1" />
+        <div class="rail-grid">
+          <div>
+            <label for="minLevel">Min level</label>
+            <input id="minLevel" type="number" placeholder="np. 1" min="1" />
+          </div>
+          <div>
+            <label for="maxLevel">Max level</label>
+            <input id="maxLevel" type="number" placeholder="np. 400" min="1" />
+          </div>
+          <div>
+            <label for="minHonor">Min honor</label>
+            <input id="minHonor" type="number" placeholder="np. -100" />
+          </div>
+          <div>
+            <label for="maxHonor">Max honor</label>
+            <input id="maxHonor" type="number" placeholder="np. 99999" />
+          </div>
         </div>
+
         <div>
-          <label for="maxLevel">Max level</label>
-          <input id="maxLevel" type="number" placeholder="np. 400" min="1" />
-        </div>
-        <div>
-          <label for="minHonor">Min honor</label>
-          <input id="minHonor" type="number" placeholder="np. -100" />
-        </div>
-        <div>
-          <label for="maxHonor">Max honor</label>
-          <input id="maxHonor" type="number" placeholder="np. 99999" />
-        </div>
-        <div class="col-2">
           <label for="onlineValue">Ostatnio online (maks. dni)</label>
-          <div style="display:flex;gap:6px">
+          <div class="rail-row">
             <input id="onlineValue" type="number" value="" min="0" step="1" placeholder="wszyscy" style="flex:1;min-width:0" />
             <select id="onlinePreset" aria-label="Gotowe progi aktywności" style="width:auto">
               <option value="all">Wszyscy</option>
@@ -505,102 +592,131 @@
             </select>
           </div>
         </div>
-        <div class="col-full">
+
+        <div>
           <!-- The six checkboxes are one group: without `role="group"` a screen reader
                announces them as six independent fields, with no mention of "Profesja".
-               The container has to stay empty — `buildProfCheckboxes` appends to it without
-               clearing, so static fields would give twelve instead of six. -->
+               The container has to stay empty — `buildProfessionCheckboxes` appends to it
+               without clearing, so static fields would give twelve instead of six. -->
           <span class="field-title" id="profLabel">Profesja</span>
           <div class="prof-checkboxes" id="profCheckboxes" role="group" aria-labelledby="profLabel"></div>
         </div>
+
         <div>
-          <button id="resetBtn" class="reset-btn">Resetuj filtry</button>
+          <!-- This is not a control's label but a caption over text — a `<label>` with no
+               `for` labels nothing and confuses a screen reader. -->
+          <span class="field-title">Plik</span>
+          <div id="sourceInfo" class="source">—</div>
         </div>
       </div>
+
+      <!-- What the reader is about to spend, where the spending is decided. The transfer
+           has no ceiling any more, so naming the price beside the filter is the whole of
+           what keeps it knowingly bought. -->
+      <div class="rail-foot">
+        <span class="field-title">Pobieranie</span>
+        <div id="transferInfo" class="transfer">—</div>
       </div>
-    </div>
+    </aside>
 
-    <main id="content">
-    <div id="error" class="error" role="alert"></div>
-
-    <div class="section-head" id="snapshot">
-      <h2>Przekrój</h2>
-      <span id="snapshotMeta" class="meta">—</span>
-    </div>
-
-    <div id="suspect" class="suspect card" role="status" hidden></div>
-
-    <div class="stats card" id="stats">Ładowanie…</div>
-
-    <div class="card chartBox">
-      <!-- The empty state has to have a way out: "Resetuj filtry" sits in a closed drawer,
-           so without this the only way back was guessing that "Filtry" had to be opened. -->
-      <div id="chartEmpty" class="empty" hidden>
-        <span>Brak graczy spełniających filtry.</span>
-        <button id="emptyResetBtn" class="reset-btn" type="button">Resetuj filtry</button>
-      </div>
-      <canvas id="professionChart" role="img" aria-label="Rozkład poziomów według profesji w wybranej migawce."></canvas>
-    </div>
-
-    <div class="section-head" id="history">
-      <h2>Historia</h2>
-      <span id="historyStatus" class="meta">—</span>
-      <div class="history-controls">
-        <div>
-          <label for="thresholdSelect">Próg aktywności</label>
-          <select id="thresholdSelect"></select>
-        </div>
-        <div>
-          <label for="modeSelect">Skala</label>
-          <select id="modeSelect">
-            <option value="liczba">Liczba graczy</option>
-            <option value="udzial">Udział w populacji</option>
-          </select>
+    <div class="view">
+      <div class="topbar card" id="filterBar">
+        <select id="worldSelect" aria-label="Świat"></select>
+        <div id="matchLine" class="match" role="status">Ładowanie…</div>
+        <div id="filterChips" class="chips"></div>
+        <nav class="filterbar-nav" aria-label="Sekcje">
+          <a href="#snapshot">Przekrój</a>
+          <a href="#history">Historia</a>
+        </nav>
+        <div class="filterbar-actions">
+          <button id="filtersToggle" class="ghost-btn" aria-expanded="false" aria-controls="filterFields">Filtry</button>
         </div>
       </div>
+
+      <main id="content">
+      <div id="error" class="error" role="alert"></div>
+
+      <div class="section-head" id="snapshot">
+        <h2>Przekrój</h2>
+        <span id="snapshotMeta" class="meta">—</span>
+      </div>
+
+      <div id="suspect" class="suspect card" role="status" hidden></div>
+
+      <div class="stats card" id="stats">Ładowanie…</div>
+
+      <div class="card chartBox">
+        <!-- The empty state has to have a way out: on a phone "Resetuj" sits in a closed
+             rail, so without this the only way back was guessing that "Filtry" had to be
+             opened. -->
+        <div id="chartEmpty" class="empty" hidden>
+          <span>Brak graczy spełniających filtry.</span>
+          <button id="emptyResetBtn" class="reset-btn" type="button">Resetuj filtry</button>
+        </div>
+        <canvas id="professionChart" role="img" aria-label="Rozkład poziomów według profesji w wybranej migawce."></canvas>
+      </div>
+
+      <div class="section-head" id="history">
+        <h2>Historia</h2>
+        <span id="historyStatus" class="meta">—</span>
+        <div class="history-controls">
+          <div>
+            <label for="thresholdSelect">Próg aktywności</label>
+            <select id="thresholdSelect"></select>
+          </div>
+          <div>
+            <label for="modeSelect">Skala</label>
+            <select id="modeSelect">
+              <option value="liczba">Liczba graczy</option>
+              <option value="udzial">Udział w populacji</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats card" id="summary">Ładowanie…</div>
+
+      <div id="singlePoint" class="note card" role="status" hidden>
+        <span aria-hidden="true">ℹ</span>
+        <span><b>Ten świat ma jedną migawkę.</b> Punkt jest poprawny, ale na trend jest za wcześnie — kolejna runda scrapa da drugi.</span>
+      </div>
+
+      <div id="partialNote" class="note card" role="status" hidden></div>
+
+      <div id="suspectNote" class="note card warn" role="status" hidden>
+        <span aria-hidden="true">⚠</span>
+        <span><b>Któraś migawka może być obcięta.</b> Punkty narysowane pustym kółkiem mają flagę <code>suspect</code> — spadek populacji o ponad 5% wygląda tak samo jak niekompletny scrape.</span>
+      </div>
+
+      <div id="onlineNote" class="note card">
+        <span aria-hidden="true">ℹ</span>
+        <span><b>„Ostatnio online” zależy od godziny scrapa.</b> Rundy schodzą raz o 4 rano, raz o 21, w różne dni tygodnia,
+        więc próg <b>&lt; 24h</b> waha się o ~15% przy populacji stabilnej na 0,6%. Do oceny trendu miarodajniejsze są progi
+        <b>≤ 7 dni</b> i <b>≤ 30 dni</b>; godzina UTC każdej migawki jest w dymku wykresu.</span>
+      </div>
+
+      <div id="thresholdNote" class="note card" role="status" hidden></div>
+
+      <div class="grid-2">
+        <div class="card chartBox short">
+          <canvas id="popChart" role="img" aria-label="Liczba graczy w kolejnych migawkach."></canvas>
+        </div>
+
+        <div id="actChartBox" class="card chartBox short">
+          <canvas id="actChart" role="img" aria-label="Liczba aktywnych graczy w kolejnych migawkach."></canvas>
+        </div>
+
+        <div class="card chartBox short">
+          <canvas id="profChart" role="img" aria-label="Liczba graczy każdej profesji w kolejnych migawkach."></canvas>
+        </div>
+
+        <!-- The container scrolls, so without `tabindex` the right-hand columns and the
+             older rows are unreachable from the keyboard — WCAG 2.1.1. -->
+        <div class="card tableBox" id="changeTable" tabindex="0" role="region"
+             aria-label="Zmiany populacji między migawkami"></div>
+      </div>
+      </main>
     </div>
-
-    <div class="stats card" id="summary">Ładowanie…</div>
-
-    <div id="singlePoint" class="note card" role="status" hidden>
-      <span aria-hidden="true">ℹ</span>
-      <span><b>Ten świat ma jedną migawkę.</b> Punkt jest poprawny, ale na trend jest za wcześnie — kolejna runda scrapa da drugi.</span>
-    </div>
-
-    <div id="partialNote" class="note card" role="status" hidden></div>
-
-    <div id="suspectNote" class="note card warn" role="status" hidden>
-      <span aria-hidden="true">⚠</span>
-      <span><b>Któraś migawka może być obcięta.</b> Punkty narysowane pustym kółkiem mają flagę <code>suspect</code> — spadek populacji o ponad 5% wygląda tak samo jak niekompletny scrape.</span>
-    </div>
-
-    <div id="onlineNote" class="note card">
-      <span aria-hidden="true">ℹ</span>
-      <span><b>„Ostatnio online” zależy od godziny scrapa.</b> Rundy schodzą raz o 4 rano, raz o 21, w różne dni tygodnia,
-      więc próg <b>&lt; 24h</b> waha się o ~15% przy populacji stabilnej na 0,6%. Do oceny trendu miarodajniejsze są progi
-      <b>≤ 7 dni</b> i <b>≤ 30 dni</b>; godzina UTC każdej migawki jest w dymku wykresu.</span>
-    </div>
-
-    <div id="thresholdNote" class="note card" role="status" hidden></div>
-
-    <div class="card chartBox short">
-      <canvas id="popChart" role="img" aria-label="Liczba graczy w kolejnych migawkach."></canvas>
-    </div>
-
-    <div id="actChartBox" class="card chartBox short">
-      <canvas id="actChart" role="img" aria-label="Liczba aktywnych graczy w kolejnych migawkach."></canvas>
-    </div>
-
-    <div class="card chartBox">
-      <canvas id="profChart" role="img" aria-label="Liczba graczy każdej profesji w kolejnych migawkach."></canvas>
-    </div>
-
-    <!-- The container scrolls horizontally (measured: 526 px of content in 333 px at a
-         width of 375 px), so without `tabindex` the right-hand columns are unreachable from
-         the keyboard — WCAG 2.1.1. -->
-    <div class="card tableBox" id="changeTable" tabindex="0" role="region"
-         aria-label="Zmiany populacji między migawkami"></div>
-    </main>
   </div>
 
   <script type="module" src="app.js"></script>

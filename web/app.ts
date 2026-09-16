@@ -40,6 +40,7 @@ import {
   fillSnapshotSelect,
   fillThresholdSelect,
   fillWorldSelect,
+  isFieldsOpen,
   readFilters,
   renderChips,
   resetFilters,
@@ -54,6 +55,7 @@ import {
   renderStats,
   renderSummary,
   renderTable,
+  renderTransferInfo,
   showSuspect,
 } from "@/web/panels.ts";
 
@@ -128,7 +130,7 @@ function startView() {
     const population = base && index > -1 ? base.total[index] : undefined;
     renderMatchLine(matched, population ?? data.count);
     board.renderLevelChart(counts);
-    renderStats(counts, countByActivity(data, filters), filters.maxDays, filters.professions);
+    renderStats(counts, countByActivity(data, filters), filters.maxDays, filters.professions, population ?? data.count);
   }
 
   /**
@@ -146,6 +148,7 @@ function startView() {
     if (!base) {
       getElement("historyStatus").textContent = "brak historii dla tego świata";
       getElement("summary").textContent = "—";
+      renderTransferInfo(0, 0, false);
       clearHistory();
       return;
     }
@@ -159,6 +162,11 @@ function startView() {
     );
 
     renderHistoryStatus(loaded, dated.length, base.bytes ?? 0, progress);
+    // The status line prices what is still coming; the rail prices the whole set. Two
+    // questions, not two spellings of one: the first answers "how much longer", the second
+    // "what does moving the filter cost at all" — and that one is only worth printing once
+    // the filter has moved, because until then nothing is fetched per snapshot.
+    renderTransferInfo(base.bytes ?? 0, dated.length, progress.expected > 0);
     // The note hangs on how much is genuinely missing — not on whether anything is still in
     // flight. Otherwise a failed fetch made it disappear, leaving an incomplete chart with
     // nothing said about it.
@@ -432,17 +440,24 @@ function startView() {
 
   getElement("filtersToggle").addEventListener("click", (event) => {
     event.stopPropagation?.();
-    setFieldsOpen(getElement("filterFields").hidden);
+    setFieldsOpen(!isFieldsOpen());
   });
 
-  // The drawer closes like any other: Escape, or a click outside it. Without that it covers
-  // the charts and the only way out is hitting the same button again.
+  // Below 1100 px the rail covers the charts, so it closes like any overlay: Escape, or a
+  // click outside it. Above that width `isFieldsOpen()` stays false and both are no-ops —
+  // there the rail is beside the charts and covers nothing.
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !getElement("filterFields").hidden) setFieldsOpen(false);
+    if (event.key === "Escape" && isFieldsOpen()) setFieldsOpen(false);
   });
   document.addEventListener("click", (event) => {
-    if (getElement("filterFields").hidden) return;
-    if (!getElement("filterBar").contains?.((event.target as Node | null))) setFieldsOpen(false);
+    if (!isFieldsOpen()) return;
+    // Two containers, not one: the fields used to sit INSIDE the bar, so one `contains`
+    // covered both. The rail is now the bar's sibling, and testing only the bar closed the
+    // rail on every click landing in it — including on its own fields.
+    const target = event.target as Node | null;
+    if (getElement("filterBar").contains?.(target)) return;
+    if (getElement("filterFields").contains?.(target)) return;
+    setFieldsOpen(false);
   });
 
   getElement("filterChips").addEventListener("click", (event) => {

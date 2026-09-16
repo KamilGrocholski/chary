@@ -245,6 +245,7 @@ describe("the published data", () => {
 
 const html = await Bun.file(path.join(PUBLIC_DIR, "index.html")).text();
 const trendsHtml = await Bun.file(path.join(PUBLIC_DIR, "trends.html")).text();
+const notFoundHtml = await Bun.file(path.join(PUBLIC_DIR, "404.html")).text();
 
 // The dashboard's sources, not the bundle `bun run build` writes into public/. A rule read
 // over the bundle would be read over a transformation of what it means to hold, and the
@@ -375,6 +376,39 @@ describe("app.js asks index.html for the right kind of node", () => {
     // the duplicate is held here rather than left to drift.
     const themeColor = /<meta name="theme-color" content="([^"]+)"/.exec(html)?.[1];
     expect(themeColor).toBe(tokens.get("--bg"));
+  });
+
+  test("the other two pages carry the dashboard's palette, not their own copy of its hexes", () => {
+    // Three pages, three copies of the palette. There is no CSS build step, and index.html's
+    // block has to stay INLINE — `dom-smoke.ts` strips every `<script>` and never fetches a
+    // `<link>`, so `getThemeTokens()` would assert on a token that no longer resolves. So the
+    // copies cannot be removed; what can be removed is the drift between them, which is what
+    // this is. Before it, `trends.html` and `404.html` held `#101013` and `#3987e5` as
+    // literals and stayed on the old theme through the redesign without a word.
+    const readBlock = (source: string, pattern: RegExp) =>
+      new Map(
+        [...(pattern.exec(source)?.[1] ?? "").matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map(
+          ([, name, value]) => [name!, value!.trim()],
+        ),
+      );
+    const BLOCKS = [
+      ["ciemny", /:root\s*\{([\s\S]*?)\n\s*\}/],
+      ["jasny", /:root:not\(\[data-theme="dark"\]\)\s*\{([\s\S]*?)\n\s*\}/],
+    ] as const;
+    // What those two pages actually paint with. They have no charts, no cards and no
+    // controls, so the rest of the palette would be a copy with no reader.
+    const SHARED = ["--bg", "--text", "--muted", "--accent"];
+
+    for (const [mode, pattern] of BLOCKS) {
+      const ours = readBlock(html, pattern);
+      expect(`${mode}: ${ours.size}`).not.toBe(`${mode}: 0`);
+      for (const [name, source] of [["trends.html", trendsHtml], ["404.html", notFoundHtml]] as const) {
+        const theirs = readBlock(source, pattern);
+        for (const token of SHARED) {
+          expect(`${name} ${mode} ${token}=${theirs.get(token)}`).toBe(`${name} ${mode} ${token}=${ours.get(token)}`);
+        }
+      }
+    }
   });
 
   test("every class the view writes is a class the stylesheet styles", () => {
@@ -702,6 +736,14 @@ describe("the view comes together — the default filter", () => {
     expect(out.historyStatus).toMatch(/^\d+ migawek$/);
   });
 
+  test("the rail prices one snapshot, and nothing else, while nothing is being fetched", () => {
+    // fobos: 67 184 B gzip a snapshot, from `bytes` in trends.json. The second line would
+    // price a history nobody is buying — at the default filter not one `.f.json` is
+    // fetched, and a figure standing there anyway is the kind of number §9.6 forbids: one
+    // that might be wrong and looks exactly like one that is right.
+    expect(out.transferInfo).toBe("Ta migawka ~66 KB");
+  });
+
   test("every chart gets points placed in time, not in snapshot order", () => {
     for (const [id, expectedSeries] of [["popChart", 1], ["actChart", 1], ["profChart", 6]] as const) {
       expect(out.charts[id].series).toBe(expectedSeries);
@@ -809,6 +851,13 @@ describe("the view comes together — a filter set", () => {
     expect(out.historyStatus).toMatch(/^\d+ migawek$/);
   });
 
+  test("the rail prices the whole history once the filter has started spending it", () => {
+    // aether: 99 146 B gzip a snapshot × 15 dated snapshots = 1,4 MB. The status line
+    // prices what is still coming and reads "15 migawek" once it has all come; this prices
+    // what moving the filter costs at all, which is the figure that does not go away.
+    expect(out.transferInfo).toBe("Ta migawka ~97 KB Cała historia ~1,4 MB");
+  });
+
   test("the last history point is the same number as the snapshot view of that snapshot", () => {
     // Two independent routes to one number: the histogram summed across its series, and
     // the aggregate computed by summarizeFiltered. Drift would mean one of them filters
@@ -820,21 +869,27 @@ describe("the view comes together — a filter set", () => {
     expect(out.charts.profChart.series).toBe(2);
   });
 
-  test("the bar summarises a filter that has scrolled off the screen", () => {
-    // It is 961 px from the filter to the first history chart — more than a screen. The bar
-    // is the only place where what is set and what it acts on are visible at once.
+  test("the bar summarises a filter, including where the rail is not on screen", () => {
+    // Below 1100 px the rail is an overlay and closed by default, so the chips are the only
+    // place the filter state is readable — and the only way to remove one of them. Above
+    // that width the rail stands beside the charts and the chips repeat what it shows,
+    // which Baymard measured as fewer user errors than either one alone.
     expect(out.bar.chips).toEqual(["Poziom 200-250", "Wojownik, Tropiciel"]);
     expect(out.bar.toggle).toBe("Filtry (2)");
   });
 
-  test("the drawer starts closed and nothing toggles it once the data arrives", () => {
-    // A panel toggled from JS only after the `fetch`es moved the page by its own height
-    // mid-load — and on a reload the restored scroll position landed somewhere else. The
-    // initial state now lives in the markup alone.
-    expect(out.bar.fieldsHidden).toBe(true);
-    expect(out.afterOpen.fieldsHidden).toBe(false);
+  test("the rail starts closed and nothing toggles it once the data arrives", () => {
+    // A panel toggled from JS only after the `fetch`es moved the page mid-load — and on a
+    // reload the restored scroll position landed somewhere else. The initial state still
+    // lives in the markup alone, now as `data-open="false"`.
+    //
+    // An attribute rather than `hidden`, because the answer depends on the width: above
+    // 1100 px the rail is shown whatever this says and `#filtersToggle` is not rendered at
+    // all, so one boolean on the element could not be right at both widths at once.
+    expect(out.bar.fieldsOpen).toBe("false");
+    expect(out.afterOpen.fieldsOpen).toBe("true");
     expect(out.afterOpen.expanded).toBe("true");
-    expect(out.afterClose.fieldsHidden).toBe(true);
+    expect(out.afterClose.fieldsOpen).toBe("false");
     expect(out.afterClose.expanded).toBe("false");
     // opening and closing does not touch the filters
     expect(out.afterOpen.chips).toEqual(out.bar.chips);

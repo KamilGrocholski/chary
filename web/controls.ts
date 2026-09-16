@@ -1,6 +1,6 @@
 // The filter bar: everything that reads or writes a form control, plus the two things that
 // belong to it rather than to the page below — the chips summarising the active filters,
-// and the drawer they open.
+// and the rail of fields they summarise.
 //
 // It decides nothing about what to draw. Data arrives as arguments and the redraw is the
 // caller's, so this module reads as one question: what is in the form right now?
@@ -173,17 +173,33 @@ export function renderChips(filters: Filters) {
   next.focus?.();
 }
 
+/**
+ * Opens and closes the rail.
+ *
+ * Above 1100 px there is nothing to open: the rail holds the filters beside the charts at
+ * every scroll position, and `#filtersToggle` is not rendered. Below it the rail is an
+ * overlay over the charts and this is how it comes and goes.
+ *
+ * `data-open`, not `hidden`: `hidden` is one answer for every width, and it would have to be
+ * absent on a desktop and present on a phone at the same moment. The attribute is written in
+ * the markup, read back from it, and CSS decides at which width it means anything — so the
+ * open state has one address and nothing sets it on load.
+ */
 export function setFieldsOpen(open: boolean) {
-  // Closing hides the drawer with `display: none`. If focus were inside, the browser
-  // would drop it onto `<body>` and the next Tab would start from the top of the
-  // document — so we hand it to the button that opens the drawer.
+  // Closing hides the rail with `display: none`. If focus were inside, the browser would
+  // drop it onto `<body>` and the next Tab would start from the top of the document — so we
+  // hand it to the button that opens the rail.
   const fields = getElement("filterFields");
   const active = typeof document !== "undefined" ? document.activeElement : null;
   const focusWasInside = !open && active && fields.contains?.(active);
 
-  fields.hidden = !open;
+  fields.dataset.open = String(open);
   getElement("filtersToggle").setAttribute("aria-expanded", String(open));
   if (focusWasInside) getElement("filtersToggle").focus?.();
+}
+
+export function isFieldsOpen(): boolean {
+  return getElement("filterFields").dataset.open === "true";
 }
 
 
