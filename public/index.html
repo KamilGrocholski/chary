@@ -446,10 +446,17 @@
 
     /* `auto`, never `hidden`: at 375 px there were 193 px of table past the edge, and a
        clipped column cannot be reached by wheel, touch or tab. In the grid the table also
-       gets a ceiling, so a long history does not stretch the row its chart sits in. */
-    .tableBox { overflow: auto; max-height: 300px; }
+       gets a ceiling, so a long history does not stretch the row its chart sits in.
+
+       No padding at the TOP, and this is the whole reason the rule overrides `.card`: this
+       box is the scroll container AND the card, and `position: sticky` pins the heading row
+       to the padding box, not to the content box. With the card's 16 px still there, rows
+       scrolled through that strip and printed ABOVE the heading as well as below it — two
+       bands of rows with the column names floating between them. The cells carry the side
+       padding instead, so the table reaches the card's edges on purpose. */
+    .tableBox { overflow: auto; max-height: 300px; padding: 0 0 var(--space-2); }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+    th, td { padding: 7px 14px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
     th {
       color: var(--muted);
       font-weight: 600;
@@ -457,7 +464,12 @@
          out of it and the columns lose their names. */
       position: sticky;
       top: 0;
+      padding-top: var(--space-3);
       background: var(--panel);
+      /* A sticky cell's own border does not travel with it in every engine — the rows
+         scrolling underneath painted over it. An inset shadow is part of the cell. */
+      border-bottom: none;
+      box-shadow: inset 0 -1px 0 var(--border);
     }
     td.number, th.number { text-align: right; font-variant-numeric: tabular-nums; }
     tbody tr:last-child td { border-bottom: none; }
