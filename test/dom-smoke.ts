@@ -193,7 +193,6 @@ const result: Record<string, unknown> = {
   stats: getText("stats"),
   summary: getText("summary"),
   historyStatus: node("historyStatus").textContent,
-  transferInfo: getText("transferInfo"),
   professionCheckboxes: node("profCheckboxes").querySelectorAll("input").length,
   source: node("sourceInfo").textContent,
   snapshotMeta: node("snapshotMeta").textContent,

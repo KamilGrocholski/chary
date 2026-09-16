@@ -736,14 +736,6 @@ describe("the view comes together — the default filter", () => {
     expect(out.historyStatus).toMatch(/^\d+ migawek$/);
   });
 
-  test("the rail prices one snapshot, and nothing else, while nothing is being fetched", () => {
-    // fobos: 67 184 B gzip a snapshot, from `bytes` in trends.json. The second line would
-    // price a history nobody is buying — at the default filter not one `.f.json` is
-    // fetched, and a figure standing there anyway is the kind of number §9.6 forbids: one
-    // that might be wrong and looks exactly like one that is right.
-    expect(out.transferInfo).toBe("Ta migawka ~66 KB");
-  });
-
   test("every chart gets points placed in time, not in snapshot order", () => {
     for (const [id, expectedSeries] of [["popChart", 1], ["actChart", 1], ["profChart", 6]] as const) {
       expect(out.charts[id].series).toBe(expectedSeries);
@@ -849,13 +841,6 @@ describe("the view comes together — a filter set", () => {
     expect(out.charts.popChart.points).toBeGreaterThan(1);
     expect(out.partialNoteHidden).toBe(true); // the full set arrived in time
     expect(out.historyStatus).toMatch(/^\d+ migawek$/);
-  });
-
-  test("the rail prices the whole history once the filter has started spending it", () => {
-    // aether: 99 146 B gzip a snapshot × 15 dated snapshots = 1,4 MB. The status line
-    // prices what is still coming and reads "15 migawek" once it has all come; this prices
-    // what moving the filter costs at all, which is the figure that does not go away.
-    expect(out.transferInfo).toBe("Ta migawka ~97 KB Cała historia ~1,4 MB");
   });
 
   test("the last history point is the same number as the snapshot view of that snapshot", () => {

@@ -55,7 +55,6 @@ import {
   renderStats,
   renderSummary,
   renderTable,
-  renderTransferInfo,
   showSuspect,
 } from "@/web/panels.ts";
 
@@ -148,7 +147,6 @@ function startView() {
     if (!base) {
       getElement("historyStatus").textContent = "brak historii dla tego świata";
       getElement("summary").textContent = "—";
-      renderTransferInfo(0, 0, false);
       clearHistory();
       return;
     }
@@ -162,11 +160,6 @@ function startView() {
     );
 
     renderHistoryStatus(loaded, dated.length, base.bytes ?? 0, progress);
-    // The status line prices what is still coming; the rail prices the whole set. Two
-    // questions, not two spellings of one: the first answers "how much longer", the second
-    // "what does moving the filter cost at all" — and that one is only worth printing once
-    // the filter has moved, because until then nothing is fetched per snapshot.
-    renderTransferInfo(base.bytes ?? 0, dated.length, progress.expected > 0);
     // The note hangs on how much is genuinely missing — not on whether anything is still in
     // flight. Otherwise a failed fetch made it disappear, leaving an incomplete chart with
     // nothing said about it.

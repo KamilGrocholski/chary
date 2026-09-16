@@ -180,39 +180,6 @@ export function renderTable(trend: WorldTrend) {
 }
 
 /**
- * What this world's data costs the reader, printed where the spending is decided.
- *
- * The transfer has no ceiling any more — the whole history of the priciest world is 2.1 MB
- * gzipped — so the only thing left that keeps it knowingly bought is the price standing
- * beside the filter that spends it.
- *
- * The second reading appears only once a filter has moved: at the default filter the history
- * is drawn from `trends.json` and not one `.f.json` is fetched, so a figure for "the whole
- * history" would price something nobody is buying.
- *
- * Approximate, and says so with a `~`: `bytes` is the gzip size of the world's NEWEST
- * snapshot and the older ones are smaller, because the population shrank.
- *
- * @param bytes gzip size of one snapshot; 0 = not measured
- * @param available every dated snapshot this world has
- * @param spending whether a filtered history is being, or has been, fetched
- */
-export function renderTransferInfo(bytes: number, available: number, spending: boolean) {
-  const node = getElement("transferInfo");
-  // Absent is not zero: a world whose price was never measured gets no figure rather than a
-  // "0 KB" nobody wrote (§9.5).
-  if (bytes <= 0) {
-    node.textContent = "—";
-    return;
-  }
-  const row = (label: string, value: string) =>
-    `<div class="stats-line" style="justify-content:space-between"><span>${label}</span><b>${value}</b></div>`;
-  node.innerHTML =
-    row("Ta migawka", `~${formatBytes(bytes)}`) +
-    (spending ? row("Cała historia", `~${formatBytes(available * bytes)}`) : "");
-}
-
-/**
  * The history counter, which doubles as the fetch progress bar — and, while it is running,
  * as the price of what is being fetched.
  *

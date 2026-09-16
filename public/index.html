@@ -126,18 +126,6 @@
     .rail-head { display: flex; align-items: baseline; justify-content: space-between; }
     .rail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
     .rail-row { display: flex; gap: var(--space-2); }
-    /* Pinned to the bottom of the rail whatever the filter list's height, so the price does
-       not move when a chip appears. */
-    .rail-foot {
-      margin-top: auto;
-      padding-top: var(--space-3);
-      border-top: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-1);
-    }
-    .transfer { font-size: 12px; color: var(--muted); }
-    .transfer b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 
     .card {
       background: var(--panel);
@@ -610,13 +598,6 @@
         </div>
       </div>
 
-      <!-- What the reader is about to spend, where the spending is decided. The transfer
-           has no ceiling any more, so naming the price beside the filter is the whole of
-           what keeps it knowingly bought. -->
-      <div class="rail-foot">
-        <span class="field-title">Pobieranie</span>
-        <div id="transferInfo" class="transfer">—</div>
-      </div>
     </aside>
 
     <div class="view">
