@@ -16,6 +16,7 @@ import {
 } from "@/web/filters.ts";
 import { getActivityBucket, getDaysBetween, formatSnapshotDate, isNeverOnline } from "@/src/shared.ts";
 import { stripComments } from "@/test/source-text.ts";
+import { selectSpacedTicks } from "@/web/charts.ts";
 
 // The reference is a sample of a real snapshot in the old v1 schema
 // (test/fixtures/legacy-snapshot-aether.json — every 12th row of the original, so it
@@ -629,6 +630,52 @@ const runSmoke = (scenario: string) => {
     out: result.exitCode === 0 && result.stdout.length > 0 ? JSON.parse(result.stdout.toString()) : null,
   };
 };
+
+describe("the time axis prints a date only where a date fits", () => {
+  // Real spacing, not a synthetic one: the whole point is that rounds are run by hand at
+  // uneven 2-17 day intervals, so two of them land close enough to collide. aether's last
+  // two snapshots are 1.9 days apart out of a 150-day axis.
+  const aether = JSON.parse(readFileSync(path.join(PUBLIC_DIR, "trends.json"), "utf8")).worlds.aether;
+  const dates: number[] = aether.startedAt.map((isoText: string) => Date.parse(isoText));
+  const LABEL_PX = 44;
+  const measure = (width: number) => {
+    const min = dates[0]!;
+    const span = dates[dates.length - 1]! - min;
+    const getPixel = (value: number) => ((value - min) / span) * width;
+    return { kept: selectSpacedTicks(dates, getPixel, LABEL_PX), getPixel };
+  };
+
+  test("no two printed dates are closer than one date is wide", () => {
+    // 500 px is what the two-column history grid gives a chart at 1440; 260 is a phone.
+    for (const width of [260, 500, 1080]) {
+      const { kept, getPixel } = measure(width);
+      for (let index = 1; index < kept.length; index += 1) {
+        const gap = getPixel(kept[index]!) - getPixel(kept[index - 1]!);
+        expect(`${width}px gap ${Math.round(gap)}`).toBe(`${width}px gap ${Math.round(Math.max(gap, LABEL_PX))}`);
+      }
+    }
+  });
+
+  test("both ends print, because they are what says which period the chart covers", () => {
+    for (const width of [260, 500, 1080]) {
+      const { kept } = measure(width);
+      expect(kept[0]).toBe(dates[0]!);
+      expect(kept[kept.length - 1]).toBe(dates[dates.length - 1]!);
+    }
+  });
+
+  test("where the last two collide, the one that gives way is not the newest", () => {
+    // 1.9 days of 150 is 6 px of a 500 px chart — the pair that used to print as "121.0909".
+    const { kept } = measure(500);
+    expect(kept).toContain(dates[dates.length - 1]!);
+    expect(kept).not.toContain(dates[dates.length - 2]!);
+  });
+
+  test("an axis with one snapshot keeps it", () => {
+    expect(selectSpacedTicks([dates[0]!], () => 0, LABEL_PX)).toEqual([dates[0]!]);
+    expect(selectSpacedTicks([], () => 0, LABEL_PX)).toEqual([]);
+  });
+});
 
 describe("the view comes together — the default filter", () => {
   const { result, out } = runSmoke("default");

@@ -35,6 +35,52 @@ export type ChartInstance = any;
 export type ChartBoard = ReturnType<typeof createChartBoard>;
 
 /**
+ * How wide one printed date is, plus its gutter. "17.04" at 11 px in the chart font measures
+ * about 33 px unrotated; the rest is the gap that keeps two of them from touching.
+ */
+const TICK_LABEL_WIDTH_PX = 44;
+
+/**
+ * Which of the axis's dates get a printed label.
+ *
+ * Every snapshot is a TICK, because the axis belongs to the aggregate and a date missing
+ * from it would read as a date that does not exist. Which of them get a printed LABEL is a
+ * different question: two rounds can be 1.9 days apart — 12.09 and 14.09 — and at that
+ * spacing their labels run into each other at any chart width. Measured before this, on a
+ * 500 px chart: "12.09" and "14.09" came out as "121.0909", which is neither one date nor
+ * two.
+ *
+ * The LAST one always prints, whatever the spacing, and when it would collide the label
+ * before it gives way instead: the ends of the axis are what say which period the chart
+ * covers, and dropping the newest date would end the axis on a date that is not its end.
+ *
+ * Pure, and takes the geometry rather than reading it: at the moment Chart.js calls this the
+ * scale has a width but not yet its pixel origin, so `getPixelForValue` would answer `NaN`.
+ *
+ * @param getPixel where the axis puts a value, in pixels from its left edge
+ * @param minGapPx the width of a printed label plus its gutter
+ */
+export function selectSpacedTicks(values: number[], getPixel: (value: number) => number, minGapPx: number): number[] {
+  if (values.length < 2) return [...values];
+  const last = assertDefined(values[values.length - 1], "a list of two or more has a last value");
+  const kept: number[] = [];
+  let lastPixel = -Infinity;
+  for (const value of values.slice(0, -1)) {
+    const pixel = getPixel(value);
+    if (pixel - lastPixel < minGapPx) continue;
+    kept.push(value);
+    lastPixel = pixel;
+  }
+  while (kept.length > 0) {
+    const previous = kept[kept.length - 1];
+    if (previous === undefined || getPixel(last) - getPixel(previous) >= minGapPx) break;
+    kept.pop();
+  }
+  kept.push(last);
+  return kept;
+}
+
+/**
  * The one board the view draws on. Built once, on startup, because it reads `:root` from the
  * document and sets Chart.js's own defaults from it.
  */
@@ -216,7 +262,18 @@ export function createChartBoard() {
           type: "linear",
           ...(axisRange ?? {}),
           afterBuildTicks: (axis: any) => {
-            axis.ticks = tickValues.map((value) => ({ value }));
+            // The geometry is computed here rather than asked for: `axis.width` is set by
+            // then, the range is ours, and `axis.getPixelForValue` is not usable yet.
+            const range = axisRange;
+            const span = range ? range.max - range.min : 0;
+            const width = typeof axis.width === "number" ? axis.width : 0;
+            // With no width or no range there is nothing to measure a collision against, so
+            // every date prints rather than some being dropped on a guess.
+            const labelled =
+              range && width > 0 && span > 0
+                ? selectSpacedTicks(tickValues, (value) => ((value - range.min) / span) * width, TICK_LABEL_WIDTH_PX)
+                : tickValues;
+            axis.ticks = labelled.map((value) => ({ value }));
           },
           ticks: { callback: (value: number) => formatShortDate(value), maxRotation: 45, autoSkip: false },
           grid: { color: theme.gridSoft },
